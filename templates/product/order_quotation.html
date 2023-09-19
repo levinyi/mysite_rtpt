@@ -1,0 +1,129 @@
+{% extends "user_center/base.html" %}
+{% load static %}
+{% block title %}Order Quotation{% endblock %}
+{% block extra_head %}
+<style>
+    table {
+        border-collapse: collapse;
+    }
+    table td {
+        border: 1px solid black;
+        padding: 10px;
+    }
+    .custom-bordered {
+        border-collapse: collapse;
+    }
+    .custom-bordered td, 
+    .custom-bordered th {
+        border: 5px solid black;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row pt-3 mt-3 form-control">
+        <h4 class="mb-5">Check Quotation</h4>
+        <table class="table custom-bordered table-bordered border-primary" style="text-align:center">
+            <tbody>
+                <tr>
+                    <td colspan="7" style="text-align:left; background-color:#FB85FF;">CUSTOMER INFORMATION</td>
+                </tr>
+                <tr>
+                    <td style="text-bolder">Customer Name</td>
+                    <td colspan="6">{{ shopping_cart.user.username }}</td>
+                </tr>
+                <tr>
+                    <td>Customer Email</td>
+                    <td colspan="6">{{ shopping_cart.user.email }}</td>
+                </tr>
+                <tr>
+                    <td>Customer Phone</td>
+                    <td colspan="6">{{ shopping_cart.user.phone }}</td>
+                </tr>
+                <tr>
+                    <td>Customer Address</td>
+                    <td colspan="6">{{ shopping_cart.user.address }}</td>
+                </tr>
+                <tr>
+                    <td colspan="7" style="text-align:left; background-color:#FB85FF;">PRICING</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>Item</td>
+                    <td>Unit Price(USD)</td>
+                    <td>Qty</td>
+                    <td>Subtotal(USD)</td>
+                    <td>TAT*</td>
+                    <td>Total Price(USD)</td>
+                </tr>
+                <tr>
+                    <td>1</td>
+                    <td>{{ shopping_cart.product.product_name }}</td>
+                    <td>{{ shopping_cart.product.price }}</td>
+                    <td>{{ shopping_cart.antibody_number }}</td>
+                    <td>0</td>
+                    <td rowspan="5" style="vertical-align:middle;">{{ shopping_cart.product.turnaround_time }}</td>
+                    <td rowspan="5" style="vertical-align:middle;">{{ shopping_cart.total_price }}</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Sequence verification</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Plasmid construction</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Ab expression and purification</td>
+                    <td>0</td>
+                    <td>1</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td>Shipping and handing cost</td>
+                    <td>200</td>
+                    <td>1</td>
+                    <td>200</td>
+                </tr>
+                <tr>
+                    <td colspan="7" style="text-align:left; background-color:#FB85FF;">NOTE</td>
+                </tr>
+                <tr>
+                    <td colspan="7" style="text-align:left;">*The turn-around time(TAT) does not include shipping and handing time and reconstruction time of the customer's vector.</td>
+                </tr>
+                <tr>
+                    <td colspan="7" style="text-align:left;">
+                        <p> RootPath Genomics, Inc.</p>
+                        <p> 65 Grove Street, STE 202, Watertown, Massachusetts, USA 02472</p>
+                        <p> James Zhang</p>
+                        <p> Tel: 617-600-8415</p>
+                        <p> Email: james.zhang@rootpathgx.com</p>
+                    </td>
+            </tbody>
+        </table>
+            
+        <a href="{% url 'user_center:download_pdf' shopping_cart.id %}"><button type="button" class="btn btn-primary">Download Quotation as PDF</button></a>
+    </div>
+    <div class="row pt-3 mt-3 form-control">
+        <div class="col-12">
+            <h4 class="mb-3">Continue with Sequence Submission
+            <h5>download the <a href="#">template file</a> and complete it for sequence submission.</h4>
+            <div>
+                <label for="formFileLg" class="form-label">and then upload your filled-out file here.</label>
+                <input class="form-control form-control-lg" id="formFileLg" type="file">
+            </div>
+            <div class="mt-3">
+                <button type="button" class="btn btn-primary">Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

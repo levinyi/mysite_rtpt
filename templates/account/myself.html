@@ -1,0 +1,91 @@
+{% extends "user_center/base.html" %}
+{% block title %}my information{% endblock %}
+
+{% block content %}
+<div class="card-header bg-transparent border-bottom">
+    <h3 class="card-header-title mb-0">Edit Profile</h3>
+    <h5 class="card-header-title mb-0">Register at {{ user.register_time }}.</h5>
+</div>
+<div class="card-body">
+    <!-- Form -->
+    <form class="row g-4">
+
+        <!-- Profile picture -->
+        <div class="col-12 justify-content-center align-items-center">
+            <label class="form-label">Profile picture</label>
+            <div class="d-flex align-items-center">
+                <label class="position-relative me-4" for="uploadfile-1" title="Replace this pic">
+                    <!-- Avatar place holder -->
+                    <span class="avatar avatar-xl">
+                        <img id="uploadfile-1-preview" class="avatar-img rounded-circle border border-white border-3 shadow" src="assets/images/avatar/07.jpg" alt="">
+                    </span>
+                    <!-- Remove btn -->
+                    <button type="button" class="uploadremove"><i class="bi bi-x text-white"></i></button>
+                </label>
+                <!-- Upload button -->
+                <label class="btn btn-primary-soft mb-0" for="uploadfile-1">Change</label>
+                <input id="uploadfile-1" class="form-control d-none" type="file">
+            </div>
+        </div>
+
+        <!-- Full name -->
+        <div class="col-12">
+            <label class="form-label">Full name</label>
+            <div class="input-group">
+                <input type="text" class="form-control" value="{{ user.first_name }}" placeholder="First name">
+                <input type="text" class="form-control" value="{{ user.last_name }}" placeholder="Last name">
+            </div>
+        </div>
+
+        <!-- Username -->
+        <div class="col-md-6">
+            <label class="form-label">Username</label>
+            <div class="input-group">
+                <span class="input-group-text">RootPath.com</span>
+                <input type="text" class="form-control" value="{{ user.username }}">
+            </div>
+        </div>
+
+        <!-- Email id -->
+        <div class="col-md-6">
+            <label class="form-label">Email id</label>
+            <input class="form-control" type="email" value="{{ user.email }}" placeholder="Email">
+        </div>
+
+        <!-- Phone number -->
+        <div class="col-md-6">
+            <label class="form-label">Phone number</label>
+            <input type="text" class="form-control" value="{{ user.phone }}" placeholder="Phone number">
+        </div>
+
+        <!-- level -->
+        <div class="col-md-6">
+            <label class="form-label">Level</label>
+            <input class="form-control" type="text" value="{{ user.level }}">
+        </div>
+
+        <!-- Company -->
+        <div class="col-md-6">
+            <label class="form-label">Company</label>
+            <input class="form-control" type="text" value="{{ user.company }}">
+        </div>
+        
+        <!-- department -->
+        <div class="col-md-6">
+            <label class="form-label">Department</label>
+            <input class="form-control" type="text" value="{{ user.department }}">
+        </div>
+
+        <!-- Shipping address -->
+        <div class="col-12">
+            <label class="form-label">Shipping Address</label>
+            <input class="form-control mb-2" type="text" value="{{ user.shipping_address }}">
+        </div>
+
+        <!-- Save button -->
+        <div class="d-sm-flex justify-content-end">
+            <button type="button" class="btn btn-primary mb-0">Save changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

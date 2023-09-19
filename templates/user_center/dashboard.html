@@ -1,0 +1,102 @@
+{% extends "user_center/base.html" %}
+{% load static %}
+{% block title %}User Center{% endblock %}
+{% block content %}
+<div> 
+    <div class="row mt-5 pt-4">
+        <h4>Welcome to your RootPath User Center! </h4>
+        <br>
+        <h4>We help you elevate the throughput of protein functional interrogation.  </h5>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-4">
+            <div class="card" style="width:18rem;">
+                <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
+                    <!-- Badge Code Starts Here -->
+                    <span class="position-absolute" 
+                          style="bottom: 35%; right: calc(50% - 55px); 
+                                 transform: translateY(50%); z-index: 1; 
+                                 background-color: rgba(196,153,236, 0.9);
+                                 color: white; 
+                                 border-radius: 50%; 
+                                 padding: 10px; 
+                                 width: 30px; height: 30px; 
+                                 display: flex; 
+                                 justify-content: center; 
+                                 font-size: larger;
+                                 align-items: center;">
+                        {{ order_number_in_production }}
+                    </span>
+                    <!-- Badge Code Ends Here -->
+                    <img class="card-img-top mx-auto d-block" src="{% static 'user_center/img/production.png' %}" alt="Card image cap" style="width:100px">
+                </div>
+                <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
+                    <h5> <strong>{{ order_number_in_production }} </strong> order(s) in Production</h5>
+                    <br><br>
+                    <a href="{% url 'product:create_order' %}" class="btn btn-primary">Start New Order</a>
+                </div>
+            </div>
+        </div>        
+        <div class="col-md-4" >
+            <div class="card" style="width:18rem;">
+                <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
+                    <!-- Badge Code Starts Here -->
+                    <span class="position-absolute" 
+                          style="bottom: 35%; right: calc(50% - 55px); 
+                                 transform: translateY(50%); z-index: 1; 
+                                 background-color: rgba(196,153,236, 0.9);
+                                 color: white; 
+                                 border-radius: 50%; 
+                                 padding: 10px; 
+                                 width: 30px; height: 30px; 
+                                 display: flex; 
+                                 justify-content: center; 
+                                 font-size: larger;
+                                 align-items: center;">
+                        {{ order_number_in_shipment }}
+                    </span>
+                    <!-- Badge Code Ends Here -->
+                    <img class="card-img-top mx-auto d-block" src="{% static 'user_center/img/shipment.png' %}" alt="Card image cap" style="width:105px">
+                </div>
+                <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
+                    <h5><strong>{{ order_number_in_shipment }}</strong> order(s) in Shipment </h5>
+                    <br><br>
+                    <a href="{% url 'user_center:shopping_cart' %}" class="btn btn-primary">View Order History</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card" style="width:18rem;">
+                <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
+                    <!-- Badge Code Starts Here -->
+                    <span class="position-absolute" 
+                          style="bottom: 35%; right: calc(50% - 55px); 
+                                 transform: translateY(50%); z-index: 1; 
+                                 background-color: rgba(196,153,236, 0.9);
+                                 color: white; 
+                                 border-radius: 50%; 
+                                 padding: 10px; 
+                                 width: 30px; height: 30px; 
+                                 display: flex; 
+                                 justify-content: center; 
+                                 font-size: larger;
+                                 align-items: center;">
+                        {{ order_number_in_cart }}
+                    </span>
+                    <!-- Badge Code Ends Here -->
+                    <img class="card-img-top mx-auto d-block" src="{% static 'user_center/img/shopping_cart.png' %}" alt="Card image cap" style="width:100px;">
+                </div>
+                <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
+                    <h5><strong>{{ order_number_in_cart }}</strong> order(s) in Shopping Cart</h5>
+                    <br><br>
+                    <a href="{% url 'user_center:shopping_cart' %}" class="btn btn-primary">Shopping Cart</a>
+                </div>
+            </div>
+        </div>
+        
+        
+        
+    </div>
+</div> 
+{% endblock %}

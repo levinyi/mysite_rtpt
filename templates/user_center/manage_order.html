@@ -1,0 +1,66 @@
+{% extends "user_center/base.html" %}
+{% load static %}
+{% block title %}Shopping Cart{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row pt-3 mt-3 form-control">
+        <div class="col-12">
+            <h4 class="mb-3">Checked Order Information</h4>
+            <table class="table table-striped table-hover table-bordered" style="text-align:center">
+                <thead>
+                    <tr>
+                        <th scope="col">Project Name</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Create time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in order_list %}
+                    <tr>
+                        <td>{{ order.shopping_cart.project_name }}</td>
+                        <td>{{ order.status }}</td>
+                        <td>{{ order.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block javascript %}
+<script type="text/javascript">
+    function del_cart(the, shopping_id){
+        var article_name = $(the).parents("tr").children("td").eq(1).text();
+        layer.open({
+            type: 1,
+            skin: "layui-layer-rim",
+            area: ["400px", "200px"],
+            title: "Delete shopping cart record",
+            content: '<div class="text-center" style="margin-top:20px"><p>是否确定删除《'+ shopping_id +'》</p></div>',
+            btn:['Yes', 'No'],
+            yes: function(){
+                $.ajax({
+                    url: '{% url "user_center:shopping_cart_remove" %}',
+                    type:"POST",
+                    data: {
+                        "shopping_id": shopping_id,
+                        "csrfmiddlewaretoken": '{{ csrf_token }}'
+                    },
+                    success: function(e) {
+                        if (e == "1") {
+                            parent.location.reload();
+                            layer.msg("has been deleted.");
+                        } else {
+                            layer.msg("删除失败");
+                        }
+                    },
+                    error: function(e) {
+                        layer.msg("请求失败");
+                    }
+                })
+            },
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block title %}Create New Order{% endblock %}
+{% block extra_head %}
+<style>
+    /* 进度条的颜色样式 */
+    input[type="range"]::-webkit-slider-runnable-track {
+        background: linear-gradient(90deg, blue var(--percent), #ddd var(--percent));
+    }
+
+    input[type="range"]::-moz-range-track {
+        background: linear-gradient(90deg, blue var(--percent), #ddd var(--percent));
+    }
+
+    /* 滑动圆点上方的数值显示 */
+    input[type="range"]:hover::before,
+    input[type="range"]:active::before,
+    input[type="range"]:focus::before {
+        content: attr(data-value) ' Abs';
+        position: absolute;
+        top: -2em;
+        left: var(--percent);
+        transform: translateX(-50%);
+        display: block;
+        white-space: nowrap;
+        background-color: #f5f5f5;
+        border: 1px solid #ccc;
+        border-radius: 0.25rem;
+        padding: 0.1em 0.5em;
+        font-size: 0.75em;
+        z-index: 2;
+    }
+</style>
+
+{% endblock %}
+{% block content %}
+<div class="container"> 
+    <div class="row mt-5">
+        <div class="col">
+            <h1>Customize your {{shopping_cart.product.product_name }} product Now. </h1>
+            <p>start at: {{ shopping_cart.adding_time }}</p>
+            <p>status: {{ shopping_cart.status }}</p>
+        </div>
+    </div>
+</div>
+<div class="container mt-5">
+    <div class="row mt-5">
+        <!-- Left Side -->
+        <div class="col-4 position-sticky top-0" style="max-height: 100vh; overflow-y: auto;">
+            <div class="row">
+                <h3>Product Information</h3>
+                <h5>Product Name: {{ shopping_cart.product.product_name }}</h5>
+                <h5>Product type: {{ shopping_cart.product.product_type }}</h5>
+                <h5 id="unit-price">Price: ${{ shopping_cart.product.price}} / chain</h5>
+                <h5>TAT: {{ shopping_cart.product.turnaround_time }}</h5>
+                <h5></h5>
+            </div>
+        </div>
+
+        <!-- Right Side -->
+        <div class="col-8">
+            <div class="row">
+                <h3>Purification Method</h3>
+                <h5>Choose a purification method.</h5>
+                <div class="col-4 mt-2">
+                    <div class="card selectable-card" id="protein1">
+                        <div class="card-body">
+                            <h5 class="card-title">Protein A</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4 mt-2">
+                    <div class="card selectable-card" id="protein2">
+                        <div class="card-body">
+                            <h5 class="card-title">Protein G</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-5">
+                <h3>Expression Host</h3>
+                <h5>Choose expression host.</h5>
+                <div class="col-4 mt-2">
+                    <div class="card selectable-card" id="host1">
+                        <div class="card-body">
+                            <h5 class="card-title">293F</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4 mt-2">
+                    <div class="card selectable-card" id="host2">
+                        <div class="card-body">
+                            <h5 class="card-title">CHO</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-5">
+                <h3>Scale </h3>
+                <h5>Choose scale.</h5>
+                <div class="col-4 mt-2">
+                    <div class="card selectable-card" id="scale1">
+                        <div class="card-body">
+                            <h5 class="card-title">30ml</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4 mt-2">
+                    <div class="card selectable-card" id="scale2">
+                        <div class="card-body">
+                            <h5 class="card-title">3ml</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-5 mb-5">
+                <h3>Antibody Number</h3>
+                <h5>How many antibodies do you want to produce?</h5>
+                {% comment %} <div class="col-8 mt-2">
+                    <div class="card selectable-card">
+                        <div class="card-body">
+                            <label for="customRange2" class="form-label">Antibody number</label>
+                            <input type="range" class="form-range" min="50" max="500" id="customRange2">
+                            <h5 class="card-title">you select: <span id="selectedValue">50</span></h5>
+                        </div>
+                    </div>
+                </div> {% endcomment %}
+            </div>
+            <div class="row mt-5 mb-5">
+                <div class="row mt-4">
+                    <div class="col-8">
+                        <input type="range" class="form-range" min="1" max="400" value="50" step="1">
+                        <div class="d-flex justify-content-between">
+                            <span>1 Abs</span>
+                            <span>200 Abs</span>
+                            <span>400 Abs</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="input-group mb-3">
+                        <input type="number" class="form-control" placeholder="" min="1" max="200" step="1" value="178">
+                        <span class="input-group-text">Abs</span>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-5 mb-5">
+                <h3>Any Analysis?</h3>
+                <h5>If you choose Additional analysis service here, The price will recalculated.</h5>
+                <div class="col-2 mt-2">
+                    <div class="card selectable-card no-analysis-card" id="analysis0">
+                        <div class="card-body">
+                            <h5 class="card-title">No</h5>
+                            <p class="card-text text-muted">0 weeks</p>
+                            <p class="card-text text-muted">Price: $0 </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-3 mt-2">
+                    <div class="card selectable-card analysis-card" data-new-unit-price="120" id="analysis1">
+                        <div class="card-body">
+                            <h5 class="card-title">SEC-HPLC</h5>
+                            <p class="card-text text-muted">+0.5 weeks</p>
+                            <p class="card-text text-muted">Price: $120 / Ab</p>
+                        </div>
+                    </div>
+                </div>    
+                <div class="col-3 mt-2">
+                    <div class="card selectable-card analysis-card" data-new-unit-price="120" id="analysis2">
+                        <div class="card-body">
+                            <h5 class="card-title">Endotoxin</h5>
+                            <p class="card-text text-muted">+0.5 weeks</p>
+                            <p class="card-text text-muted">Price: $120 / Ab</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container fixed-bottom" style="background-color: #F9F9F9;">
+    <div class="row mt-5">
+        <!-- Delivery Column -->
+        <div class="col-lg-6">
+            <div class="row">
+                <div class="col-7">
+                    <h4>Delivery:</h4>
+                    <p id="delivery-fee"> Total $100 </p>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Purchase Column -->
+        <div class="col-lg-3 d-flex justify-content-end">
+            <div>
+                <h4 id="total-price">$0</h4>
+            </div>
+        </div>
+        <!-- Purchase Column -->
+        <div class="col-lg-3 d-flex justify-content-center">
+            <form>
+                <button id="GenerateQuote" type="button" class="btn btn-primary">Generate Quote</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="modal fade" id="loginModal" tabindex="-1" role="dialog" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">登录</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="username">用户名</label>
+                            <input type="text" class="form-control" id="username" placeholder="输入用户名">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">密码</label>
+                            <input type="password" class="form-control" id="password" placeholder="输入密码">
+                        </div>
+                        <button type="submit" class="btn btn-primary">登录</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
+{% endblock %}
+
+{% block javascript %}
+
+<script>
+    const rangeInput = document.getElementById('customRange2');
+    const selectedValueSpan = document.getElementById('selectedValue');
+
+    // 监听input事件
+    rangeInput.addEventListener('input', function() {
+        selectedValueSpan.innerText = rangeInput.value;
+    });
+</script>
+<script>
+    $(document).ready(function() {
+      // 监听所有 'selectable-card' 的点击事件
+      $(".selectable-card").click(function() {
+        // 找到这个卡片所在行的其他所有 'selectable-card'
+        const row = $(this).closest('.row');
+        const otherCards = row.find('.selectable-card');
+        
+        // 移除所有其他卡片的 'border-primary' 类
+        otherCards.removeClass("border-primary");
+        
+        // 给被点击的卡片添加 'border-primary' 类
+        $(this).addClass("border-primary");
+      });
+    });
+</script>
+<script>
+    $(document).ready(function() {
+        // 初始化价格
+        var initialUnitPrice = parseFloat($("#unit-price").text().split("$")[1]); // 获取并存储初始单价
+        var unitPrice = initialUnitPrice; // 当前单价，开始时与初始单价相同
+        var unitPrice = parseFloat($("#unit-price").text().split("$")[1]); // 从文本中提取单价
+        var deliveryFee = parseFloat($("#delivery-fee").text().split("$")[1]); // 从文本中提取Delivery费用
+        var selectedValue = parseInt($("#selectedValue").text()); // 获取初始化的选中数量
+        var totalPrice = parseFloat($("#total-price").text().split("$")[1]); // 获取初始化的总价
+    
+        // 更新总价
+        function updateTotalPrice() {
+            var totalPrice = (unitPrice * selectedValue) + deliveryFee;
+            $("#total-price").text("$" + totalPrice.toFixed(2)); // 保留两位小数
+        }
+    
+        // 初始化总价
+        updateTotalPrice();
+    
+        // 监听选中数量的更改
+        $("#customRange2").on("input", function() {
+            selectedValue = parseInt($(this).val()); // 更新选中数量
+            $("#selectedValue").text(selectedValue); // 显示选中数量
+            updateTotalPrice(); // 更新总价
+        });
+    
+        // 如果还有其他因素影响总价，您也可以在这里添加更多的事件监听器
+        $(".analysis-card").click(function() {
+            unitPrice = parseFloat($(this).data("new-unit-price")); // 获取新单价
+            updateTotalPrice(); // 更新总价
+        });
+
+        // 监听 "No" 卡片的点击事件
+        $(".no-analysis-card").click(function() {
+            unitPrice = initialUnitPrice; // 将单价重新设置为初始单价
+            updateTotalPrice(); // 更新总价
+        });
+    });
+</script>
+<script>
+    $(document).ready(function() {
+        // 初始化一个变量用于存储用户的选择
+        let selectedInfo = {
+            "purification_method": null,
+            "expression_host": null,
+            "scale": null,
+            "antibody_number": null,
+            "analysis": null,
+        };
+        
+        // 监听Purification 的id的点击事件
+        $("#protein1, #protein2").click(function(event) {
+            selectedInfo['purification_method'] = $(this).attr("id");
+        });
+        
+        // 监听HOST 的id的点击事件
+        $("#host1, #host2").click(function(event) {
+            selectedInfo['expression_host'] = $(this).attr("id");
+        });
+
+        // 监听Scale 的id的点击事件
+        $("#scale1, #scale2").click(function(event) {
+            selectedInfo['scale'] = $(this).attr("id");
+        });
+
+        // 监听Antibody Number 的id的点击事件
+        $("#customRange2").on('input', function(event) {
+            selectedInfo['antibody_number'] = parseInt($(this).val());
+            $("#selectedValue").text($(this).val());
+        });
+
+        // 监听Analysis 的id的点击事件
+        $("#analysis0, #analysis1, #analysis2").click(function(event) {
+            selectedInfo['analysis'] = $(this).attr("id");
+        });
+
+        // 获取cookie
+        function getCookie(name) {
+            var cookieArr = document.cookie.split(";");
+            for(var i = 0; i < cookieArr.length; i++) {
+                var cookiePair = cookieArr[i].split("=");
+                if(name == cookiePair[0].trim()) {
+                    return decodeURIComponent(cookiePair[1]);
+                }
+            }
+            return null;
+        }
+        // 当用户点击GenerateQuote按钮时，将数据传送到后端
+        $("#GenerateQuote").click(function(event) {
+            // 获取CSRF token
+            const csrfToken = $('[name="csrfmiddlewaretoken"]').val();  // 获取 CSRF Token
+            console.log(csrfToken);
+            // 当用户点击GenerateQuote按钮时，获取当前显示的价格
+            var total_price = $("#total-price").text().split("$")[1];
+
+            // 使用AJAX将数据传送到后端
+            $.ajax({
+                url: "/product/order_selection/"+ {{ shopping_cart.id }}+"/",
+                type: "POST",
+                headers: {
+                    'X-CSRFToken': csrfToken
+                },
+                data: { 
+                    purification_method: selectedInfo['purification_method'],
+                    expression_host: selectedInfo['expression_host'],
+                    scale: selectedInfo['scale'],
+                    antibody_number: selectedInfo['antibody_number'],
+                    analysis: selectedInfo['analysis'],
+                    total_price: total_price,
+                },
+                success: function(data) {
+                    // alert("已加入购物车，点击确定，查看购物车。");
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    }
+                },
+                error: function(response) {
+                    let data;
+                    try {
+                        data = JSON.parse(response.responseText);
+                    } catch (e) {
+                        alert("服务器错误");
+                        return;
+                    }
+                    if (response.status === 401 && data.message === 'Please login.') {
+                        // 如果用户未登录，显示登录模态框
+                        $("#loginModal").modal('show');
+        
+                        // 当登录表单被提交时
+                        $("#loginForm").submit(function(e) {
+                            e.preventDefault();
+                            var username = $("#username").val();
+                            var password = $("#password").val();
+        
+                            // 这里用AJAX提交登录请求
+                            $.ajax({
+                                url: "/account/login/",
+                                type: "POST",
+                                data: { username: username, password: password ,"csrfmiddlewaretoken": '{{ csrf_token }}'}, 
+                            }).done(function(data) {
+                                // 更新 CSRF token
+                                var newCsrfToken = data.csrfmiddlewaretoken || getCookie('csrftoken');  // 假设 getCookie 是获取 cookie 的函数
+                                $('[name="csrfmiddlewaretoken"]').val(newCsrfToken);  // 更新表单中的 CSRF token
+
+                                $("#loginModal").modal('hide');  // 关闭模态框
+                                $("#GenerateQuote").click();  // 再次提交原来的表单
+                            }).fail(function(response) {
+                                // 登录失败，你可以在这里添加更多的处理逻辑
+                                alert("登录失败，请重试。");
+                            });
+                            
+                        });
+                    } else {
+                        alert("其他错误：" + data.message);  // 更通用的错误处理方法
+                    }
+                }
+            });
+        });
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const rangeInput = document.querySelector('#customRange');
+        const numberInput = document.querySelector('.form-control');
+
+        function updateRangeStyles() {
+            const max = parseFloat(rangeInput.max);
+            const val = parseFloat(rangeInput.value);
+            const percent = (val / max) * 100;
+            rangeInput.style.setProperty('--percent', `${percent}%`);
+            rangeInput.setAttribute('data-value', val);
+        }
+
+        rangeInput.addEventListener('input', function() {
+            updateRangeStyles();
+            numberInput.value = rangeInput.value;
+        });
+
+        numberInput.addEventListener('input', function(e) {
+            rangeInput.value = e.target.value;
+            updateRangeStyles();
+        });
+
+        // 初始化进度条的颜色
+        updateRangeStyles();
+    });
+</script>
+
+
+{% endblock %}
+

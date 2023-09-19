@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="row text-center">
+    {% if form.errors %}
+    <p>Your username and password didn't match. Please try again</p>
+    {% endif %}
+
+    <div class="w-100 mx-auto mt-5 pt-1 pt-md-4 pb-4" style="max-width: 526px;">
+        <form class="needs-validation mb-2" method="post" role="form">
+            {% csrf_token %}
+            <div class="position-relative mb-4">
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                {{ form.username }}
+            </div>
+            <div class="mb-4">
+                <div class="password-toggle form-label fs-base">
+                    <label for="{{ form.password.id_for_label }}">Password</label>
+                    {{ form.password }}
+                </div>
+            </div>
+            <p class="text-center text-xl-start pb-3 mb-3">
+                Don’t have an account yet? <a href="{% url 'account:user_register' %}" style="text-decoration: none;">Register here.</a>
+            </p>
+            <button type="submit" class="btn btn-primary shadow-primary w-100">Sign in</button>
+        </form>
+        <a href="{% url 'account:password_reset' %}" class="btn btn-link btn-lg w-100" style="text-decoration: none;">Forgot your password?</a>
+        <hr class="my-4">
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %} register user {% endblock %}
+{% block content %}
+<div class="row text-center">
+    <h1> Register</h1>
+    <p>If you are a user, <strong><a href="{% url 'account:user_login' %}">login</a></strong>please.</p>
+    <p> or register.</p>
+    <form class="" action="." method="post">{% csrf_token %}
+        <div >
+            <label for="{{ form.username.id_for_label }}" class="">Username</label>
+            <div class="">{{ form.username }}</div>
+        </div>
+        
+        <div>
+            <label for="{{ form.email.id_for_label }}" class=""> Email</label>
+            <div class="">{{ form.email }}</div> 
+        </div>
+        
+        <div >
+            <label for="{{ form.password.id_for_label }}" class="">Password</label>
+            <div class="">{{ form.password }}</div>
+        </div>
+        <div >
+            <label for="{{ form.password.id_for_label }}" class=""> Confirm Password</label>
+            <div class="">{{ form.password2 }}</div> 
+        </div>        
+        <input type="submit" class="btn btn-primary" value="REGISTER">
+    </form>
+</div>
+{% endblock %}

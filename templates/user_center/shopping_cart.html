@@ -1,0 +1,107 @@
+{% extends "user_center/base.html" %}
+{% load static %}
+{% block title %}Shopping Cart{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row pt-3 mt-3 form-control">
+        <h4 class="mb-3">Shopping Cart</h4>
+        <table class="table table-striped table-hover table-bordered" style="text-align:center">
+            <thead>
+                <tr>
+                    <th scope="col">Order ID</th>
+                    <th scope="col">Product Type</th>
+                    <th scope="col">Adding time</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Expression Host</th>
+                    <th scope="col">Purification Method</th>
+                    <th scope="col">Turnaround Time</th>
+                    <th scope="col">Qty</th>
+                    <th scope="col">Total Price</th>
+                    <th scope="col">Submit / Continue</th>
+                    <th scope="col">Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for shopping in shopping_cart %}
+                <tr>
+                    <td>{{ shopping.id }}</td>
+                    <td>{{ shopping.product.product_name }}</td>
+                    <td>{{ shopping.adding_time }}</td>
+                    <td>{{ shopping.status }}</td>
+                    <td>{{ shopping.express_host }}</td>
+                    <td>{{ shopping.purification_method }}</td>
+                    <td>{{ shopping.product.turnaround_time }}</td>
+                    <td>{{ shopping.antibody_number }}</td>
+                    <td>{{ shopping.total_price }}</td>
+                    {% if shopping.status == "COMPLETED" %}
+                    <td>
+                        <i class="bi bi-clipboard-check"></i>
+                    </td>
+                    {% elif shopping.status == "INCOMPLETE" and shopping.express_host == 'None'%}
+                    <td>
+                        <a href="{% url 'user_center:order_selection' shopping.id %}">
+                            <button type="button" class="btn btn-warning">Continue</button>
+                        </a>
+                    </td>
+                    {% elif shopping.status == "INCOMPLETE" and shopping.sequence_file == 'None' %}
+                    <td>
+                        <a href="{% url 'product:order_quotation' shopping.id %}">
+                            <button type="button" class="btn btn-warning">Continue</button>
+                        </a>
+                    </td>
+                    {% elif shopping.status == "READYTOSUBMIT" %}
+                    <td>
+                        <a href="{% url 'user_center:submit_order' shopping.id %}">
+                            <button type="button" class="btn btn-success">Submit</button>
+                        </a>
+                    </td>
+                    {% endif %}
+                    <td>
+                        <a href="javascript:void(0)" onclick="del_cart(this, {{ shopping.id }})">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p>*The turn-around time(TAT) does not include shipping and handing time and reconstruction time of the customer's vector.</p>
+    </div>
+</div>
+{% endblock %}
+{% block javascript %}
+<script type="text/javascript">
+    function del_cart(the, shopping_id){
+        var article_name = $(the).parents("tr").children("td").eq(1).text();
+        layer.open({
+            type: 1,
+            skin: "layui-layer-rim",
+            area: ["400px", "200px"],
+            title: "Delete shopping cart record",
+            content: '<div class="text-center" style="margin-top:20px"><p>是否确定删除《'+ shopping_id +'》</p></div>',
+            btn:['Yes', 'No'],
+            yes: function(){
+                $.ajax({
+                    url: '{% url "user_center:shopping_cart_remove" %}',
+                    type:"POST",
+                    data: {
+                        "shopping_id": shopping_id,
+                        "csrfmiddlewaretoken": '{{ csrf_token }}'
+                    },
+                    success: function(e) {
+                        if (e == "1") {
+                            parent.location.reload();
+                            layer.msg("has been deleted.");
+                        } else {
+                            layer.msg("删除失败");
+                        }
+                    },
+                    error: function(e) {
+                        layer.msg("请求失败");
+                    }
+                })
+            },
+        });
+    }
+</script>
+{% endblock %}

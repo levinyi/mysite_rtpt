@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Create New Order{% endblock %}
+{% block content %}
+<div class="container"> 
+    <div class="row mt-5 pt-4">
+        <h4>Start New order </h4>
+    </div>
+
+    <div class="row mt-5">
+        <form id="your-form" method="post" action="{% url 'product:create_order' %}">
+            {% csrf_token %} 
+            <label for="project_name">Project name:</label>
+            <input type="text" id="project_name" name="project_name" required><br><br>
+            <div class="row">
+                <div class="col-3">
+                    <button id="btn1" class="btn btn-primary btn-lg w-100 mb-3 selectable-button">Plasmid</button>
+                    <button id="btn2" class="btn btn-secondary btn-lg w-100 mb-3 selectable-button">Antibody</button>
+                    <button id="btn3" class="btn btn-secondary btn-lg w-100 mb-3 selectable-button">Analysis</button>
+                </div>
+                <!-- Information Column -->
+                <div class="col-1">
+                    </div>
+                <div class="col-4">
+                    <div id="info1" class="card mb-3 selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">Fast Plasmid</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 1 weeks </h5>
+                            <h5 class="card-title">Price $59 / chain </h5>
+                        </div>
+                    </div>
+                    <div id="info3" class="card mb-3 d-none selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">Fast Antibody</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 2 weeks</h5>
+                            <h5 class="card-title">Price: $250 / Ab</h5>
+                        </div>
+                    </div>
+                    <div id="info5" class="card mb-3 d-none selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">SEC-HPLC</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 0.5 weeks</h5>
+                            <h5 class="card-title">Price: $120 / Ab</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-3 mx-auto">
+                    <div id="info2" class="card mb-3 selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">HT Plasmid</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 3 weeks</h5>
+                            <h5 class="card-title">Price: $19 / chain</h5>
+                        </div>
+                    </div>
+                    <div id="info4" class="card mb-3 d-none selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">HT Antibody</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 5 weeks</h5>
+                            <h5 class="card-title">Price: $90 / Ab</h5>
+                        </div>
+                    </div>
+                    <div id="info6" class="card mb-3 d-none selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">Endotoxin</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 0.5 weeks</h5>
+                            <h5 class="card-title">Price: $120 / Ab</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% comment %} for Expression host {% endcomment %}
+            <h5>Expression Host:</h5>
+            <select class="form-select" name="expression_host" aria-label="Default select example" required>
+                <option selected>Expression host:</option>
+                <option value="293F">293F</option>
+                <option value="CHO">CHO</option>
+                </select>
+            <br><br>
+            {% comment %} for Purification Method {% endcomment %}
+            <h5>Purification Method :</h5>
+            <select class="form-select" name="purification_method" aria-label="Default select example" required>
+                <option selected>purification Method:</option>
+                <option value="ProteinA">Protein A</option>
+                <option value="ProteinB">Protein G</option>
+            </select>
+            <br><br>
+            {% comment %} for number of antibodies {% endcomment %}
+            <label for="input5">number of antibodies:</label>aa
+            <input type="text" id="ab_number" name="antibody_number" required><br><br>
+            
+            <!-- 添加隐藏的输入字段来存储选定的按钮 -->
+            <input type="hidden" id="selected_button" name="selected_button" value="">
+            <input type="hidden" id="selected_card" name="selected_card" value="">
+            <input type="submit" value="Generate Quote" >
+        </form>
+    </div>
+    <div class="modal fade" id="loginModal" tabindex="-1" role="dialog" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">登录</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="username">用户名</label>
+                            <input type="text" class="form-control" id="username" placeholder="输入用户名">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">密码</label>
+                            <input type="password" class="form-control" id="password" placeholder="输入密码">
+                        </div>
+                        <button type="submit" class="btn btn-primary">登录</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
+{% endblock %}
+
+{% block javascript %}
+<script type="text/javascript">
+    $(document).ready(function() {
+        // 默认情况：展示info1和info2的卡片，button1是高亮的。
+        $("#btn1").addClass("btn-primary");
+        $("#info1, #info2").removeClass("d-none");
+
+        // Helper function to reset all buttons and information cards
+        function resetAll() {
+            $("#btn1, #btn2, #btn3").removeClass("btn-primary").addClass("btn-secondary");
+            $("#info1, #info2, #info3, #info4, #info5, #info6").addClass("d-none");
+        }
+
+        function getCookie(name) {
+            var cookieArr = document.cookie.split(";");
+            
+            for(var i = 0; i < cookieArr.length; i++) {
+                var cookiePair = cookieArr[i].split("=");
+                
+                if(name == cookiePair[0].trim()) {
+                    return decodeURIComponent(cookiePair[1]);
+                }
+            }
+            
+            return null;
+        }        
+
+        // 切换按钮时，切换卡片
+        $("#btn1, #btn2, #btn3").click(function(event) {
+            event.preventDefault();  // 阻止默认行为
+            resetAll();
+            $(this).removeClass("btn-secondary").addClass("btn-primary");
+            var infoToShow;
+            if (this.id === "btn1") {
+                infoToShow = ["#info1", "#info2"];
+            } else if (this.id === "btn2") {
+                infoToShow = ["#info3", "#info4"];
+            } else if (this.id === "btn3") {
+                infoToShow = ["#info5", "#info6"];
+            }
+            $(infoToShow.join(", ")).removeClass("d-none");
+        });
+
+        let selectedCard = null; // 用于存储选定的卡片的ID
+        let selectedButton = null; // 用于存储选定的按钮的ID
+    
+        // 初始化：可以设置默认选定的卡片
+        selectedCard = 'info1';
+        selectedButton = 'btn1';
+        $("#" + selectedCard).addClass('border-primary');
+        $("#" + selectedButton).addClass('btn-primary');
+    
+        // 更新隐藏的输入字段的默认值
+        $('#selected_button').val(selectedButton);
+        $('#selected_card').val(selectedCard);
+    
+        $(".selectable-button").click(function() {
+            if(selectedButton) {
+                $("#" + selectedButton).removeClass('btn-primary').addClass('btn-secondary');
+            }
+            selectedButton = $(this).attr('id');
+            $("#" + selectedButton).addClass('btn-primary');
+    
+            $('#selected_button').val(selectedButton);
+        });
+    
+        $(".selectable-card").click(function() {
+            if(selectedCard) {
+                $("#" + selectedCard).removeClass('border-primary');
+            }
+            selectedCard = $(this).attr('id');
+            $("#" + selectedCard).addClass('border-primary');
+    
+            $('#selected_card').val(selectedCard);
+        });
+    
+        $("#your-form").submit(function(e) {
+            e.preventDefault();  // 阻止默认的表单提交行为
+    
+            const csrfToken = $('[name="csrfmiddlewaretoken"]').val();  // 获取 CSRF Token
+            console.log(csrfToken);
+            $.ajax({
+                url: "/product/create_order/",
+                type: "post",
+                headers: {
+                    'X-CSRFToken': csrfToken  // 添加 CSRF Token
+                },
+                data: { 
+                    selected_button: $('#selected_button').val(), 
+                    selected_card: $('#selected_card').val(),
+                    project_name: $('#project_name').val(),
+                    expression_host: $('[name="expression_host"]').val(),
+                    purification_method: $('[name="purification_method"]').val(),
+                    antibody_number: $('#ab_number').val(),
+                },
+                success: function(data) {
+                    alert("已加入购物车，点击确定，查看购物车。");
+                    if (data.redirect_url) {
+                        window.location.href = data.redirect_url;
+                    }
+                },
+                error: function(response) {
+                    let data;
+                    try {
+                        data = JSON.parse(response.responseText);
+                    } catch (e) {
+                        alert("服务器错误");
+                        return;
+                    }
+                    if (response.status === 401 && data.message === 'Please login.') {
+                        // 如果用户未登录，显示登录模态框
+                        $("#loginModal").modal('show');
+        
+                        // 当登录表单被提交时
+                        $("#loginForm").submit(function(e) {
+                            e.preventDefault();
+                            var username = $("#username").val();
+                            var password = $("#password").val();
+        
+                            // 这里用AJAX提交登录请求
+                            $.ajax({
+                                url: "/account/login/",
+                                type: "POST",
+                                data: { username: username, password: password ,"csrfmiddlewaretoken": '{{ csrf_token }}'}, 
+                            }).done(function(data) {
+                                // 更新 CSRF token
+                                var newCsrfToken = data.csrfmiddlewaretoken || getCookie('csrftoken');  // 假设 getCookie 是获取 cookie 的函数
+                                $('[name="csrfmiddlewaretoken"]').val(newCsrfToken);  // 更新表单中的 CSRF token
+
+                                $("#loginModal").modal('hide');  // 关闭模态框
+                                $("#your-form").submit();  // 再次提交原来的表单
+                            }).fail(function(response) {
+                                // 登录失败，你可以在这里添加更多的处理逻辑
+                                alert("登录失败，请重试。");
+                            });
+                            
+                        });
+                    } else {
+                        alert("其他错误：" + data.message);  // 更通用的错误处理方法
+                    }
+                }
+            });
+        });
+    });
+</script>    
+{% endblock %}
+

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Create New Order{% endblock %}
+{% block extra_head %}
+<style>
+    .sticky-active {
+        background-color: #F9F9F9;
+        opacity: 1;
+        width: 100%;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+      }  
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container"> 
+    <div class="row">
+        <div class="row mt-5 mb-5">
+            <div class="col-12 d-flex justify-content-center">
+                <h1>Choose your new Order</h1>
+            </div>
+        </div>
+        <div class="sticky-top">
+            <div class="row">
+                <div class="col-12 d-flex justify-content-center">
+                    <div class="btn-group" role="group" aria-label="Segmented Control" style="z-index: 1020;">
+                        <button id="btn1" data-target="info1,info2" class="btn selectable-button border border-dark" role="radio" aria-checked="false" style="width: 300px;">
+                            <div>
+                                <span class="text-body fs-1 fw-bold">Plasmid</span><br>
+                                <span class="text-muted small">From $19/Chain</span><br>
+                            </div>
+                        </button>
+                        <button id="btn2" data-target="info3,info4" class="btn selectable-button border border-dark" role="radio" aria-checked="false" style="width: 300px;">
+                            <div>
+                                <span class="badge bg-danger">Hot</span><br>
+                                <span class="text-body fs-1 fw-bold">Antibody</span><br>
+                                <span class="text-muted small">From $90/Ab</span><br>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-5">
+            <div class="col-12 text-center">
+                <p>Have questions about the product type?<br>
+                Chat with our Specialist.</p>
+            </div>
+        </div>
+        <div class="row mt-5">
+            <div class="col-6 d-flex flex-column align-items-end">
+                <div class="col-md-6" style="width: 18rem;">
+                    <div id="info1" class="card mb-3 selectable-card" >
+                        <div class="card-header mb-3">Fast Plasmid</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 1 weeks </h5>
+                            <h5 class="card-title">Price $59 / chain </h5>
+                        </div>
+                    </div>
+                    <div id="info3" class="card mb-3 d-none selectable-card">
+                        <div class="card-header mb-3">Fast Antibody</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 2 weeks</h5>
+                            <h5 class="card-title">Price: $250 / Ab</h5>
+                        </div>
+                    </div>
+                </div>
+                <p>some description here</p>
+                <button id="Fast" type="button" class="btn btn-primary" style="width:18rem;">select</button>
+            </div>
+            <div class="col-6 d-flex flex-column align-items-start">
+                <div class="col-md-6">
+                    <div id="info2" class="card mb-3 selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">HT Plasmid</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 3 weeks</h5>
+                            <h5 class="card-title">Price: $19 / chain</h5>
+                        </div>
+                    </div>
+                    <div id="info4" class="card mb-3 d-none selectable-card" style="width: 18rem;">
+                        <div class="card-header mb-3">HT Antibody</div>
+                        <div class="card-body">
+                            <h5 class="card-title">TAT: 5 weeks</h5>
+                            <h5 class="card-title">Price: $90 / Ab</h5>
+                        </div>
+                    </div>
+                </div>
+                <p>some description here</p>
+                <button id="HT" type="button" class="btn btn-primary" style="width:18rem;">select</button>
+            </div>
+        </div>
+        
+        <div class="row mt-5">
+            <div class="row mt-5">
+                <div class="col-12 text-center">
+                <h2>some description here</h2>
+                <br>
+
+                <br>
+                <br>
+                <h2>What's in box</h2>
+                <p></p>
+                <p></p>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <p></p>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <h5>Configure your Order on the next step.</h5>
+                <p></p>
+                <p></p>
+            </div>
+        </div>
+    </div>
+</div> 
+{% endblock %}
+{% block javascript %}
+<script type="text/javascript">
+    $(document).ready(function() {
+        // Helper function to reset all buttons and information cards
+        function resetAll() {
+            $(".selectable-button").removeClass("border-primary").addClass("border-dark");
+            $(".selectable-card").addClass("d-none");
+        }
+
+        // 初始化：设置默认的边框和背景色
+        $(".selectable-button").addClass("border border-dark");
+        $(".selectable-card").addClass("d-none");
+
+        // 默认显示与第一个按钮关联的卡片
+        $("#info1, #info2").removeClass("d-none");
+
+        // 切换按钮时，切换卡片
+        $(".selectable-button").click(function(event) {
+            event.preventDefault();
+            resetAll();
+            $(this).removeClass("border-dark").addClass("border-primary");
+
+            let targetInfo = $(this).data("target");
+            $("#" + targetInfo.split(",").join(", #")).removeClass("d-none");
+        });
+    });
+</script>
+
+<script>
+    window.addEventListener("scroll", function() {
+        var element = document.querySelector(".sticky-top");
+        var rect = element.getBoundingClientRect();
+        var top = rect.top;
+        
+        if (top <= 0) {
+          // 当元素"粘贴"到顶部时添加新样式
+          element.classList.add("sticky-active");
+        } else {
+          // 当元素离开顶部时移除该样式
+          element.classList.remove("sticky-active");
+        }
+      });
+</script>
+<script>
+    $(document).ready(function() {
+        // 初始化一个变量用于存储用户的选择
+        let selectedInfo = {
+          'product_type': null,
+          'selected_button': null
+        };
+      
+        // 监听两个大按钮（btn1 和 btn2）的点击事件
+        $("#btn1, #btn2").click(function(event) {
+          // 存储用户选中的按钮的信息，比如按钮的id
+          selectedInfo['product_type'] = $(this).attr("id");
+        });
+      
+        // 监听两个select按钮（Fast 和 HT）的点击事件
+        $("#Fast, #HT").click(function(event) {
+          // 存储用户选中的按钮的信息，比如按钮的id
+          selectedInfo['selected_button'] = $(this).attr("id");
+      
+          // 使用AJAX将数据传送到后端
+          $.ajax({
+            url: '/product/create_order/',  // 你的Django视图函数对应的URL
+            method: 'POST',
+            data: {
+              'product_type': selectedInfo['product_type'],
+              'selected_button': selectedInfo['selected_button'],
+              'csrfmiddlewaretoken': '{{ csrf_token }}'  // Django的CSRF token
+            },
+            success: function(response) {
+              // 这里是成功后的回调函数，你可以添加一些代码，比如跳转到另一个页面
+              window.location.href = response.redirect_url  + response.order_id+ "/";
+            },
+            error: function(response) {
+              // 这里是失败后的回调函数，你也可以添加一些代码，比如输出错误信息
+                console.log(response);
+            }
+          });
+        });
+      });
+</script>      
+{% endblock %}
+
