@@ -14,7 +14,7 @@
                     <th scope="col">Status</th>
                     <th scope="col">Expression Host</th>
                     <th scope="col">Purification Method</th>
-                    <th scope="col">Turnaround Time</th>
+                    {% comment %} <th scope="col">Turnaround Time</th> {% endcomment %}
                     <th scope="col">Qty</th>
                     <th scope="col">Total Price</th>
                     <th scope="col">Submit / Continue</th>
@@ -30,20 +30,20 @@
                     <td>{{ shopping.status }}</td>
                     <td>{{ shopping.express_host }}</td>
                     <td>{{ shopping.purification_method }}</td>
-                    <td>{{ shopping.product.turnaround_time }}</td>
+                    {% comment %} <td>{{ shopping.product.turnaround_time }}</td> {% endcomment %}
                     <td>{{ shopping.antibody_number }}</td>
                     <td>{{ shopping.total_price }}</td>
                     {% if shopping.status == "COMPLETED" %}
                     <td>
                         <i class="bi bi-clipboard-check"></i>
                     </td>
-                    {% elif shopping.status == "INCOMPLETE" and shopping.express_host == 'None'%}
+                    {% elif shopping.status == "INCOMPLETE" and shopping.express_host == None %}
                     <td>
-                        <a href="{% url 'user_center:order_selection' shopping.id %}">
-                            <button type="button" class="btn btn-warning">Continue</button>
+                        <a href="{% url 'product:order_selection' shopping.id %}">
+                            <button type="button" class="btn btn-info">Continue</button>
                         </a>
                     </td>
-                    {% elif shopping.status == "INCOMPLETE" and shopping.sequence_file == 'None' %}
+                    {% elif shopping.status == "INCOMPLETE" and shopping.sequence_file == None %}
                     <td>
                         <a href="{% url 'product:order_quotation' shopping.id %}">
                             <button type="button" class="btn btn-warning">Continue</button>
@@ -53,6 +53,12 @@
                     <td>
                         <a href="{% url 'user_center:submit_order' shopping.id %}">
                             <button type="button" class="btn btn-success">Submit</button>
+                        </a>
+                    </td>
+                    {% else %}
+                    <td>
+                        <a href="{% url 'product:order_quotation' shopping.id %}">
+                            <button type="button" class="btn btn-warning">Continue</button>
                         </a>
                     </td>
                     {% endif %}

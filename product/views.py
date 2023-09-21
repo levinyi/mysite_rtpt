@@ -1,69 +1,17 @@
 from django.shortcuts import get_object_or_404, render
-from .models import Product, ExpressionHost, PurificationMethod, Addon, ExpressionScale
+from .models import Product, ExpressionHost, PurificationMethod, Addon, ExpressionScale, Vector
 from user_center.models import ShoppingCart, Order
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+import pandas as pd
 
 # Create your views here.
 def product_list(request):
     products = Product.objects.all()
     return render(request, 'product/products.html' , {'products': products})
 
-
-def create_order_old(request):
-    if request.method == 'POST':
-        # POST请求逻辑，要求用户登录
-        if request.user.is_authenticated:
-            # 已登录，处理post请求
-            # 获取用户提交的信息
-            project_name = request.POST.get('project_name')
-            number = request.POST.get('antibody_number')
-            purification_method = request.POST.get('purification_method')
-            expression_host = request.POST.get('expression_host')
-            selected_card  = request.POST.get('selected_card')
-            selected_button = request.POST.get('selected_button')
-            print("selected_card: ", selected_card)
-            print("selected_button: ", selected_button)
-            print("project_name: ", project_name)
-            print("number: ", number)
-            print("purification_method: ", purification_method)
-            print("expression_host: ", expression_host)
-
-            card_dict = {
-                'info1': 'Fast Plasmid',
-                'info2': 'HT Plasmid',
-                'info3': 'Fast Antibody',
-                'info4': 'HT Antibody',
-                'info5': 'SEC-HPLC',
-                'info6': 'Endotoxin',
-            }
-            btn_dict = {
-                'btn1': 'Plasmid',
-                'btn2': 'Antibody',
-                'btn3': 'Analysis',
-            }
-            product = get_object_or_404(
-                Product, 
-                product_type=btn_dict[selected_button], 
-                product_name=card_dict[selected_card])
-            price = product.price
-            total_price = int(number) * int(price)
-            # 创建一个新的购物车
-
-            ShoppingCart.objects.create(
-                user=request.user, 
-                project_name=project_name,
-                product = product,
-                express_host = expression_host,
-                purification_method = purification_method,
-                total_price = total_price,)
-            return JsonResponse({'redirect_url': '/user_center/shopping_cart/'})
-        else:
-            return JsonResponse({'status': 'error', 'message': 'Please login.'}, status=401)
-    else:
-        return render(request, 'product/create_order.html')
 
 def create_order(request):
     if request.method == "GET":
@@ -163,3 +111,55 @@ def order_quotation(request, order_id):
         return render(request, 'product/order_quotation.html', {'shopping_cart': shopping_cart})
 
 
+def vector_validation(request):
+    # 只接受post请求
+    # 获取用户上传的文件
+    # 判断文件是否合法
+    # 存入用户的数据库
+    # 返回跳转页面
+    if request.method == "POST":
+        # 判读是否登录
+        if not request.user.is_authenticated: # 未登录
+            return JsonResponse({'status': 'error', 'message': 'Please login.'}, status=401)
+        # 获取用户上传的文件
+        file = request.FILES.get('vector_file')
+        # 判断文件是否合法
+        if not file.name.endswith('.csv'):
+            return JsonResponse({'status': 'error', 'message': 'Please upload the csv file.'}, status=401)
+        # 使用pandas读取文件中的内容，验证vector_name，C_Gene是否正确，正确的话，Status为True，否则为False，逐条存入Vector数据库
+        df = pd.read_csv(file)
+        for index, row in df.iterrows():
+            if not row['Vector_name'].startswith('p'):
+                return JsonResponse({'status': 'error', 'message': 'Please check the vector name.'}, status=401)
+            if not row['C_Gene'].startswith('IGH'):
+                return JsonResponse({'status': 'error', 'message': 'Please check the C_Gene.'}, status=401)
+            if not row['V_Gene'].startswith('IGH'):
+                return JsonResponse({'status': 'error', 'message': 'Please check the V_Gene.'}, status=401)
+            if not row['NC5'].startswith('GG'):
+                return JsonResponse({'status': 'error', 'message': 'Please check the NC5.'}, status=401)
+            if not row['NC3'].startswith('TT'):
+                return JsonResponse({'status': 'error', 'message': 'Please check the NC3.'}, status=401)
+            # 存入用户的数据库
+            Vector.objects.create(
+                user=request.user,
+                vector_name=row['Vector_name'],
+                vector_map=row['Vector_map'],
+                C_Gene=row['C_Gene'],
+                V_Gene=row['V_Gene'],
+                NC5=row['NC5'],
+                NC3=row['NC3'],
+                is_ready_to_use=False,
+            )
+            
+        
+        # 存入用户的数据库
+        Vector.objects.create(
+            user=request.user,
+            vector_name=file.name,
+            vector_map=file,
+            is_ready_to_use=False,
+        )
+        # 返回跳转页面
+        return JsonResponse({'redirect_url': '/user_center/manage_vector/'})
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Please use POST.'}, status=401)

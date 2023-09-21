@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 
 # Create your models here.
@@ -45,3 +46,21 @@ class ExpressionScale(models.Model):
 
     def __str__(self):
         return self.scale
+
+class Vector(models.Model):
+    user = models.ForeignKey(User, verbose_name="User", on_delete=models.SET_NULL, null=True, blank=True)
+    vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
+    cloning_site = models.CharField(verbose_name="Cloning_site", max_length=20)
+    vector_map = models.CharField(verbose_name="Vector_Map", max_length=20)
+    C_Gene = models.CharField(verbose_name="C_Gene", max_length=20)
+    V_Gene = models.CharField(verbose_name="V_Gene", max_length=20)
+    NC5 = models.CharField(verbose_name="5NC", max_length=20)
+    NC3 = models.CharField(verbose_name="3NC", max_length=20)
+    is_ready_to_use = models.BooleanField(default=False)
+
+    def is_company_vector(self):
+        return self.user is None
+
+    def __str__(self):
+        return self.vector_name
+

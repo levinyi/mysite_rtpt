@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from user_center.models import Order, ShoppingCart
-from product.models import Product
+from product.models import Product, Vector
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 
@@ -53,10 +53,9 @@ def manage_order(request):
 
 
 def manage_vector(request):
-    return render(request, 'user_center/manage_vector.html', {})
-
-def vector_add(request):
-    return render(request, 'user_center/vector_add.html', {})
+    company_vectors = Vector.objects.filter(user=None)
+    user_vectors = Vector.objects.filter(user=request.user)
+    return render(request, 'user_center/manage_vector.html', {'company_vectors': company_vectors, 'user_vectors': user_vectors})
 
 def download_pdf(request, order_id):
     data = {}
