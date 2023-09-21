@@ -9,3 +9,4 @@ venv/
 media/
 .DS_Store
 .env
+.sql
