@@ -115,15 +115,6 @@
             <div class="row mt-5 mb-5">
                 <h3>Antibody Number</h3>
                 <h5>How many antibodies do you want to produce?</h5>
-                {% comment %} <div class="col-8 mt-2">
-                    <div class="card selectable-card">
-                        <div class="card-body">
-                            <label for="customRange2" class="form-label">Antibody number</label>
-                            <input type="range" class="form-range" min="50" max="500" id="customRange2">
-                            <h5 class="card-title">you select: <span id="selectedValue">50</span></h5>
-                        </div>
-                    </div>
-                </div> {% endcomment %}
             </div>
             <div class="row mt-5 mb-5">
                 <div class="row mt-4">
@@ -138,7 +129,7 @@
                 </div>
                 <div class="col-3">
                     <div class="input-group mb-3">
-                        <input type="number" class="form-control" placeholder="" min="1" max="200" step="1" value="178">
+                        <input type="number" class="form-control" placeholder="" min="1" max="400" step="1" value="50">
                         <span class="input-group-text">Abs</span>
                     </div>
                 </div>
@@ -424,7 +415,7 @@
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const rangeInput = document.querySelector('#customRange');
+        const rangeInput = document.querySelector('.form-range');
         const numberInput = document.querySelector('.form-control');
 
         function updateRangeStyles() {
@@ -449,7 +440,6 @@
         updateRangeStyles();
     });
 </script>
-
 
 {% endblock %}
 

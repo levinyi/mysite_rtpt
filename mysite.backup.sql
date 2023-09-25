@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: mysite
 -- ------------------------------------------------------
--- Server version	8.0.34-0ubuntu0.22.04.1
+-- Server version	8.0.34-0ubuntu0.20.04.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -24,16 +24,16 @@ DROP TABLE IF EXISTS `account_account`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `account_account` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `first_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `company` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `department` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phone` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `register_time` date NOT NULL,
-  `photo` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `photo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `level` smallint NOT NULL,
-  `shipping_address` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `shipping_address` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`),
@@ -59,16 +59,16 @@ DROP TABLE IF EXISTS `account_userprofile`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `account_userprofile` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `first_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `company` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `department` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phone` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `register_time` date NOT NULL,
-  `photo` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `photo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `level` smallint NOT NULL,
-  `shipping_address` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `shipping_address` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`),
@@ -95,7 +95,7 @@ DROP TABLE IF EXISTS `auth_group`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `auth_group` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -147,13 +147,13 @@ DROP TABLE IF EXISTS `auth_permission`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `auth_permission` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `content_type_id` int NOT NULL,
-  `codename` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `codename` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `auth_permission_content_type_id_codename_01ab375a_uniq` (`content_type_id`,`codename`),
   CONSTRAINT `auth_permission_content_type_id_2f476e4b_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=81 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=85 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -162,7 +162,7 @@ CREATE TABLE `auth_permission` (
 
 LOCK TABLES `auth_permission` WRITE;
 /*!40000 ALTER TABLE `auth_permission` DISABLE KEYS */;
-INSERT INTO `auth_permission` VALUES (1,'Can add log entry',1,'add_logentry'),(2,'Can change log entry',1,'change_logentry'),(3,'Can delete log entry',1,'delete_logentry'),(4,'Can view log entry',1,'view_logentry'),(5,'Can add permission',2,'add_permission'),(6,'Can change permission',2,'change_permission'),(7,'Can delete permission',2,'delete_permission'),(8,'Can view permission',2,'view_permission'),(9,'Can add group',3,'add_group'),(10,'Can change group',3,'change_group'),(11,'Can delete group',3,'delete_group'),(12,'Can view group',3,'view_group'),(13,'Can add user',4,'add_user'),(14,'Can change user',4,'change_user'),(15,'Can delete user',4,'delete_user'),(16,'Can view user',4,'view_user'),(17,'Can add content type',5,'add_contenttype'),(18,'Can change content type',5,'change_contenttype'),(19,'Can delete content type',5,'delete_contenttype'),(20,'Can view content type',5,'view_contenttype'),(21,'Can add session',6,'add_session'),(22,'Can change session',6,'change_session'),(23,'Can delete session',6,'delete_session'),(24,'Can view session',6,'view_session'),(25,'Can add shopping cart',7,'add_shoppingcart'),(26,'Can change shopping cart',7,'change_shoppingcart'),(27,'Can delete shopping cart',7,'delete_shoppingcart'),(28,'Can view shopping cart',7,'view_shoppingcart'),(29,'Can add account',8,'add_account'),(30,'Can change account',8,'change_account'),(31,'Can delete account',8,'delete_account'),(32,'Can view account',8,'view_account'),(33,'Can add product',9,'add_product'),(34,'Can change product',9,'change_product'),(35,'Can delete product',9,'delete_product'),(36,'Can view product',9,'view_product'),(37,'Can add order',10,'add_order'),(38,'Can change order',10,'change_order'),(39,'Can delete order',10,'delete_order'),(40,'Can view order',10,'view_order'),(41,'Can add shopping cart detail',11,'add_shoppingcartdetail'),(42,'Can change shopping cart detail',11,'change_shoppingcartdetail'),(43,'Can delete shopping cart detail',11,'delete_shoppingcartdetail'),(44,'Can view shopping cart detail',11,'view_shoppingcartdetail'),(45,'Can add order detail',12,'add_orderdetail'),(46,'Can change order detail',12,'change_orderdetail'),(47,'Can delete order detail',12,'delete_orderdetail'),(48,'Can view order detail',12,'view_orderdetail'),(49,'Can add shopping cart',13,'add_shoppingcart'),(50,'Can change shopping cart',13,'change_shoppingcart'),(51,'Can delete shopping cart',13,'delete_shoppingcart'),(52,'Can view shopping cart',13,'view_shoppingcart'),(53,'Can add expression_host',14,'add_expression_host'),(54,'Can change expression_host',14,'change_expression_host'),(55,'Can delete expression_host',14,'delete_expression_host'),(56,'Can view expression_host',14,'view_expression_host'),(57,'Can add addon',15,'add_addon'),(58,'Can change addon',15,'change_addon'),(59,'Can delete addon',15,'delete_addon'),(60,'Can view addon',15,'view_addon'),(61,'Can add expression scale',16,'add_expressionscale'),(62,'Can change expression scale',16,'change_expressionscale'),(63,'Can delete expression scale',16,'delete_expressionscale'),(64,'Can view expression scale',16,'view_expressionscale'),(65,'Can add purification_method',17,'add_purification_method'),(66,'Can change purification_method',17,'change_purification_method'),(67,'Can delete purification_method',17,'delete_purification_method'),(68,'Can view purification_method',17,'view_purification_method'),(69,'Can add expression host',14,'add_expressionhost'),(70,'Can change expression host',14,'change_expressionhost'),(71,'Can delete expression host',14,'delete_expressionhost'),(72,'Can view expression host',14,'view_expressionhost'),(73,'Can add purification method',17,'add_purificationmethod'),(74,'Can change purification method',17,'change_purificationmethod'),(75,'Can delete purification method',17,'delete_purificationmethod'),(76,'Can view purification method',17,'view_purificationmethod'),(77,'Can add user profile',18,'add_userprofile'),(78,'Can change user profile',18,'change_userprofile'),(79,'Can delete user profile',18,'delete_userprofile'),(80,'Can view user profile',18,'view_userprofile');
+INSERT INTO `auth_permission` VALUES (1,'Can add log entry',1,'add_logentry'),(2,'Can change log entry',1,'change_logentry'),(3,'Can delete log entry',1,'delete_logentry'),(4,'Can view log entry',1,'view_logentry'),(5,'Can add permission',2,'add_permission'),(6,'Can change permission',2,'change_permission'),(7,'Can delete permission',2,'delete_permission'),(8,'Can view permission',2,'view_permission'),(9,'Can add group',3,'add_group'),(10,'Can change group',3,'change_group'),(11,'Can delete group',3,'delete_group'),(12,'Can view group',3,'view_group'),(13,'Can add user',4,'add_user'),(14,'Can change user',4,'change_user'),(15,'Can delete user',4,'delete_user'),(16,'Can view user',4,'view_user'),(17,'Can add content type',5,'add_contenttype'),(18,'Can change content type',5,'change_contenttype'),(19,'Can delete content type',5,'delete_contenttype'),(20,'Can view content type',5,'view_contenttype'),(21,'Can add session',6,'add_session'),(22,'Can change session',6,'change_session'),(23,'Can delete session',6,'delete_session'),(24,'Can view session',6,'view_session'),(25,'Can add shopping cart',7,'add_shoppingcart'),(26,'Can change shopping cart',7,'change_shoppingcart'),(27,'Can delete shopping cart',7,'delete_shoppingcart'),(28,'Can view shopping cart',7,'view_shoppingcart'),(29,'Can add account',8,'add_account'),(30,'Can change account',8,'change_account'),(31,'Can delete account',8,'delete_account'),(32,'Can view account',8,'view_account'),(33,'Can add product',9,'add_product'),(34,'Can change product',9,'change_product'),(35,'Can delete product',9,'delete_product'),(36,'Can view product',9,'view_product'),(37,'Can add order',10,'add_order'),(38,'Can change order',10,'change_order'),(39,'Can delete order',10,'delete_order'),(40,'Can view order',10,'view_order'),(41,'Can add shopping cart detail',11,'add_shoppingcartdetail'),(42,'Can change shopping cart detail',11,'change_shoppingcartdetail'),(43,'Can delete shopping cart detail',11,'delete_shoppingcartdetail'),(44,'Can view shopping cart detail',11,'view_shoppingcartdetail'),(45,'Can add order detail',12,'add_orderdetail'),(46,'Can change order detail',12,'change_orderdetail'),(47,'Can delete order detail',12,'delete_orderdetail'),(48,'Can view order detail',12,'view_orderdetail'),(49,'Can add shopping cart',13,'add_shoppingcart'),(50,'Can change shopping cart',13,'change_shoppingcart'),(51,'Can delete shopping cart',13,'delete_shoppingcart'),(52,'Can view shopping cart',13,'view_shoppingcart'),(53,'Can add expression_host',14,'add_expression_host'),(54,'Can change expression_host',14,'change_expression_host'),(55,'Can delete expression_host',14,'delete_expression_host'),(56,'Can view expression_host',14,'view_expression_host'),(57,'Can add addon',15,'add_addon'),(58,'Can change addon',15,'change_addon'),(59,'Can delete addon',15,'delete_addon'),(60,'Can view addon',15,'view_addon'),(61,'Can add expression scale',16,'add_expressionscale'),(62,'Can change expression scale',16,'change_expressionscale'),(63,'Can delete expression scale',16,'delete_expressionscale'),(64,'Can view expression scale',16,'view_expressionscale'),(65,'Can add purification_method',17,'add_purification_method'),(66,'Can change purification_method',17,'change_purification_method'),(67,'Can delete purification_method',17,'delete_purification_method'),(68,'Can view purification_method',17,'view_purification_method'),(69,'Can add expression host',14,'add_expressionhost'),(70,'Can change expression host',14,'change_expressionhost'),(71,'Can delete expression host',14,'delete_expressionhost'),(72,'Can view expression host',14,'view_expressionhost'),(73,'Can add purification method',17,'add_purificationmethod'),(74,'Can change purification method',17,'change_purificationmethod'),(75,'Can delete purification method',17,'delete_purificationmethod'),(76,'Can view purification method',17,'view_purificationmethod'),(77,'Can add user profile',18,'add_userprofile'),(78,'Can change user profile',18,'change_userprofile'),(79,'Can delete user profile',18,'delete_userprofile'),(80,'Can view user profile',18,'view_userprofile'),(81,'Can add vector',19,'add_vector'),(82,'Can change vector',19,'change_vector'),(83,'Can delete vector',19,'delete_vector'),(84,'Can view vector',19,'view_vector');
 /*!40000 ALTER TABLE `auth_permission` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -175,13 +175,13 @@ DROP TABLE IF EXISTS `auth_user`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `auth_user` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `password` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `last_login` datetime(6) DEFAULT NULL,
   `is_superuser` tinyint(1) NOT NULL,
-  `username` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `first_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `username` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `first_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_staff` tinyint(1) NOT NULL,
   `is_active` tinyint(1) NOT NULL,
   `date_joined` datetime(6) NOT NULL,
@@ -196,7 +196,7 @@ CREATE TABLE `auth_user` (
 
 LOCK TABLES `auth_user` WRITE;
 /*!40000 ALTER TABLE `auth_user` DISABLE KEYS */;
-INSERT INTO `auth_user` VALUES (1,'pbkdf2_sha256$390000$hbeAsSW51oyUMO9WbKlJAD$JpsBRSbyJv1WcuW4Atfu39viNfx7pyOuQgOh1lgTynE=','2023-09-12 11:32:38.977442',1,'dushiyi','','','',1,1,'2023-08-23 12:08:19.150374'),(2,'pbkdf2_sha256$390000$wwJ0FWBaKCXjRbQ0xDdP94$u3RfjJBosk40pywfmqK3a0gKkcpDjF5wbfMQbbcCaUk=','2023-08-27 03:59:07.012458',1,'admin','','','',1,1,'2023-08-27 02:50:35.296977'),(3,'',NULL,0,'temp_user','','','',0,1,'2023-09-06 00:28:49.654421');
+INSERT INTO `auth_user` VALUES (1,'pbkdf2_sha256$320000$tBgSIsxCoV7RGywQk2GaSX$GCuFVb2xgmQCesrc3ps1FaiYFsKbmGViJ3mXuT8jiAk=','2023-09-21 10:56:19.503280',1,'dushiyi','','','',1,1,'2023-08-23 12:08:19.150374'),(2,'pbkdf2_sha256$390000$wwJ0FWBaKCXjRbQ0xDdP94$u3RfjJBosk40pywfmqK3a0gKkcpDjF5wbfMQbbcCaUk=','2023-08-27 03:59:07.012458',1,'admin','','','',1,1,'2023-08-27 02:50:35.296977'),(3,'',NULL,0,'temp_user','','','',0,1,'2023-09-06 00:28:49.654421');
 /*!40000 ALTER TABLE `auth_user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -266,10 +266,10 @@ DROP TABLE IF EXISTS `django_admin_log`;
 CREATE TABLE `django_admin_log` (
   `id` int NOT NULL AUTO_INCREMENT,
   `action_time` datetime(6) NOT NULL,
-  `object_id` longtext COLLATE utf8mb4_unicode_ci,
-  `object_repr` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `object_id` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `object_repr` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `action_flag` smallint unsigned NOT NULL,
-  `change_message` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `change_message` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `content_type_id` int DEFAULT NULL,
   `user_id` int NOT NULL,
   PRIMARY KEY (`id`),
@@ -278,7 +278,7 @@ CREATE TABLE `django_admin_log` (
   CONSTRAINT `django_admin_log_content_type_id_c4bce8eb_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`),
   CONSTRAINT `django_admin_log_user_id_c564eba6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`),
   CONSTRAINT `django_admin_log_chk_1` CHECK ((`action_flag` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -287,7 +287,7 @@ CREATE TABLE `django_admin_log` (
 
 LOCK TABLES `django_admin_log` WRITE;
 /*!40000 ALTER TABLE `django_admin_log` DISABLE KEYS */;
-INSERT INTO `django_admin_log` VALUES (1,'2023-08-27 04:10:29.752715','1','Fast Plasmid',1,'[{\"added\": {}}]',9,2),(2,'2023-08-27 04:11:29.014143','2','HT Plasmid',1,'[{\"added\": {}}]',9,2),(3,'2023-08-27 04:12:28.932858','3','Fast Antibody',1,'[{\"added\": {}}]',9,2),(4,'2023-08-27 04:13:16.259624','4','HT Antibody',1,'[{\"added\": {}}]',9,2),(5,'2023-08-27 04:16:22.088959','5','SEC-HPLC',1,'[{\"added\": {}}]',9,2),(6,'2023-08-27 04:16:55.821465','6','Endotoxin',1,'[{\"added\": {}}]',9,2),(7,'2023-08-30 06:15:09.606376','6','Endotoxin',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(8,'2023-08-30 06:15:15.290343','5','SEC-HPLC',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(9,'2023-08-30 06:15:20.508254','4','HT Antibody',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(10,'2023-08-30 06:15:27.343043','4','HT Antibody',2,'[]',9,1),(11,'2023-08-30 06:15:33.460664','3','Fast Antibody',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(12,'2023-08-30 06:15:38.793929','2','HT Plasmid',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(13,'2023-08-30 06:15:44.640581','1','Fast Plasmid',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(14,'2023-08-30 15:28:22.609072','1','Order object (1)',3,'',10,1),(15,'2023-08-30 15:28:29.685665','2','Order object (2)',3,'',10,1),(16,'2023-08-30 15:28:35.867342','3','Order object (3)',3,'',10,1),(17,'2023-08-30 15:28:41.527387','4','Order object (4)',3,'',10,1),(18,'2023-08-30 15:37:21.119337','8','Order object (8)',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',10,1),(19,'2023-09-04 10:49:54.340592','1','30ml',1,'[{\"added\": {}}]',16,1),(20,'2023-09-04 10:50:10.880593','2','3ml',1,'[{\"added\": {}}]',16,1),(21,'2023-09-04 10:50:41.235052','1','293F',1,'[{\"added\": {}}]',14,1),(22,'2023-09-04 10:50:56.584309','2','CHO',1,'[{\"added\": {}}]',14,1),(23,'2023-09-04 10:53:50.405460','1','Protein A',1,'[{\"added\": {}}]',17,1),(24,'2023-09-04 10:54:06.720280','2','Protein G',1,'[{\"added\": {}}]',17,1),(25,'2023-09-04 10:58:22.745724','1','SEC-HPLC',1,'[{\"added\": {}}]',15,1),(26,'2023-09-04 10:58:59.768407','2','Endotoxin',1,'[{\"added\": {}}]',15,1),(27,'2023-09-06 04:11:27.219706','38','ShoppingCart object (38)',3,'',13,1),(28,'2023-09-06 04:11:34.634692','37','ShoppingCart object (37)',3,'',13,1),(29,'2023-09-06 04:11:41.568685','36','ShoppingCart object (36)',3,'',13,1),(30,'2023-09-06 04:11:48.916611','35','ShoppingCart object (35)',3,'',13,1),(31,'2023-09-06 04:11:58.728943','34','ShoppingCart object (34)',3,'',13,1),(32,'2023-09-06 04:12:10.759252','33','ShoppingCart object (33)',3,'',13,1),(33,'2023-09-06 04:12:17.761569','32','ShoppingCart object (32)',3,'',13,1),(34,'2023-09-06 08:45:18.840559','12','ShoppingCart object (12)',3,'',13,1),(35,'2023-09-06 08:45:27.231314','15','ShoppingCart object (15)',3,'',13,1),(36,'2023-09-06 08:45:35.429481','16','ShoppingCart object (16)',3,'',13,1),(37,'2023-09-06 08:45:44.966397','17','ShoppingCart object (17)',3,'',13,1),(38,'2023-09-06 08:45:56.115352','18','ShoppingCart object (18)',3,'',13,1),(39,'2023-09-06 08:46:05.135303','19','ShoppingCart object (19)',3,'',13,1),(40,'2023-09-06 08:46:14.886396','20','ShoppingCart object (20)',3,'',13,1),(41,'2023-09-06 08:46:24.380864','22','ShoppingCart object (22)',3,'',13,1),(42,'2023-09-06 08:46:33.224780','24','ShoppingCart object (24)',3,'',13,1),(43,'2023-09-06 08:46:42.337752','25','ShoppingCart object (25)',3,'',13,1),(44,'2023-09-06 08:46:54.948024','26','ShoppingCart object (26)',3,'',13,1),(45,'2023-09-06 08:47:09.852194','27','ShoppingCart object (27)',3,'',13,1),(46,'2023-09-06 08:55:52.668310','28','ShoppingCart object (28)',3,'',13,1),(47,'2023-09-06 08:55:59.769636','29','ShoppingCart object (29)',3,'',13,1),(48,'2023-09-06 08:56:08.316086','30','ShoppingCart object (30)',3,'',13,1),(49,'2023-09-09 13:09:49.035305','31','31',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(50,'2023-09-09 13:21:53.012904','40','40',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(51,'2023-09-09 13:22:01.278141','41','41',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(52,'2023-09-09 13:22:10.196684','42','42',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(53,'2023-09-09 14:35:36.169114','31','31',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(54,'2023-09-09 14:36:51.758473','42','42',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1);
+INSERT INTO `django_admin_log` VALUES (1,'2023-08-27 04:10:29.752715','1','Fast Plasmid',1,'[{\"added\": {}}]',9,2),(2,'2023-08-27 04:11:29.014143','2','HT Plasmid',1,'[{\"added\": {}}]',9,2),(3,'2023-08-27 04:12:28.932858','3','Fast Antibody',1,'[{\"added\": {}}]',9,2),(4,'2023-08-27 04:13:16.259624','4','HT Antibody',1,'[{\"added\": {}}]',9,2),(5,'2023-08-27 04:16:22.088959','5','SEC-HPLC',1,'[{\"added\": {}}]',9,2),(6,'2023-08-27 04:16:55.821465','6','Endotoxin',1,'[{\"added\": {}}]',9,2),(7,'2023-08-30 06:15:09.606376','6','Endotoxin',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(8,'2023-08-30 06:15:15.290343','5','SEC-HPLC',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(9,'2023-08-30 06:15:20.508254','4','HT Antibody',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(10,'2023-08-30 06:15:27.343043','4','HT Antibody',2,'[]',9,1),(11,'2023-08-30 06:15:33.460664','3','Fast Antibody',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(12,'2023-08-30 06:15:38.793929','2','HT Plasmid',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(13,'2023-08-30 06:15:44.640581','1','Fast Plasmid',2,'[{\"changed\": {\"fields\": [\"Price\"]}}]',9,1),(14,'2023-08-30 15:28:22.609072','1','Order object (1)',3,'',10,1),(15,'2023-08-30 15:28:29.685665','2','Order object (2)',3,'',10,1),(16,'2023-08-30 15:28:35.867342','3','Order object (3)',3,'',10,1),(17,'2023-08-30 15:28:41.527387','4','Order object (4)',3,'',10,1),(18,'2023-08-30 15:37:21.119337','8','Order object (8)',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',10,1),(19,'2023-09-04 10:49:54.340592','1','30ml',1,'[{\"added\": {}}]',16,1),(20,'2023-09-04 10:50:10.880593','2','3ml',1,'[{\"added\": {}}]',16,1),(21,'2023-09-04 10:50:41.235052','1','293F',1,'[{\"added\": {}}]',14,1),(22,'2023-09-04 10:50:56.584309','2','CHO',1,'[{\"added\": {}}]',14,1),(23,'2023-09-04 10:53:50.405460','1','Protein A',1,'[{\"added\": {}}]',17,1),(24,'2023-09-04 10:54:06.720280','2','Protein G',1,'[{\"added\": {}}]',17,1),(25,'2023-09-04 10:58:22.745724','1','SEC-HPLC',1,'[{\"added\": {}}]',15,1),(26,'2023-09-04 10:58:59.768407','2','Endotoxin',1,'[{\"added\": {}}]',15,1),(27,'2023-09-06 04:11:27.219706','38','ShoppingCart object (38)',3,'',13,1),(28,'2023-09-06 04:11:34.634692','37','ShoppingCart object (37)',3,'',13,1),(29,'2023-09-06 04:11:41.568685','36','ShoppingCart object (36)',3,'',13,1),(30,'2023-09-06 04:11:48.916611','35','ShoppingCart object (35)',3,'',13,1),(31,'2023-09-06 04:11:58.728943','34','ShoppingCart object (34)',3,'',13,1),(32,'2023-09-06 04:12:10.759252','33','ShoppingCart object (33)',3,'',13,1),(33,'2023-09-06 04:12:17.761569','32','ShoppingCart object (32)',3,'',13,1),(34,'2023-09-06 08:45:18.840559','12','ShoppingCart object (12)',3,'',13,1),(35,'2023-09-06 08:45:27.231314','15','ShoppingCart object (15)',3,'',13,1),(36,'2023-09-06 08:45:35.429481','16','ShoppingCart object (16)',3,'',13,1),(37,'2023-09-06 08:45:44.966397','17','ShoppingCart object (17)',3,'',13,1),(38,'2023-09-06 08:45:56.115352','18','ShoppingCart object (18)',3,'',13,1),(39,'2023-09-06 08:46:05.135303','19','ShoppingCart object (19)',3,'',13,1),(40,'2023-09-06 08:46:14.886396','20','ShoppingCart object (20)',3,'',13,1),(41,'2023-09-06 08:46:24.380864','22','ShoppingCart object (22)',3,'',13,1),(42,'2023-09-06 08:46:33.224780','24','ShoppingCart object (24)',3,'',13,1),(43,'2023-09-06 08:46:42.337752','25','ShoppingCart object (25)',3,'',13,1),(44,'2023-09-06 08:46:54.948024','26','ShoppingCart object (26)',3,'',13,1),(45,'2023-09-06 08:47:09.852194','27','ShoppingCart object (27)',3,'',13,1),(46,'2023-09-06 08:55:52.668310','28','ShoppingCart object (28)',3,'',13,1),(47,'2023-09-06 08:55:59.769636','29','ShoppingCart object (29)',3,'',13,1),(48,'2023-09-06 08:56:08.316086','30','ShoppingCart object (30)',3,'',13,1),(49,'2023-09-09 13:09:49.035305','31','31',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(50,'2023-09-09 13:21:53.012904','40','40',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(51,'2023-09-09 13:22:01.278141','41','41',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(52,'2023-09-09 13:22:10.196684','42','42',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(53,'2023-09-09 14:35:36.169114','31','31',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(54,'2023-09-09 14:36:51.758473','42','42',2,'[{\"changed\": {\"fields\": [\"Status\"]}}]',13,1),(55,'2023-09-20 14:25:29.076994','1','pAbCode-IGG4',1,'[{\"added\": {}}]',19,1),(56,'2023-09-20 14:25:38.457767','1','pAbCode-IGG4',2,'[{\"changed\": {\"fields\": [\"Is ready to use\"]}}]',19,1);
 /*!40000 ALTER TABLE `django_admin_log` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -300,11 +300,11 @@ DROP TABLE IF EXISTS `django_content_type`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_content_type` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `app_label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `model` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `app_label` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `model` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `django_content_type_app_label_model_76bd3d3b_uniq` (`app_label`,`model`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -313,7 +313,7 @@ CREATE TABLE `django_content_type` (
 
 LOCK TABLES `django_content_type` WRITE;
 /*!40000 ALTER TABLE `django_content_type` DISABLE KEYS */;
-INSERT INTO `django_content_type` VALUES (8,'account','account'),(7,'account','shoppingcart'),(18,'account','userprofile'),(1,'admin','logentry'),(3,'auth','group'),(2,'auth','permission'),(4,'auth','user'),(5,'contenttypes','contenttype'),(15,'product','addon'),(14,'product','expressionhost'),(16,'product','expressionscale'),(9,'product','product'),(17,'product','purificationmethod'),(6,'sessions','session'),(10,'user_center','order'),(12,'user_center','orderdetail'),(13,'user_center','shoppingcart'),(11,'user_center','shoppingcartdetail');
+INSERT INTO `django_content_type` VALUES (8,'account','account'),(7,'account','shoppingcart'),(18,'account','userprofile'),(1,'admin','logentry'),(3,'auth','group'),(2,'auth','permission'),(4,'auth','user'),(5,'contenttypes','contenttype'),(15,'product','addon'),(14,'product','expressionhost'),(16,'product','expressionscale'),(9,'product','product'),(17,'product','purificationmethod'),(19,'product','vector'),(6,'sessions','session'),(10,'user_center','order'),(12,'user_center','orderdetail'),(13,'user_center','shoppingcart'),(11,'user_center','shoppingcartdetail');
 /*!40000 ALTER TABLE `django_content_type` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -326,11 +326,11 @@ DROP TABLE IF EXISTS `django_migrations`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_migrations` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `app` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `app` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `applied` datetime(6) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -339,7 +339,7 @@ CREATE TABLE `django_migrations` (
 
 LOCK TABLES `django_migrations` WRITE;
 /*!40000 ALTER TABLE `django_migrations` DISABLE KEYS */;
-INSERT INTO `django_migrations` VALUES (1,'product','0001_initial','2023-08-23 12:07:47.757238'),(2,'contenttypes','0001_initial','2023-08-23 12:07:47.847242'),(3,'auth','0001_initial','2023-08-23 12:07:48.532562'),(4,'account','0001_initial','2023-08-23 12:07:48.804093'),(5,'admin','0001_initial','2023-08-23 12:07:48.984652'),(6,'admin','0002_logentry_remove_auto_add','2023-08-23 12:07:49.001298'),(7,'admin','0003_logentry_add_action_flag_choices','2023-08-23 12:07:49.018303'),(8,'contenttypes','0002_remove_content_type_name','2023-08-23 12:07:49.117888'),(9,'auth','0002_alter_permission_name_max_length','2023-08-23 12:07:49.187178'),(10,'auth','0003_alter_user_email_max_length','2023-08-23 12:07:49.234396'),(11,'auth','0004_alter_user_username_opts','2023-08-23 12:07:49.248068'),(12,'auth','0005_alter_user_last_login_null','2023-08-23 12:07:49.318648'),(13,'auth','0006_require_contenttypes_0002','2023-08-23 12:07:49.323759'),(14,'auth','0007_alter_validators_add_error_messages','2023-08-23 12:07:49.337027'),(15,'auth','0008_alter_user_username_max_length','2023-08-23 12:07:49.404762'),(16,'auth','0009_alter_user_last_name_max_length','2023-08-23 12:07:49.513979'),(17,'auth','0010_alter_group_name_max_length','2023-08-23 12:07:49.548956'),(18,'auth','0011_update_proxy_permissions','2023-08-23 12:07:49.562438'),(19,'auth','0012_alter_user_first_name_max_length','2023-08-23 12:07:49.622418'),(20,'sessions','0001_initial','2023-08-23 12:07:49.675890'),(21,'user_center','0001_initial','2023-08-23 12:07:50.033954'),(22,'product','0002_product_express_host_product_number_of_antibody_and_more','2023-08-27 02:44:36.080174'),(23,'product','0003_remove_product_number_of_antibody','2023-08-27 04:20:15.043776'),(24,'user_center','0002_shoppingcart_alter_shoppingcartdetail_cart','2023-08-29 11:54:07.117425'),(25,'account','0002_delete_shoppingcart','2023-08-29 11:54:07.150040'),(26,'product','0004_remove_product_express_host_and_more','2023-08-30 06:00:14.530427'),(27,'user_center','0002_alter_shoppingcart_user','2023-08-30 09:42:45.066029'),(28,'product','0002_rename_turnaroud_time_product_turnaround_time','2023-08-30 13:24:24.059547'),(29,'user_center','0003_order_shopping_cart','2023-08-30 15:19:40.258709'),(30,'user_center','0004_remove_shoppingcartdetail_cart_and_more','2023-08-30 15:19:40.530987'),(31,'product','0003_purification_method_expressionscale_expression_host_and_more','2023-09-04 10:47:14.633884'),(32,'product','0004_addon_desc_addon_turnaround_time','2023-09-04 10:56:03.169901'),(33,'product','0002_rename_expression_host_expressionhost_and_more','2023-09-06 02:40:53.796817'),(34,'user_center','0002_alter_shoppingcart_express_host_and_more','2023-09-06 09:51:19.016999'),(35,'account','0002_userprofile','2023-09-06 15:08:12.949275'),(36,'user_center','0003_alter_shoppingcart_status','2023-09-09 12:31:26.217690'),(37,'user_center','0004_alter_shoppingcart_project_name','2023-09-09 13:09:11.071629'),(38,'user_center','0005_alter_shoppingcart_status','2023-09-12 11:21:07.390889'),(39,'user_center','0006_shoppingcart_sequence_file','2023-09-12 11:21:07.461990');
+INSERT INTO `django_migrations` VALUES (1,'product','0001_initial','2023-08-23 12:07:47.757238'),(2,'contenttypes','0001_initial','2023-08-23 12:07:47.847242'),(3,'auth','0001_initial','2023-08-23 12:07:48.532562'),(4,'account','0001_initial','2023-08-23 12:07:48.804093'),(5,'admin','0001_initial','2023-08-23 12:07:48.984652'),(6,'admin','0002_logentry_remove_auto_add','2023-08-23 12:07:49.001298'),(7,'admin','0003_logentry_add_action_flag_choices','2023-08-23 12:07:49.018303'),(8,'contenttypes','0002_remove_content_type_name','2023-08-23 12:07:49.117888'),(9,'auth','0002_alter_permission_name_max_length','2023-08-23 12:07:49.187178'),(10,'auth','0003_alter_user_email_max_length','2023-08-23 12:07:49.234396'),(11,'auth','0004_alter_user_username_opts','2023-08-23 12:07:49.248068'),(12,'auth','0005_alter_user_last_login_null','2023-08-23 12:07:49.318648'),(13,'auth','0006_require_contenttypes_0002','2023-08-23 12:07:49.323759'),(14,'auth','0007_alter_validators_add_error_messages','2023-08-23 12:07:49.337027'),(15,'auth','0008_alter_user_username_max_length','2023-08-23 12:07:49.404762'),(16,'auth','0009_alter_user_last_name_max_length','2023-08-23 12:07:49.513979'),(17,'auth','0010_alter_group_name_max_length','2023-08-23 12:07:49.548956'),(18,'auth','0011_update_proxy_permissions','2023-08-23 12:07:49.562438'),(19,'auth','0012_alter_user_first_name_max_length','2023-08-23 12:07:49.622418'),(20,'sessions','0001_initial','2023-08-23 12:07:49.675890'),(21,'user_center','0001_initial','2023-08-23 12:07:50.033954'),(22,'product','0002_product_express_host_product_number_of_antibody_and_more','2023-08-27 02:44:36.080174'),(23,'product','0003_remove_product_number_of_antibody','2023-08-27 04:20:15.043776'),(24,'user_center','0002_shoppingcart_alter_shoppingcartdetail_cart','2023-08-29 11:54:07.117425'),(25,'account','0002_delete_shoppingcart','2023-08-29 11:54:07.150040'),(26,'product','0004_remove_product_express_host_and_more','2023-08-30 06:00:14.530427'),(27,'user_center','0002_alter_shoppingcart_user','2023-08-30 09:42:45.066029'),(28,'product','0002_rename_turnaroud_time_product_turnaround_time','2023-08-30 13:24:24.059547'),(29,'user_center','0003_order_shopping_cart','2023-08-30 15:19:40.258709'),(30,'user_center','0004_remove_shoppingcartdetail_cart_and_more','2023-08-30 15:19:40.530987'),(31,'product','0003_purification_method_expressionscale_expression_host_and_more','2023-09-04 10:47:14.633884'),(32,'product','0004_addon_desc_addon_turnaround_time','2023-09-04 10:56:03.169901'),(33,'product','0002_rename_expression_host_expressionhost_and_more','2023-09-06 02:40:53.796817'),(34,'user_center','0002_alter_shoppingcart_express_host_and_more','2023-09-06 09:51:19.016999'),(35,'account','0002_userprofile','2023-09-06 15:08:12.949275'),(36,'user_center','0003_alter_shoppingcart_status','2023-09-09 12:31:26.217690'),(37,'user_center','0004_alter_shoppingcart_project_name','2023-09-09 13:09:11.071629'),(38,'user_center','0005_alter_shoppingcart_status','2023-09-12 11:21:07.390889'),(39,'user_center','0006_shoppingcart_sequence_file','2023-09-12 11:21:07.461990'),(40,'product','0003_vector','2023-09-20 11:06:10.156063'),(41,'product','0004_delete_vector','2023-09-20 13:53:02.707173'),(42,'product','0005_vector','2023-09-20 14:13:26.536218'),(43,'product','0006_remove_vector_status_vector_is_ready_to_use','2023-09-20 14:24:41.854019');
 /*!40000 ALTER TABLE `django_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -351,8 +351,8 @@ DROP TABLE IF EXISTS `django_session`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_session` (
-  `session_key` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `session_data` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_key` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `expire_date` datetime(6) NOT NULL,
   PRIMARY KEY (`session_key`),
   KEY `django_session_expire_date_a5c62663` (`expire_date`)
@@ -365,7 +365,7 @@ CREATE TABLE `django_session` (
 
 LOCK TABLES `django_session` WRITE;
 /*!40000 ALTER TABLE `django_session` DISABLE KEYS */;
-INSERT INTO `django_session` VALUES ('6yryj53ybi0b2xv7suwjgatiwet2nkbr','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qa7yr:xm3uaT41cCL4GfVgZHaZxkxTUxuQGSOQjtsYn_W24-k','2023-09-10 05:06:33.639691'),('d5exrlfu8jgzfs9xjtrz7p23murk9n8k','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qb04G:kkkpQlVEGQ760ZQfNKa-MOIgc151iJodwY9GH4ZDcwc','2023-09-12 14:51:44.153300'),('g4qcoqpkveqel4g0ajefr2m0eaxkh4xf','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qfYXH:C1tDnYNjcHxgAx2zQRoDt0UHI0NXrO0sKcKF8AAgD2U','2023-09-25 04:28:31.697255'),('q1b04j5djuowa0dbtcprrar31fxnnh6q','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qbKyW:pe3ycWFZv5pMU8aBrQ-MFXNrO1qWpJAPVNq5fdPCreg','2023-09-13 13:11:12.760725'),('r8naqybckiz5w9pb5pg01w7yu1cz6f0u','.eJxVjEEKwyAQAP_iuYgRdWOPvfcNsqtrTVsUYnIK_XsRcmivM8McIuC-lbB3XsOSxFVocfllhPHFdYj0xPpoMra6rQvJkcjTdnlvid-3s_0bFOxlbGHyhi0qNJCcdR44a4wEdnY5kY8WHXuvFFHEPEOknCcynpLVBA7E5wvvmDiq:1qa6vb:XuttqQacVrEdwHsG1CFxOw2pgGOTYASzDlVUIzopIw4','2023-09-10 03:59:07.030465'),('vv8tvtj1pwnt4p4p5qnupeu43kjene15','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qg1dG:y0DpGjEKgolaFPff7WuO4N9CCR40yDn6bQAIHxMqm2M','2023-09-26 11:32:38.981640');
+INSERT INTO `django_session` VALUES ('6yryj53ybi0b2xv7suwjgatiwet2nkbr','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qa7yr:xm3uaT41cCL4GfVgZHaZxkxTUxuQGSOQjtsYn_W24-k','2023-09-10 05:06:33.639691'),('cny8dv86dsorm18rycwigiherccpjrzs','.eJxVjMsOwiAUBf-FtSEgvSAu3fsNzX2AVA0kpV0Z_12bdKHbMzPnpUZclzKuPc3jJOqsrDr8boT8SHUDcsd6a5pbXeaJ9KbonXZ9bZKel939OyjYy7c2R29jCAOE7KyVAEQn4cSWPTgBwxBSFjLsvFiiiJkzICIzxsGAqPcH4fo44Q:1qjGLE:M-eARAMh4yDoDEWCtSB0lOdhSpZPyv77ED0FKNJrHCI','2023-10-05 09:51:24.037521'),('d5exrlfu8jgzfs9xjtrz7p23murk9n8k','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qb04G:kkkpQlVEGQ760ZQfNKa-MOIgc151iJodwY9GH4ZDcwc','2023-09-12 14:51:44.153300'),('dmnxjjc1haajh0297db4l0uedcqpdfld','.eJxVjMsOwiAUBf-FtSEgvSAu3fsNzX2AVA0kpV0Z_12bdKHbMzPnpUZclzKuPc3jJOqsrDr8boT8SHUDcsd6a5pbXeaJ9KbonXZ9bZKel939OyjYy7c2R29jCAOE7KyVAEQn4cSWPTgBwxBSFjLsvFiiiJkzICIzxsGAqPcH4fo44Q:1qjHM3:FWMRq2G0BSqjIoV5XighOPr4Cl_4qxGjjRGL7_-lxaU','2023-10-05 10:56:19.505026'),('g4qcoqpkveqel4g0ajefr2m0eaxkh4xf','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qfYXH:C1tDnYNjcHxgAx2zQRoDt0UHI0NXrO0sKcKF8AAgD2U','2023-09-25 04:28:31.697255'),('m1qrv1mfi709oo1i6rt9j7imfbivsauw','.eJxVjMsOwiAUBf-FtSEgvSAu3fsNzX2AVA0kpV0Z_12bdKHbMzPnpUZclzKuPc3jJOqsrDr8boT8SHUDcsd6a5pbXeaJ9KbonXZ9bZKel939OyjYy7c2R29jCAOE7KyVAEQn4cSWPTgBwxBSFjLsvFiiiJkzICIzxsGAqPcH4fo44Q:1qitYE:bjOZrFPB_guexYHGhofbJI_T8UQbj2Ay7WBwd3GKQeY','2023-10-04 09:31:18.693607'),('q1b04j5djuowa0dbtcprrar31fxnnh6q','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qbKyW:pe3ycWFZv5pMU8aBrQ-MFXNrO1qWpJAPVNq5fdPCreg','2023-09-13 13:11:12.760725'),('r8naqybckiz5w9pb5pg01w7yu1cz6f0u','.eJxVjEEKwyAQAP_iuYgRdWOPvfcNsqtrTVsUYnIK_XsRcmivM8McIuC-lbB3XsOSxFVocfllhPHFdYj0xPpoMra6rQvJkcjTdnlvid-3s_0bFOxlbGHyhi0qNJCcdR44a4wEdnY5kY8WHXuvFFHEPEOknCcynpLVBA7E5wvvmDiq:1qa6vb:XuttqQacVrEdwHsG1CFxOw2pgGOTYASzDlVUIzopIw4','2023-09-10 03:59:07.030465'),('u9k4o6gux6tz12z50goohxst5tah9ol7','.eJxVjMsOwiAUBf-FtSEgvSAu3fsNzX2AVA0kpV0Z_12bdKHbMzPnpUZclzKuPc3jJOqsrDr8boT8SHUDcsd6a5pbXeaJ9KbonXZ9bZKel939OyjYy7c2R29jCAOE7KyVAEQn4cSWPTgBwxBSFjLsvFiiiJkzICIzxsGAqPcH4fo44Q:1qjDUX:GpqkVJJZcb8VwUPpAdIgHXArvj4ixUuMoaOlPIUPFRE','2023-10-05 06:48:49.050445'),('vv8tvtj1pwnt4p4p5qnupeu43kjene15','.eJxVjMsOwiAQRf-FtSHDYyi4dO83EB6DVA0kpV0Z_12bdKHbe865L-bDtla_DVr8nNmZCXb63WJID2o7yPfQbp2n3tZljnxX-EEHv_ZMz8vh_h3UMOq3NqBKkiAdZJupSAVBSYUCo0E0aKE40EVIq01GCjZR1HJyk0mgyabC3h-5sjcU:1qg1dG:y0DpGjEKgolaFPff7WuO4N9CCR40yDn6bQAIHxMqm2M','2023-09-26 11:32:38.981640');
 /*!40000 ALTER TABLE `django_session` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -378,10 +378,10 @@ DROP TABLE IF EXISTS `product_addon`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_addon` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `price` decimal(10,2) NOT NULL,
-  `desc` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `turnaround_time` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `desc` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `turnaround_time` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -434,7 +434,7 @@ DROP TABLE IF EXISTS `product_expressionhost`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_expressionhost` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `host_name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `host_name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -487,7 +487,7 @@ DROP TABLE IF EXISTS `product_expressionscale`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_expressionscale` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `scale` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `scale` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -540,10 +540,10 @@ DROP TABLE IF EXISTS `product_product`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_product` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `product_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `price` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `product_name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `turnaround_time` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `price` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `product_name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `turnaround_time` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -567,7 +567,7 @@ DROP TABLE IF EXISTS `product_purificationmethod`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `product_purificationmethod` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `method_name` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `method_name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -612,6 +612,40 @@ INSERT INTO `product_purificationmethod_product` VALUES (1,1,1),(2,1,2),(3,1,3),
 UNLOCK TABLES;
 
 --
+-- Table structure for table `product_vector`
+--
+
+DROP TABLE IF EXISTS `product_vector`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `product_vector` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `vector_name` varchar(20) NOT NULL,
+  `cloning_site` varchar(20) NOT NULL,
+  `vector_map` varchar(20) NOT NULL,
+  `C_Gene` varchar(20) NOT NULL,
+  `V_Gene` varchar(20) NOT NULL,
+  `NC5` varchar(20) NOT NULL,
+  `NC3` varchar(20) NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `is_ready_to_use` tinyint(1) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `product_vector_user_id_f5718aa6_fk_auth_user_id` (`user_id`),
+  CONSTRAINT `product_vector_user_id_f5718aa6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `product_vector`
+--
+
+LOCK TABLES `product_vector` WRITE;
+/*!40000 ALTER TABLE `product_vector` DISABLE KEYS */;
+INSERT INTO `product_vector` VALUES (1,'pAbCode-IGG4','34','AAA','AAA','AAA','AAA','AAA',NULL,1);
+/*!40000 ALTER TABLE `product_vector` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `user_center_order`
 --
 
@@ -620,7 +654,7 @@ DROP TABLE IF EXISTS `user_center_order`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_center_order` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `status` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `user_id` int NOT NULL,
   `shopping_cart_id` bigint NOT NULL,
@@ -652,18 +686,18 @@ DROP TABLE IF EXISTS `user_center_shoppingcart`;
 CREATE TABLE `user_center_shoppingcart` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `adding_time` datetime(6) NOT NULL,
-  `status` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` int NOT NULL,
   `express_host_id` bigint DEFAULT NULL,
   `product_id` bigint DEFAULT NULL,
-  `purification_method` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `purification_method` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `total_price` int DEFAULT NULL,
-  `project_name` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `project_name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `analysis_id` bigint DEFAULT NULL,
   `antibody_number` smallint unsigned DEFAULT NULL,
   `purification_method_id` bigint DEFAULT NULL,
   `scale_id` bigint DEFAULT NULL,
-  `sequence_file` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sequence_file` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `product_id` (`product_id`),
   KEY `user_center_shoppingcart_user_id_7ca42ad4` (`user_id`),
@@ -676,7 +710,7 @@ CREATE TABLE `user_center_shoppingcart` (
   CONSTRAINT `user_center_shoppingcart_ibfk_2` FOREIGN KEY (`purification_method_id`) REFERENCES `product_purificationmethod` (`id`),
   CONSTRAINT `user_center_shoppingcart_user_id_7ca42ad4_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`),
   CONSTRAINT `user_center_shoppingcart_chk_1` CHECK ((`antibody_number` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=50 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -685,7 +719,7 @@ CREATE TABLE `user_center_shoppingcart` (
 
 LOCK TABLES `user_center_shoppingcart` WRITE;
 /*!40000 ALTER TABLE `user_center_shoppingcart` DISABLE KEYS */;
-INSERT INTO `user_center_shoppingcart` VALUES (31,'2023-09-05 11:15:12.125582','COMPLETED',1,1,4,'',60100,NULL,2,500,1,1,NULL),(40,'2023-09-06 09:53:05.197646','INCOMPLETE',1,1,3,NULL,60100,NULL,1,500,1,1,NULL),(41,'2023-09-06 14:36:00.984601','INCOMPLETE',1,1,4,NULL,60100,NULL,1,500,1,1,NULL),(42,'2023-09-09 01:41:43.985835','INCOMPLETE',1,1,2,NULL,60100,NULL,1,500,1,1,NULL),(47,'2023-09-12 11:21:30.747181','INCOMPLETE',1,1,3,NULL,60100,NULL,1,500,1,1,NULL),(48,'2023-09-12 11:31:22.093950','INCOMPLETE',1,1,3,NULL,60100,NULL,2,500,1,1,NULL);
+INSERT INTO `user_center_shoppingcart` VALUES (31,'2023-09-05 11:15:12.125582','COMPLETED',1,1,4,'',60100,NULL,2,500,1,1,NULL),(40,'2023-09-06 09:53:05.197646','INCOMPLETE',1,1,3,NULL,60100,NULL,1,500,1,1,NULL),(41,'2023-09-06 14:36:00.984601','INCOMPLETE',1,1,4,NULL,60100,NULL,1,500,1,1,NULL),(42,'2023-09-09 01:41:43.985835','INCOMPLETE',1,1,2,NULL,60100,NULL,1,500,1,1,NULL),(47,'2023-09-12 11:21:30.747181','INCOMPLETE',1,1,3,NULL,60100,NULL,1,500,1,1,NULL),(48,'2023-09-12 11:31:22.093950','INCOMPLETE',1,1,3,NULL,60100,NULL,2,500,1,1,NULL),(49,'2023-09-20 09:49:57.226304','INCOMPLETE',1,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `user_center_shoppingcart` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -698,4 +732,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-09-13 20:33:54
+-- Dump completed on 2023-09-22 11:26:55

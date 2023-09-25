@@ -1,4 +1,3 @@
-# 使用一个官方的 Python 运行时作为父镜像
 FROM python:3.10
 
 # 设置工作目录
@@ -8,9 +7,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-
 # 安装系统依赖
-
 RUN apt-get clean && apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     default-libmysqlclient-dev && \

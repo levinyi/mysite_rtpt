@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'account',
     'product',
     'user_center',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE = [

@@ -1,32 +1,42 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load widget_tweaks %}
 {% block title %}Login{% endblock %}
 {% block content %}
-<div class="row text-center">
-    {% if form.errors %}
-    <p>Your username and password didn't match. Please try again</p>
-    {% endif %}
-
-    <div class="w-100 mx-auto mt-5 pt-1 pt-md-4 pb-4" style="max-width: 526px;">
-        <form class="needs-validation mb-2" method="post" role="form">
-            {% csrf_token %}
-            <div class="position-relative mb-4">
-                <label for="{{ form.username.id_for_label }}">Username</label>
-                {{ form.username }}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        {% if form.errors %}
+        <div class="col-12 mb-3">
+            <div class="alert alert-danger text-center" role="alert">
+                <p>Your username and password didn't match. Please try again.</p>
             </div>
-            <div class="mb-4">
-                <div class="password-toggle form-label fs-base">
-                    <label for="{{ form.password.id_for_label }}">Password</label>
-                    {{ form.password }}
+        </div>
+        {% endif %}
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="post" role="form" class="needs-validation">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                            {{ form.username|add_class:"form-control" }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.password.id_for_label }}" class="form-label">Password</label>
+                            {{ form.password|add_class:"form-control" }}
+                        </div>
+                        <div class="d-grid col-6">
+                            <button type="submit" class="btn btn-primary">Sign in</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <p class="mb-0">Don’t have an account yet? <a href="{% url 'account:user_register' %}">Register here.</a></p>
+                    <p class="mb-0">Forgot your password? <a href="{% url 'account:password_reset' %}" class="text-decoration-none">Reset here</a>
                 </div>
             </div>
-            <p class="text-center text-xl-start pb-3 mb-3">
-                Don’t have an account yet? <a href="{% url 'account:user_register' %}" style="text-decoration: none;">Register here.</a>
-            </p>
-            <button type="submit" class="btn btn-primary shadow-primary w-100">Sign in</button>
-        </form>
-        <a href="{% url 'account:password_reset' %}" class="btn btn-link btn-lg w-100" style="text-decoration: none;">Forgot your password?</a>
-        <hr class="my-4">
+        </div>
     </div>
 </div>
 {% endblock %}

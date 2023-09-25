@@ -8,8 +8,8 @@
 </div>
 <div class="card-body">
     <!-- Form -->
-    <form class="row g-4">
-
+    <form class="row g-4" method="post" action="{% url 'account:myself_edit' %}" enctype="multipart/form-data">
+        {% csrf_token %}
         <!-- Profile picture -->
         <div class="col-12 justify-content-center align-items-center">
             <label class="form-label">Profile picture</label>
@@ -17,7 +17,7 @@
                 <label class="position-relative me-4" for="uploadfile-1" title="Replace this pic">
                     <!-- Avatar place holder -->
                     <span class="avatar avatar-xl">
-                        <img id="uploadfile-1-preview" class="avatar-img rounded-circle border border-white border-3 shadow" src="assets/images/avatar/07.jpg" alt="">
+                        <img id="uploadfile-1-preview" class="avatar-img rounded-circle border border-white border-3 shadow" src="{{ user.photo }}" alt="">
                     </span>
                     <!-- Remove btn -->
                     <button type="button" class="uploadremove"><i class="bi bi-x text-white"></i></button>
@@ -32,8 +32,8 @@
         <div class="col-12">
             <label class="form-label">Full name</label>
             <div class="input-group">
-                <input type="text" class="form-control" value="{{ user.first_name }}" placeholder="First name">
-                <input type="text" class="form-control" value="{{ user.last_name }}" placeholder="Last name">
+                <input type="text" class="form-control" name="first_name" value="{{ userprofile.first_name }}" placeholder="First name">
+                <input type="text" class="form-control" name="last_name" value="{{ userprofile.last_name }}" placeholder="Last name">
             </div>
         </div>
 
@@ -42,49 +42,50 @@
             <label class="form-label">Username</label>
             <div class="input-group">
                 <span class="input-group-text">RootPath.com</span>
-                <input type="text" class="form-control" value="{{ user.username }}">
+                <input type="text" class="form-control" value="{{ user.username }}" disabled>
             </div>
         </div>
 
         <!-- Email id -->
         <div class="col-md-6">
             <label class="form-label">Email id</label>
-            <input class="form-control" type="email" value="{{ user.email }}" placeholder="Email">
+            <input class="form-control" name="email" type="email" value="{{ userprofile.email }}" placeholder="Email">
         </div>
 
         <!-- Phone number -->
         <div class="col-md-6">
             <label class="form-label">Phone number</label>
-            <input type="text" class="form-control" value="{{ user.phone }}" placeholder="Phone number">
+            <input type="text" class="form-control" name="phone" value="{{ userprofile.phone }}" placeholder="Phone number">
         </div>
 
         <!-- level -->
         <div class="col-md-6">
             <label class="form-label">Level</label>
-            <input class="form-control" type="text" value="{{ user.level }}">
+            <input class="form-control" type="text" name="level", value="{{ userprofile.level }}" disabled>
         </div>
 
         <!-- Company -->
         <div class="col-md-6">
             <label class="form-label">Company</label>
-            <input class="form-control" type="text" value="{{ user.company }}">
+            <input class="form-control" type="text" name="company" value="{{ userprofile.company }}">
         </div>
         
         <!-- department -->
         <div class="col-md-6">
             <label class="form-label">Department</label>
-            <input class="form-control" type="text" value="{{ user.department }}">
+            <input class="form-control" type="text" name="department" value="{{ userprofile.department }}">
         </div>
 
         <!-- Shipping address -->
         <div class="col-12">
             <label class="form-label">Shipping Address</label>
-            <input class="form-control mb-2" type="text" value="{{ user.shipping_address }}">
+            <input class="form-control mb-2" type="text" name="shipping_address" value="{{ userprofile.shipping_address }}">
         </div>
 
         <!-- Save button -->
+        <!-- Your form fields go here -->
         <div class="d-sm-flex justify-content-end">
-            <button type="button" class="btn btn-primary mb-0">Save changes</button>
+            <button type="submit" class="btn btn-primary mb-0">Save changes</button>
         </div>
     </form>
 </div>

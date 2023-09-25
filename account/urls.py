@@ -17,7 +17,7 @@ urlpatterns = [
 
 
     path('my-information/', views.myself, name='my_information'),
-    path('edit-my-information/', views.myself_edit, name='edit_my_information'),
+    path('myself_edit/', views.myself_edit, name='myself_edit'),
 
     path('settings/', views.settings, name='settings'),
 ]
