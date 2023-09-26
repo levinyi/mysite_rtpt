@@ -6,4 +6,5 @@ pillow==9.4.0
 mysqlclient
 python-decouple
 django-widget-tweaks
-
+pandas
+django-cors-headers

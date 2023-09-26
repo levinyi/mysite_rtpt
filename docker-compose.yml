@@ -3,7 +3,7 @@ version: '3'
 services:
   web:
     image: levindu11/mysite_rtpt:latest
-    command: gunicorn mysite.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn mysite.wsgi:application --bind 0.0.0.0:8000 --log-level debug
     volumes:
       - .:/code
     ports:
