@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Tools List{% endblock %}
+{% block extra_head %}
+<style>
+    .card {
+        border: 1px solid; /* 为了保持格式一致，当没有hover时使用透明边框 */
+    }
+
+    .card:hover {
+        border-color: blue !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="mt-8">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div
+                    class="bg-light d-lg-flex justify-content-between align-items-center py-6 py-lg-3 px-8 rounded-3 text-center text-lg-start">
+                    <!-- img -->
+                    <div class="d-lg-flex align-items-center">
+                        <img src="https://freshcart.codescandy.com/assets/images/about/about-icons-1.svg" alt=""
+                            class="img-fluid">
+                        <!-- text -->
+                        <div class="ms-lg-4">
+                            <h1 class="fs-2 mb-1">We have <span class="text-primary">{{ tools.count }}</span> tools now</h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="mt-4 mb-lg-14 mb-8">
+    <div class="container">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for tool in tools %}
+            <div class="col">
+                <div class="card border">
+                    <a href="/tools/{{ tool.tool_name }}/" class="text-decoration-none text-dark stretched-link">
+                        <div class="row g-0">
+                            <div class="col-md-4">
+                                <img src="{% static '' %}/tools_icon/{{ tool.tool_name }}.icon.png" class="img-fluid rounded-start" alt="{{ tool.tools_name }}">
+                            </div>
+                            <div class="col-md-8">
+                                <div class="card-body">
+                                    <h4 class="card-title"> {{ tool.tool_name }}</h4>
+                                    <p class="card-text">{{ tool.tool_desc }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% endblock %}

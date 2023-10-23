@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'product',
     'user_center',
     'widget_tweaks',
-    # 'corsheaders',
+    'tools',
 ]
 
 MIDDLEWARE = [
@@ -56,7 +56,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'mysite.urls'
@@ -87,10 +86,10 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'mysite',
+        'NAME': 'mysite_rtpt',
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
-        'HOST': 'localhost',  # db for docker-compose. /localhost
+        'HOST': config('DB_HOST'),  # 'db' for docker-compose. 'localhost' for local
         'PORT': 3306,
         'OPTIONS': {'unix_socket': '/var/run/mysqld/mysqld.sock'},
     }
