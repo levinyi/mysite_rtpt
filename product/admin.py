@@ -5,9 +5,9 @@ from .models import Product, Addon, ExpressionScale, ExpressionHost,Purification
 
 
 class VectorAdmin(admin.ModelAdmin):
-    list_display = ('vector_name', 'cloning_site', 'vector_map', 'is_ready_to_use', 'C_Gene', 'V_Gene', 'NC5', 'NC3')
-    list_filter = ('vector_name', 'cloning_site', 'vector_map', 'is_ready_to_use', 'C_Gene', 'V_Gene', 'NC5', 'NC3')
-    search_fields = ('vector_name', 'cloning_site', 'vector_map', 'is_ready_to_use', 'C_Gene', 'V_Gene', 'NC5', 'NC3')
+    list_display = ('vector_name', 'cloning_site', 'is_ready_to_use', 'NC5', 'NC3')
+    list_filter = ('vector_name', 'cloning_site', 'is_ready_to_use', 'NC5', 'NC3')
+    search_fields = ('vector_name', 'cloning_site', 'is_ready_to_use', 'NC5', 'NC3')
 
 
 admin.site.register(Product)

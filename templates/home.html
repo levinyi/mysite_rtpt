@@ -1,7 +1,26 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}home page{% endblock %}
 {% block content %}
 <div class="container text-center">
-It's home page, Empty for now
+    <div class="row mt-5">
+        <h1 class="mt-5">We are doing something ...</h1>
+    </div>
+    <div class="row mt-5">
+        <div class="col-4">
+        </div>
+        <div class="col-4">
+            <div id="carouselExampleSlidesOnly" class="carousel slide" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    <div class="carousel-item active">
+                    <img src="{% static 'images/construction1.png' %}" class="d-block w-100" alt="...">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-4">
+        </div>
+    </div>
 </div>
 {% endblock %}

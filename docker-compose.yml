@@ -14,7 +14,7 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_DATABASE: mysite
+      MYSQL_DATABASE: mysite_rtpt
       MYSQL_ROOT_PASSWORD: 123456
       MYSQL_HOST: db
     volumes:
