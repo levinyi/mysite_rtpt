@@ -10,5 +10,7 @@ urlpatterns = [
     path('shopping_cart_remove/', views.shopping_cart_remove, name='shopping_cart_remove'),
     path('manage_order/', views.manage_order, name='manage_order'),
     path('manage_vector/', views.manage_vector, name='manage_vector'),
+    path('vector_add/', views.vector_add, name='vector_add'),
     path('download_pdf/<int:order_id>/', views.download_pdf, name='download_pdf'),
+
 ]

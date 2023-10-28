@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-
+from django.utils import timezone
 
 # Create your models here.
 class Product(models.Model):
@@ -50,11 +50,17 @@ class ExpressionScale(models.Model):
 class Vector(models.Model):
     user = models.ForeignKey(User, verbose_name="User", on_delete=models.SET_NULL, null=True, blank=True)
     vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
-    cloning_site = models.CharField(verbose_name="Cloning_site", max_length=20)
+    # cloning_site = models.CharField(verbose_name="Cloning_site", max_length=20, null=True, blank=True)
     vector_map = models.TextField(verbose_name="Vector_Seq")
     NC5 = models.CharField(verbose_name="5NC", max_length=20)
     NC3 = models.CharField(verbose_name="3NC", max_length=20)
-    is_ready_to_use = models.BooleanField(default=False)
+    # is_ready_to_use = models.BooleanField(default=False)
+    create_date = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=255, default='Need_To_Validate')
+
+    forbid_seq = models.CharField(max_length=255, null=True, blank=True)
+    combined_seq = models.TextField(null=True, blank=True)
+    saved_seq = models.TextField(null=True, blank=True)
 
     def is_company_vector(self):
         return self.user is None
@@ -62,3 +68,7 @@ class Vector(models.Model):
     def __str__(self):
         return self.vector_name
 
+class GeneSynEnzymeCutSite(models.Model):
+    enzyme_name = models.CharField(verbose_name="酶切位点", max_length=256)
+    enzyme_seq = models.CharField(verbose_name="酶切序列", max_length=256)
+    usescope = models.CharField(verbose_name="使用范围", max_length=256)
