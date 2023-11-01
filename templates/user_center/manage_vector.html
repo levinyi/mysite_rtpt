@@ -30,10 +30,10 @@
                     {% for vector in company_vectors %}
                     <tr>
                         <td>{{ vector.vector_name }}</td>
-                        <td>{{ vector.is_ready_to_use }}</td>
+                        <td>{{ vector.status }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_map }}</td>
-                        <td>{{ vector.NC5 }}</td>
-                        <td>{{ vector.NC3 }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -64,16 +64,24 @@
                         <th scope="col">Map</th>
                         <th scope="col">5NC</th>
                         <th scope="col">3NC</th>
+                        <th scope="col">Edit</th>
+                        <th scope="col">Delete</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for vector in user_vectors %}
                     <tr>
-                        <td>{{ vector.vector_name }}</td>
-                        <td>{{ vector.is_ready_to_use }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</td>
+                        <td>{{ vector.status }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_map }}</td>
-                        <td>{{ vector.NC5 }}</td>
-                        <td>{{ vector.NC3 }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
+                        <td><a type="button" href="{% url 'user_center:vector_detail' vector.id %}" class="btn btn-primary">Edit</a></td>
+                        <td><form method="post" action="{% url 'user_center:vector_delete' vector.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger">Delete</button>
+                            </form>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

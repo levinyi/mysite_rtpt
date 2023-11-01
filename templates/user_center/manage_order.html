@@ -1,6 +1,6 @@
 {% extends "user_center/base.html" %}
 {% load static %}
-{% block title %}Shopping Cart{% endblock %}
+{% block title %}Orders{% endblock %}
 {% block content %}
 <div class="container">
     <div class="row pt-3 mt-3 form-control">
@@ -25,42 +25,12 @@
                 </tbody>
             </table>
         </div>
+        <!-- add a button -->
+        <div class="col-12">
+            <a href="{% url 'user_center:order_create' %}" class="btn btn-primary">Order Now</a>
+        </div>
     </div>
 </div>
 {% endblock %}
 {% block javascript %}
-<script type="text/javascript">
-    function del_cart(the, shopping_id){
-        var article_name = $(the).parents("tr").children("td").eq(1).text();
-        layer.open({
-            type: 1,
-            skin: "layui-layer-rim",
-            area: ["400px", "200px"],
-            title: "Delete shopping cart record",
-            content: '<div class="text-center" style="margin-top:20px"><p>是否确定删除《'+ shopping_id +'》</p></div>',
-            btn:['Yes', 'No'],
-            yes: function(){
-                $.ajax({
-                    url: '{% url "user_center:shopping_cart_remove" %}',
-                    type:"POST",
-                    data: {
-                        "shopping_id": shopping_id,
-                        "csrfmiddlewaretoken": '{{ csrf_token }}'
-                    },
-                    success: function(e) {
-                        if (e == "1") {
-                            parent.location.reload();
-                            layer.msg("has been deleted.");
-                        } else {
-                            layer.msg("删除失败");
-                        }
-                    },
-                    error: function(e) {
-                        layer.msg("请求失败");
-                    }
-                })
-            },
-        });
-    }
-</script>
 {% endblock %}
