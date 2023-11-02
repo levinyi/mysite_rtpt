@@ -11,7 +11,7 @@
             <ul class="nav col-12 col-lg-auto me-lg-auto mb-2 justify-content-center mb-md-0">
                 <li><a href="{% url 'home' %}" class="nav-link px-2 text-secondary">主页</a></li>
                 {% comment %} <li><a href="{% url 'product:product_list' %}" class="nav-link px-2 text-secondary">Products</a></li> {% endcomment %}
-                <li><a href="#" class="nav-link px-2 text-secondary">订单管理系统</a></li>
+                <li><a href="{% url 'user_center:order_create' %}" class="nav-link px-2 text-secondary">订单管理系统</a></li>
                 <li><a href="{% url 'tools:tools_list' %}" class="nav-link px-2 text-secondary">工具</a></li>
             </ul>
 

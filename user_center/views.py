@@ -40,8 +40,16 @@ def shopping_cart_remove(request):
         return HttpResponse('2')
 
 def order_create(request):
-    if request.method == "GET":
-        return render(request, 'user_center/manage_order_create.html')
+    company_vectors = Vector.objects.filter(user=None)
+    
+    # 如果用户已登录
+    if request.user.is_authenticated:
+        customer_vectors = Vector.objects.filter(user=request.user)
+        return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors})
+    # 如果用户未登录
+    else:
+        return render(request, 'user_center/manage_order_create.html', {'company_vectors': company_vectors})
+
 
 def submit_order(request, shopping_id):
     shopping_cart = get_object_or_404(ShoppingCart, id=shopping_id)

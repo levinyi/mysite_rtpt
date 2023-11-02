@@ -1,5 +1,21 @@
 {% extends 'base.html' %}
 {% block title %}order{% endblock %}
+{% block extra_head %}
+    <style>
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+        .workflow-icon {
+            background-color: #ffe6cc;
+            padding: 30px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+    </style>
+{% endblock %}
 {% block content %}
 <div class="container">
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
@@ -8,22 +24,53 @@
             <li class="breadcrumb-item active" aria-current="page"></li>
         </ol>
     </nav>
-
-    <div class="card mt-3">
-        <div class="card-header">
-            <h3>下单流程</h3>
-        </div>
-        <div class="card-body">
-            <p>1. 选择载体</p>
-            <p>2. 选择物种</p>
-            <p>3. 提交合成序列</p>
+    <div class="card mt-5">
+        <h2 class="text-center mt-3 ">下单流程</h2>
+        <div class="d-flex justify-content-between mb-4 mt-3">
+            <div class="workflow-step">
+                <div class="workflow-icon mb-3">
+                    <i class="bi bi-journal-text"></i>
+                </div>
+                选择载体
+                <small>选择已有载体，或构建自己的载体</small>
+            </div>
+            <div class="workflow-step">
+                <div class="workflow-icon mb-3">
+                    <i class="bi bi-display"></i>
+                </div>
+                选择物种
+                <small>目前已支持20种物种,选择合适物种</small>
+            </div>
+            <div class="workflow-step">
+                <div class="workflow-icon mb-3">
+                    <i class="bi bi-folder-check"></i>
+                </div>
+                填写合成序列
+                <small>将需要合成的序列填写在表格中即可</small>
+            </div>
+            <div class="workflow-step">
+                <div class="workflow-icon mb-3">
+                    <i class="bi bi-person-check"></i>
+                </div>
+                验证序列
+                <small>通过Analysis工具验证序列可用验证</small>
+            </div>
+            <div class="workflow-step">
+                <div class="workflow-icon mb-3">
+                    <i class="bi bi-check-lg"></i>
+                </div>
+                提交订单
+                <small>检查完成无误后即可完成下单完成</small>
+            </div>
         </div>
     </div>
-    <div class="card mt-3">
-        <div class="card-header">
-            <h3>Step 1 选择载体</h3>
-        </div>
+    <div class="card mt-5">
+        <h2 class="text-center mt-3">开始下单</h2>
+        
         <div class="card-body">
+            <div class="card-title mb-3">
+                <h3>Step 1 选择载体</h3>
+            </div>
             <select class="form-select" multiple aria-label="Multiple select example">
                 <option selected>Open this select menu</option>
                 <option value="1">One</option>
@@ -31,10 +78,11 @@
                 <option value="3">Three</option>
             </select>
         </div>
-        <div class="card-header">
-            <h3>Step 2 选择物种</h3>
-        </div>
+            
         <div class="card-body">
+            <div class="card-title mb-3">
+                <h3>Step 2 选择物种</h3>
+            </div>
             <select class="form-select" multiple aria-label="Multiple select example">
                 <option selected>Open this select menu</option>
                 <option value="1">E.coli</option>
@@ -42,16 +90,15 @@
                 <option value="3">Mammalian</option>
             </select>
         </div>
-        <div class="card-header">
-            <h3>Step 3 提交合成序列</h3>
-        </div>
+    
         <div class="card-body">
-            <h3 class="card-title">填写载体信息.</h3>
+            <div class="card-title">
+                <h3>Step 3 提交合成序列</h3>
+            </div>
             <div id="example" class="mt-3">
                 <button onclick="postData()" class="btn btn-primary mt-4">Submit & Analyze Sequences</button>
             </div>
         </div>
-    </div>
     </div>
 </div>
 {% endblock %}
@@ -60,20 +107,15 @@
 <script>
     const container = document.querySelector('#example');
     const hot = new Handsontable(container, {
-        colHeaders: ['GeneName', 'Seq5NC', 'Sequence', 'Seq3NC', 'forbiddenSeqs', 'Species', 'VectorID'],
+        colHeaders: ['Gene Name', 'NT|AA Sequence', 'ForbiddenSeqs'],
         rowHeaders: true,
-        colWidths: [100, 200, 300, 200, 200, 100, 100],  // 设置每列的宽度
+        colWidths: [300, 600, 300],  // 设置每列的宽度
         columns: [
             { data: 'GeneName' },
-            { data: 'Seq5NC' },
             { data: 'Sequence' },
-            { data: 'Seq3NC' },
             { data: 'forbiddenSeqs' },
-            { data: 'Species' },
-            { data: 'VectorID' },
         ],
         height: 'auto',
-        // width: 'auto',
         licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
     });
 
