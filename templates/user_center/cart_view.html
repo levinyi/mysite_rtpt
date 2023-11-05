@@ -1,0 +1,43 @@
+{% extends "user_center/base.html" %}
+{% load static %}
+{% block title %}Shopping Cart{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row pt-3 mt-3 form-control">
+        <h4 class="mb-3">Shopping Cart</h4>
+        <table class="table table-striped table-hover table-bordered" style="text-align:center">
+            <thead>
+                <tr>
+                    <th scope="col">Gene ID</th>
+                    <th scope="col">Gene Name</th>
+                    <th scope="col">vector</th>
+                    <th scope="col">Species</th>
+                    <th scope="col">status</th>
+                    <th scope="col">create at</th>
+                    <th scope="col">Forbidden Seqs</th>
+                    <th scope="col">gc_content</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gene in gene_infos %}
+                <tr>
+                    <td>{{ gene.id }}</td>
+                    <td>{{ gene.gene_name }}</td>
+                    <td>{{ gene.vector }}</td>
+                    <td>{{ gene.species }}</td>
+                    <td>{{ gene.status }}</td>
+                    <td>{{ gene.create_date }}</td>
+                    <td>{{ gene.forbid_seq }}</td>
+                    <td>{{ gene.gc_content }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% comment %} <p>*The turn-around time(TAT) does not include shipping and handing time and reconstruction time of the customer's vector.</p> {% endcomment %}
+    </div>
+</div>
+{% endblock %}
+{% block javascript %}
+{% endblock %}
