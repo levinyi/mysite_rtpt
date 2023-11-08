@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, render
 from .models import Product, ExpressionHost, PurificationMethod, Addon, ExpressionScale, Vector
-from user_center.models import ShoppingCart, Order
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
@@ -12,7 +12,10 @@ def product_list(request):
     products = Product.objects.all()
     return render(request, 'product/products.html' , {'products': products})
 
+def create_order(request):
+    pass
 
+'''
 def create_order(request):
     if request.method == "GET":
         return render(request, 'product/create_order.html', {})
@@ -48,7 +51,7 @@ def create_order(request):
                 product=product,
             )
         return JsonResponse({'redirect_url': '/product/order_selection/', 'order_id': shopping_cart.id})
-
+'''
 def order_selection(request, order_id):
     if request.method == "GET":
         # 判读是否登录

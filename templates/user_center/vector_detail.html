@@ -76,7 +76,7 @@
                         </select>
                         <button class="btn btn-warning toggle-btn mt-3 min-width">Toggle Codon Boxes</button>
                         <button class="btn btn-primary mt-3 analysis-btn" data-gene-name="{{ vector.vector_name }}">Re-analyze</button>
-                        <a class="btn btn-success mt-3" href="{% url 'user_center:validation_save' vector.id %}">Save</a>
+                        <a class="btn btn-success mt-3" href="{% url 'user_center:validation_save' 'vector' vector.id %}">Save</a>
                     {% endif %}
                 </div>
             </div>

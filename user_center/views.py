@@ -1,9 +1,11 @@
 import json
 import re
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from user_center.models import Order, ShoppingCart
-from product.models import GeneSynEnzymeCutSite, Vector
+# from user_center.models import Order, ShoppingCart
+from product.models import GeneSynEnzymeCutSite, Species, Vector
+from .models import Cart, GeneInfo, OrderInfo
+from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.models import User
@@ -11,60 +13,164 @@ from django.contrib.auth.models import User
 # Create your views here.
 @login_required(login_url='/account/login/')
 def dashboard(request):
-    shopping_cart = ShoppingCart.objects.filter(user=request.user, status='INCOMPLETE')
-    production_order = Order.objects.filter(user=request.user, status='CREATED')
-    shipping_order = Order.objects.filter(user=request.user, status='SHIPPING')
+    shopping_cart = GeneInfo.objects.filter(user=request.user, status='INCOMPLETE')
+    production_order = OrderInfo.objects.filter(user=request.user, status='CREATED')
+    shipping_order = OrderInfo.objects.filter(user=request.user, status='SHIPPING')
     return render(request, 'user_center/dashboard.html', {
             'order_number_in_production': len(production_order),
             'order_number_in_shipment': len(shipping_order), 
             'order_number_in_cart': len(shopping_cart), 
             })
 
-
-@login_required
-def shopping_cart(request):
-    if request.method == 'GET':
-        shopping_cart = ShoppingCart.objects.filter(user=request.user)
-        order_list = Order.objects.filter(user=request.user)
-        return render(request, 'user_center/shopping_cart.html', {'shopping_cart': shopping_cart, 'order_list': order_list})
-
-@login_required
-@csrf_exempt
-def shopping_cart_remove(request):
-    shopping_cart_id = request.POST.get('shopping_id')
-    try:
-        shopping_cart = ShoppingCart.objects.get(id=shopping_cart_id)
-        shopping_cart.delete()
-        return HttpResponse('1')
-    except:
-        return HttpResponse('2')
-
 def order_create(request):
-    company_vectors = Vector.objects.filter(user=None)
-    
-    # 如果用户已登录
-    if request.user.is_authenticated:
-        customer_vectors = Vector.objects.filter(user=request.user)
-        return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors})
-    # 如果用户未登录
+    # 这里只能是GET请求，因为POST请求是提交订单
+    if request.method == 'POST':
+        # 这里的逻辑是创建订单
+        pass
     else:
-        return render(request, 'user_center/manage_order_create.html', {'company_vectors': company_vectors})
+        company_vectors = Vector.objects.filter(user=None)
+        species_list = Species.objects.all()
+        # 如果用户已登录
+        if request.user.is_authenticated:
+            customer_vectors = Vector.objects.filter(user=request.user)
+            return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_list': species_list})
+        # 如果用户未登录
+        else:
+            return render(request, 'user_center/manage_order_create.html', {'company_vectors': company_vectors, 'species_list': species_list})
 
 
-def submit_order(request, shopping_id):
-    shopping_cart = get_object_or_404(ShoppingCart, id=shopping_id)
-    shopping_cart.status = 'INCOMPLETE'
-    shopping_cart.save()
-    Order.objects.create(
-        user=request.user,
-        status='CREATED',
-        shopping_cart=shopping_cart,
-    )
-    return redirect('/user_center/shopping_cart/')
+def add_to_cart(request):
+    # 这里只能是POST请求，因为GET请求是查看购物车
+    if request.method == 'POST':
+        # 验证用户是否登录
+        if not request.user.is_authenticated:
+            return JsonResponse({'status': 'error', 'message': 'Please login first'})
+        
+        data = json.loads(request.body.decode('utf-8'))
+
+        vector_id = data.get("vectorId")
+        species_id = data.get("speciesId")
+        gene_table = data.get("genetable")
+        print("vector_id: ", vector_id)
+        print("species_id: ", species_id)
+        print("gene_table: ", gene_table)
+        vector = Vector.objects.get(id=vector_id)
+        print("you selected vector_name :",vector.vector_name)
+        species = Species.objects.get(id=species_id)
+        print("you selected species_name :",species.species_name)
+        nc5 = vector.NC5
+        nc3 = vector.NC3
+        print("NC5: ", nc5)
+        print("NC3: ", nc3)
+
+        for row in gene_table:
+            # row[0], row[1], row[2]
+            if any(cell is not None for cell in row):
+                gene_name, origional_seq, forbid_seq = row
+                print("maybe here is bug: ", gene_name, origional_seq, forbid_seq)
+                # 如果是AA序列呢？
+                combined_seq = nc5 + origional_seq + nc3
+                tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(combined_seq, forbid_seq)
+                if seq_status == 'Protein':
+                    return JsonResponse({'status': 'error', 'message': 'Protein sequence is not allowed.'})
+                elif seq_status == 'Invalid Protein':
+                    return JsonResponse({'status': 'error', 'message': 'Invalid protein sequence.'})
+                
+                saved_seq = tagged_seq
+
+                this_gene, created = GeneInfo.objects.update_or_create(
+                    user=request.user,
+                    gene_name=gene_name,
+                    defaults={
+                        'origional_seq': origional_seq,
+                        'vector': vector,
+                        'species': species,
+                        'status': seq_status,
+
+                        'forbid_seq': forbid_seq,
+                        'combined_seq': tagged_seq,
+                        'saved_seq': saved_seq,
+
+                        'gc_content': gc_content,
+                        'forbidden_check_list': forbidden_check_list,
+                        'contained_forbidden_list': contained_forbidden_list,
+                    }
+                )
+                print("this gene: ", this_gene.gene_name, this_gene.forbid_seq)
+        return JsonResponse({'status': 'success', "message": "Data saved successfully"})
+    else:
+        return render(request, 'user_center/manage_order_create.html')
+
+@login_required
+def gene_detail(request):
+    ''' when user click the "submit & analysis" button, this function will be called.'''
+    gene_list = GeneInfo.objects.filter(user=request.user)
+    return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list})
+
+# checked
+@login_required
+def gene_edit(request, gene_id):
+    ''' when user click the "Edit" button, this function will be called.'''
+    gene_object = GeneInfo.objects.get(user=request.user, id=gene_id)
+    gene_object.status = "validated"
+    gene_object.save()
+    return redirect(f'/user_center/gene_detail/')
+
+def gene_delete(request, gene_id):
+    if request.method == 'POST':
+        gene = GeneInfo.objects.get(user=request.user, id=gene_id)
+        gene.delete()
+        return redirect('/user_center/gene_detail/')
+    else:
+        return render(request, 'user_center/manage_order_create.html')
+
+def view_cart(request):
+    # 这里的逻辑是展示shopping cart. 也就是用户还没有提交订单，但是已经添加了一些Gene的情况
+    gene_infos = GeneInfo.objects.filter(user=request.user)
+
+    # 将这些gene的添加到Cart中
+    for gene in gene_infos:
+        Cart.objects.get_or_create(user=request.user, genes=gene)
+    
+    cart = Cart.objects.get(user=request.user)
+    shopping_cart = cart.genes.all()
+    return render(request, 'user_center/cart_view.html', {'shopping_cart': shopping_cart})
+
+
+@login_required
+@require_POST
+def checkout(request):
+    # 获取所有选中的gene_ids
+    gene_ids = request.POST.getlist('gene_ids')
+
+    if not gene_ids:
+        # 如果没有选中的gene_id，返回一个错误消息
+        return JsonResponse({'status': 'error', 'message': 'No gene selected'})
+    
+    # 将选中的gene_id从GeneInfo中删除
+    # for gene_id in gene_ids:
+    #     GeneInfo.objects.filter(user=request.user, id=gene_id).delete()
+    
+    # 为选中的gene创建一个订单
+    order = OrderInfo.objects.create(user=request.user)
+    # 获取所有选中的gene对象
+    genes = get_list_or_404(GeneInfo, user=request.user, id__in=gene_ids)
+    # 将gene添加到订单中
+    order.gene_infos.add(*genes)
+    order.status = 'CREATED'
+    order.save()
+
+    # 重定向到订单详情页面
+    return JsonResponse({'status': 'success', 'message': 'Order created successfully', 'redirect_url': f'/user_center/manage_order/'})
+
+def view_order_detail(request, order_id):
+    # 这里的逻辑是展示订单详情
+    order = OrderInfo.objects.get(id=order_id)
+    return render(request, 'user_center/view_order_detail.html', {'order': order})
 
 def manage_order(request):
-    order_list = Order.objects.filter(user=request.user)
-    return render(request, 'user_center/manage_order.html', {'order_list': order_list})
+    order_list = OrderInfo.objects.filter(user=request.user)
+    return render(request, 'user_center/order_view.html', {'order_list': order_list})
 
 @login_required
 def manage_vector(request):
@@ -199,8 +305,44 @@ def check_sequence(seq):
     all_positions = regional_GC_positions + consecutive_NT_positions
     return all_positions
 
+def identify_sequence(seq):
+    if not isinstance(seq, str):
+        return "Invalid input, expected a string."
+    
+    seq = seq.upper().replace(" ", "")
+
+    if not seq:
+        return "Empty sequence"
+
+    nucleotides_DNA = set("ATCG")
+    nucleotides_RNA = set("AUCG")
+    amino_acids = set("ACDEFGHIKLMNPQRSTVWY")
+ 
+    # 允许"*"出现，但必须出现在最后
+    if seq.endswith("*"):
+        seq = seq[:-1]
+
+    if all(base in nucleotides_DNA for base in seq):
+        return "DNA sequence"
+    elif all(base in nucleotides_RNA for base in seq):
+        return "RNA sequence"
+    elif all(aa in amino_acids for aa in seq):
+        return "Protein sequence"
+    else:
+        invalid_bases = set(seq).difference(nucleotides_DNA.union(amino_acids))
+        if invalid_bases:
+            return f"Invalid sequence, containing: {', '.join(invalid_bases)}"
+        else:
+            return "Invalid or unknown sequence"
+
 def process_sequence(seq, forbid_seq, vector_object=None):
     seq = seq.upper().replace(" ", "")
+    # 如果seq是氨基酸序列，则不需要检查forbid_seq，不需要计算gc_content，不需要检查consecutive NTs，直接返回
+    if identify_sequence(seq) == "Protein sequence":
+        return seq, "Protein", None, None, None
+    elif identify_sequence(seq) == "Invalid sequence, containing: *":
+        return seq, "Invalid Protein", None, None, None
+
     contained_forbidden_list, forbidden_check_list, forbidden_positions = check_forbiden_seq(seq, len(seq), forbid_seq)
     
     GC_content = calculate_gc_content(seq)
@@ -327,8 +469,14 @@ def vector_delete(request, vector_id):
 #     return response
 
 @login_required
-def validation_save(request, vector_id):
-    vector_object = Vector.objects.get(user=request.user, id=vector_id)
-    vector_object.status = 'saved'
-    vector_object.save()
-    return redirect(f'/user_center/vector_detail/{vector_id}')
+def validation_save(request, vector_or_gene, id):
+    if vector_or_gene == 'vector':
+        vector_object = Vector.objects.get(user=request.user, id=id)
+        vector_object.status = 'saved'
+        vector_object.save()
+        return redirect(f'/user_center/vector_detail/{id}')
+    elif vector_or_gene == 'gene':
+        gene_object = GeneInfo.objects.get(user=request.user, id=id)
+        gene_object.status = 'saved'
+        gene_object.save()
+        return redirect(f'/user_center/gene_detail/')

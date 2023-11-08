@@ -35,7 +35,7 @@
       <a href="{% url 'user_center:dashboard' %}" class="nav-link link-body-emphasis {% if request.path == '/user_center/dashboard/' %}active{% endif %}"><svg class="bi pe-none me-2" width="16" height="16"><use xlink:href="#speedometer2"/></svg>
         Dashboard</a></li>
     <li>
-      <a href="{% url 'user_center:shopping_cart' %}" class="nav-link link-body-emphasis {% if request.path == '/user_center/shopping_cart/' %}active{% endif %}"><svg class="bi pe-none me-2" width="16" height="16"><use xlink:href="#cart"/></svg>
+      <a href="{% url 'user_center:view_cart' %}" class="nav-link link-body-emphasis {% if request.path == '/user_center/view_cart/' %}active{% endif %}"><svg class="bi pe-none me-2" width="16" height="16"><use xlink:href="#cart"/></svg>
         Shopping Cart</a></li>
     <li>
       <a href="{% url 'user_center:manage_order' %}" class="nav-link link-body-emphasis {% if request.path == '/user_center/manage_order/' %}active{% endif %}"><svg class="bi pe-none me-2" width="16" height="16"><use xlink:href="#table"/></svg>

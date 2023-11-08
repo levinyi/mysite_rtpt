@@ -26,14 +26,14 @@
                             <label for="{{ form.password.id_for_label }}" class="form-label">Password</label>
                             {{ form.password|add_class:"form-control" }}
                         </div>
-                        <div class="d-grid col-6">
+                        <div class="d-grid col-auto">
                             <button type="submit" class="btn btn-primary">Sign in</button>
                         </div>
                     </form>
                 </div>
                 <div class="card-footer text-center">
-                    <p class="mb-0">Don’t have an account yet? <a href="{% url 'account:user_register' %}">Register here.</a></p>
-                    <p class="mb-0">Forgot your password? <a href="{% url 'account:password_reset' %}" class="text-decoration-none">Reset here</a>
+                    <p class="mb-0">Don’t have an account yet? <a href="{% url 'account:user_register' %}" class="text-decoration-none">Register here.</a></p>
+                    {% comment %} <p class="mb-0">Forgot your password? <a href="{% url 'account:password_reset' %}" class="text-decoration-none">Reset here</a> {% endcomment %}
                 </div>
             </div>
         </div>

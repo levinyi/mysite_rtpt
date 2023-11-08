@@ -1,28 +1,35 @@
 {% load static %}
-<header class="p-3 text-white" style="background-color: #002060;"> <!-- 替换为您提供的蓝色色值 -->
+<header class="p-3 text-white" style="background-color: #002060;"> <!-- 蓝色色值 -->
     <div class="container">
         <div class="d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start">
             
             <!-- Logo部分 -->
             <a href="{% url 'home' %}" class="d-flex align-items-center mb-2 mb-lg-0 text-white text-decoration-none">
-                <img src="{% static 'rootpath.logo.png' %}" alt="Logo"> <!-- 替换为您logo的路径 -->
+                <img src="{% static 'rootpath.logo.png' %}" alt="Logo"> <!-- logo的路径 -->
             </a>
 
-            <ul class="nav col-12 col-lg-auto me-lg-auto mb-2 justify-content-center mb-md-0">
-                <li><a href="{% url 'home' %}" class="nav-link px-2 text-secondary">主页</a></li>
-                {% comment %} <li><a href="{% url 'product:product_list' %}" class="nav-link px-2 text-secondary">Products</a></li> {% endcomment %}
-                <li><a href="{% url 'user_center:order_create' %}" class="nav-link px-2 text-secondary">订单管理系统</a></li>
-                <li><a href="{% url 'tools:tools_list' %}" class="nav-link px-2 text-secondary">工具</a></li>
+            <!-- 汉堡菜单按钮，小屏幕上显示 -->
+            <button class="navbar-toggler d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#navbarToggleExternalContent" aria-controls="navbarToggleExternalContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- 导航链接，小屏幕上隐藏，中屏幕及以上显示 -->
+            <ul class="nav col-12 col-lg-auto me-lg-auto mb-2 justify-content-center mb-md-0 d-none d-md-flex">
+                <li><a href="{% url 'home' %}" class="nav-link px-2 text-secondary">Home</a></li>
+                <!-- 更多导航项 -->
+                <li><a href="{% url 'user_center:order_create' %}" class="nav-link px-2 text-secondary">Create Order</a></li>
+                <li><a href="{% url 'tools:tools_list' %}" class="nav-link px-2 text-secondary">Tools</a></li>
             </ul>
-
-            <div class="text-end">
+            
+            <!-- 用户认证相关链接，小屏幕上堆叠显示，中屏幕及以上水平显示 -->
+            <div class="text-end d-flex flex-wrap">
+                <!-- 用户认证逻辑 -->
                 {% if user.is_authenticated %}
                 <div class="dropdown">
                     <a href="#" class="d-flex align-items-center link-body-emphasis text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        <img src="https://github.com/mdo.png" alt="" width="32" height="32" class="rounded-circle me-2">
+                        <img src="{% static 'images/user_icon.jpg' %}" alt="" width="32" height="32" class="rounded-circle me-2">
                         <strong>{{ user.username }}</strong>
                       </a>
-                    {% comment %} <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown" aria-expanded="false">{{ user.username }}</a> {% endcomment %}
                     <ul class="dropdown-menu text-small shadow" aria-labelledby="dropdownMenuLink">
                         <li><a class="dropdown-item" href="{% url 'user_center:dashboard' %}">User Center</a></li>
                         <li><a class="dropdown-item" href="{% url 'account:my_information' %}">Profile</a></li>

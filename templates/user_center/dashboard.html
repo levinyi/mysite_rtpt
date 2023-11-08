@@ -34,7 +34,7 @@
                 <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
                     <h5> <strong>{{ order_number_in_production }} </strong> order(s) in Production</h5>
                     <br><br>
-                    <a href="{% url 'product:create_order' %}" class="btn btn-primary">Start New Order</a>
+                    <a href="{% url 'user_center:order_create' %}" class="btn btn-primary">Start New Order</a>
                 </div>
             </div>
         </div>        
@@ -62,7 +62,7 @@
                 <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
                     <h5><strong>{{ order_number_in_shipment }}</strong> order(s) in Shipment </h5>
                     <br><br>
-                    <a href="{% url 'user_center:shopping_cart' %}" class="btn btn-primary">View Order History</a>
+                    <a href="{% url 'user_center:manage_order' %}" class="btn btn-primary">View Order History</a>
                 </div>
             </div>
         </div>
@@ -90,7 +90,7 @@
                 <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
                     <h5><strong>{{ order_number_in_cart }}</strong> order(s) in Shopping Cart</h5>
                     <br><br>
-                    <a href="{% url 'user_center:shopping_cart' %}" class="btn btn-primary">Shopping Cart</a>
+                    <a href="{% url 'user_center:view_cart' %}" class="btn btn-primary">Shopping Cart</a>
                 </div>
             </div>
         </div>

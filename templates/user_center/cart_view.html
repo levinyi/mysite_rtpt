@@ -3,25 +3,39 @@
 {% block title %}Shopping Cart{% endblock %}
 {% block content %}
 <div class="container">
-    <div class="row pt-3 mt-3 form-control">
-        <h4 class="mb-3">Shopping Cart</h4>
+    <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
+        <div class="row">
+            <div class="col-6">
+                <h4 class="mb-3">Shopping Cart</h4>
+            </div>
+            <div class="col-6 text-end">
+                <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-plus"></i> Add More</a>
+            </div>
+        </div>
         <table class="table table-striped table-hover table-bordered" style="text-align:center">
             <thead>
                 <tr>
-                    <th scope="col">Gene ID</th>
-                    <th scope="col">Gene Name</th>
+                    <th scope="col">
+                        <input type="checkbox" id="selectAll" name="gene_id" value="all">
+                    </th>
+                    <th scope="col">ID</th>
+                    <th scope="col">Name</th>
                     <th scope="col">vector</th>
                     <th scope="col">Species</th>
                     <th scope="col">status</th>
                     <th scope="col">create at</th>
                     <th scope="col">Forbidden Seqs</th>
-                    <th scope="col">gc_content</th>
-                    <th scope="col">Action</th>
+                    <th scope="col">GC %</th>
+                    <th scope="col">Modify</th>
+                    <th scope="col">Delete</th>
                 </tr>
             </thead>
             <tbody>
-                {% for gene in gene_infos %}
+                {% for gene in shopping_cart %}
                 <tr>
+                    <td>
+                        <input type="checkbox" name="gene_id" value="{{ gene.id }}">
+                    </td>
                     <td>{{ gene.id }}</td>
                     <td>{{ gene.gene_name }}</td>
                     <td>{{ gene.vector }}</td>
@@ -29,15 +43,77 @@
                     <td>{{ gene.status }}</td>
                     <td>{{ gene.create_date }}</td>
                     <td>{{ gene.forbid_seq }}</td>
-                    <td>{{ gene.gc_content }}</td>
-                    <td></td>
+                    <td>{{ gene.gc_content|floatformat:2 }}</td>
+                    <td>
+                        <a href="{% url 'user_center:gene_edit' gene.id %}">
+                            <i class="bi bi-journal-code"></i>
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{% url 'user_center:gene_delete' gene.id %}">
+                            <i class="bi bi-cart-x"></i>
+                        </a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% comment %} <p>*The turn-around time(TAT) does not include shipping and handing time and reconstruction time of the customer's vector.</p> {% endcomment %}
+        <div class="col-12">
+            <button id="checkoutButton" class="btn btn-primary"><i class="bi bi-bag-check"></i> Submit</button>
+        </div>
     </div>
 </div>
 {% endblock %}
 {% block javascript %}
+<script>
+    // 为全选复选框添加点击事件
+    document.getElementById("selectAll").addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('input[name="gene_id"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+
+    // 为提交按钮添加点击事件
+    document.getElementById('checkoutButton').addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('input[name="gene_id"]');
+        const gene_ids = [];
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked && checkbox.value !== 'all') {
+                gene_ids.push(checkbox.value);
+            }
+        });
+
+        if (gene_ids.length === 0) {
+            alert('Please select at least one gene!');
+            return;
+        }
+        // 使用 FormData 构造表单数据
+        let formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        gene_ids.forEach(gene_id => {
+            formData.append('gene_ids', gene_id);
+        });
+        // 打印表单数据
+        for (let [key, value] of formData.entries()) { 
+            console.log(key, value);
+        }
+        // 使用 fetch API 发起请求
+        fetch('{% url "user_center:checkout" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Submit successfully!');
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert(data['message']);
+                }
+            })
+            .catch(error => console.error(error));    
+    });
+</script>
+
 {% endblock %}

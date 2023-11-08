@@ -7,4 +7,7 @@ db.sqlite3-journal
 *.egg-info/
 .DS_Store
 .env
-.sql
+.git/
+.gitignore
+mysite.backup.sql
+*.yml

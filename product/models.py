@@ -76,3 +76,10 @@ class GeneSynEnzymeCutSite(models.Model):
     enzyme_name = models.CharField(verbose_name="酶切位点", max_length=256)
     enzyme_seq = models.CharField(verbose_name="酶切序列", max_length=256)
     usescope = models.CharField(verbose_name="使用范围", max_length=256)
+
+class Species(models.Model):
+    species_name = models.CharField(verbose_name="物种名称", max_length=256)
+    species_note = models.CharField(verbose_name="物种备注", max_length=256)
+
+    def __str__(self):
+        return self.species_name
