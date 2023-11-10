@@ -6,13 +6,13 @@
     <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
         <div class="row">
             <div class="col-6">
-                <h4 class="mb-3">Shopping Cart</h4>
+                <h4 class="mb-3"><i class="bi bi-list-ul"></i> Shopping Cart</h4>
             </div>
             <div class="col-6 text-end">
                 <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-plus"></i> Add More</a>
             </div>
         </div>
-        <table class="table table-striped table-hover table-bordered" style="text-align:center">
+        <table class="table table-striped table-hover" style="text-align:center">
             <thead>
                 <tr>
                     <th scope="col">
@@ -45,13 +45,13 @@
                     <td>{{ gene.forbid_seq }}</td>
                     <td>{{ gene.gc_content|floatformat:2 }}</td>
                     <td>
-                        <a href="{% url 'user_center:gene_edit' gene.id %}">
+                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}">
                             <i class="bi bi-journal-code"></i>
                         </a>
                     </td>
                     <td>
-                        <a href="{% url 'user_center:gene_delete' gene.id %}">
-                            <i class="bi bi-cart-x"></i>
+                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="{% url 'user_center:gene_delete' gene.id %}">
+                            <i class="bi bi-trash"></i>
                         </a>
                     </td>
                 </tr>
@@ -85,7 +85,7 @@
         });
 
         if (gene_ids.length === 0) {
-            alert('Please select at least one gene!');
+            alert('Please select at least one item!');
             return;
         }
         // 使用 FormData 构造表单数据
@@ -115,5 +115,10 @@
             .catch(error => console.error(error));    
     });
 </script>
-
+<script>
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
 {% endblock %}

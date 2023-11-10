@@ -19,7 +19,7 @@
         <div class="row mt-5">
             <div class="col-4">
                 <h4> Gene Name: {{ gene.gene_name }}</h4>
-                <h5> Overall GC content: {{ gene.gc_content }}</h5>
+                <h5> Overall GC content: {{ gene.gc_content|floatformat:2 }}</h5>
             </div>
             <div class="col-6">
                 <h5> Forbidden check list: {{ gene.forbidden_check_list }}. </h5>
@@ -124,16 +124,25 @@
                 // 获取 frameshift
                 const frameshift = parseInt(frameshiftSelector.value, 10);
                 
-                const warningEms = [...originalSeqContent.matchAll(/<em class="bg-danger">([ACGT]*)<\/em>/g)];
+                // 为 originalSeqContent 中的 <em> 和 <span> 标签添加匹配
+                const warningEms = [...originalSeqContent.matchAll(/<em class="text-warning">([ACGT]*)<\/em>/g)];
+                let dangerSpans  = [...originalSeqContent.matchAll(/<span class="bg-danger">([ACGT]*)<\/span>/g)];
 
                 // 为每三个碱基添加框，并在适当的地方插入高亮
                 let wrappedSeq = '';
                 for (let i = 0; i < pureSeq.length;) {
                     const matchingEm = warningEms.find(em => em[1] === pureSeq.substr(i, em[1].length));
+                    const matchingSpan = dangerSpans.find(span => span[1] === pureSeq.substr(i, span[1].length));
 
                     if (matchingEm) {
-                        wrappedSeq += '<em class="bg-danger">' + matchingEm[1] + '</em>';
+                        wrappedSeq += '<em class="text-warning">' + matchingEm[1] + '</em>';
                         i += matchingEm[1].length;
+                        continue;
+                    }
+
+                    if (matchingSpan) {
+                        wrappedSeq += '<span class="bg-danger">' + matchingSpan[1] + '</span>';
+                        i += matchingSpan[1].length;
                         continue;
                     }
 
@@ -173,15 +182,11 @@
                     sequence: sequenceContent,
                     gene: geneName,
                 };
-                console.log(data);
+                console.log("data: ", data);
                 // 创建一个新的XMLHttpRequest对象
                 const xhr = new XMLHttpRequest();
 
-                // 配置请求
-                const urlSegments = window.location.pathname.split('/');
-                const geneId = urlSegments[urlSegments.length - 2];  // 根据你的URL结构，获取倒数第二部分
-
-                xhr.open('POST', `/user_center/gene_validation/${geneId}/`, true);
+                xhr.open('POST', `/user_center/gene_validation/`, true);
 
                 // 设置请求头，以便服务器知道我们发送的是JSON数据
                 xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');

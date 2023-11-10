@@ -6,7 +6,7 @@
     <!-- Company Vectors -->
     <div class="card mt-4">
         <div class="card-header">
-            <h4>RootPath Vectors</h4>
+            <h4><i class="bi bi-list-ul"></i> RootPath Vectors</h4>
         </div>
         <div class="card-body">
             <div class="card-title">
@@ -16,10 +16,10 @@
             <br>
             <br>
             <h5>Custom vectors available by RootPath:</h5>
-            <table class="table table-striped table-hover table-bordered" style="text-align:center">
+            <table class="table table-striped table-hover" style="text-align:center">
                 <thead>
                     <tr>
-                        <th scope="col">Name</th>
+                        <th scope="col">Vector Name</th>
                         <th scope="col">Ready_To_Use</th>
                         <th scope="col">Map</th>
                         <th scope="col">5NC</th>
@@ -31,7 +31,11 @@
                     <tr>
                         <td>{{ vector.vector_name }}</td>
                         <td>{{ vector.status }}</td>
-                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_map }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">
+                            <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" href="{% url 'user_center:vector_download' vector.id %}"><i class="bi bi-filetype-pdf"></i></a>
+                            <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download TXT" href="{% url 'user_center:vector_download' vector.id %}"><i class="bi bi-filetype-txt"></i></a>
+                            <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id %}"><i class="bi bi-file-earmark-binary"></i></a>
+                        </td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
                     </tr>
@@ -45,18 +49,18 @@
         <div class="card-header">
             <div class="row">
                 <div class="col-6">
-                    <h4>My Vectors</h4>
+                    <h4><i class="bi bi-list-ul"></i> My Vectors</h4>
                 </div>
                 <div class="col-6 text-end">
-                    <a type="button" href="{% url 'user_center:vector_add' %}" class="btn btn-primary">Create New Vector</a>
+                    <a type="button" href="{% url 'user_center:vector_add' %}" class="btn btn-primary"><i class="bi bi-plus-circle-dotted"></i> Create New Vector</a>
                 </div>
             </div>
         </div>
         <div class="card-body">
             <div class="card-title">
-                <h5>Vector list</h5>
+                <h5> Vector list</h5>
             </div>
-            <table class="table table-striped table-hover table-bordered" style="text-align:center">
+            <table class="table table-striped table-hover" style="text-align:center">
                 <thead>
                     <tr>
                         <th scope="col">Name</th>
@@ -71,15 +75,17 @@
                 <tbody>
                     {% for vector in user_vectors %}
                     <tr>
-                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">
+                            <a type="button" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" class="text-decoration-none" href="{% url 'user_center:vector_download' vector.id %}">{{ vector.vector_name }}</a>
+                        </td>
                         <td>{{ vector.status }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_map }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
-                        <td><a type="button" href="{% url 'user_center:vector_detail' vector.id %}" class="btn btn-primary">Edit</a></td>
+                        <td><a type="button"  data-bs-toggle="tooltip" data-bs-placement="top" title="Edit item" href="{% url 'user_center:vector_detail' vector.id %}" class="text-primary"><i class="bi bi-pencil-square"></i></a></td>
                         <td><form method="post" action="{% url 'user_center:vector_delete' vector.id %}">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-danger">Delete</button>
+                                <a type="submit" class="text-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete item"><i class="bi bi-trash"></i></a>
                             </form>
                         </td>
                     </tr>
@@ -91,4 +97,10 @@
 </div>
 {% endblock %}
 {% block javascript %}
+<script>
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
 {% endblock %}

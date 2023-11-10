@@ -2,9 +2,9 @@ import json
 import re
 from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-# from user_center.models import Order, ShoppingCart
 from product.models import GeneSynEnzymeCutSite, Species, Vector
 from .models import Cart, GeneInfo, OrderInfo
+from .utils.render_to_pdf import render_to_pdf
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, JsonResponse
@@ -13,7 +13,8 @@ from django.contrib.auth.models import User
 # Create your views here.
 @login_required(login_url='/account/login/')
 def dashboard(request):
-    shopping_cart = GeneInfo.objects.filter(user=request.user, status='INCOMPLETE')
+    # 如果没有shopping cart，创建一个
+    shopping_cart = Cart.objects.filter(user=request.user)
     production_order = OrderInfo.objects.filter(user=request.user, status='CREATED')
     shipping_order = OrderInfo.objects.filter(user=request.user, status='SHIPPING')
     return render(request, 'user_center/dashboard.html', {
@@ -38,7 +39,6 @@ def order_create(request):
         else:
             return render(request, 'user_center/manage_order_create.html', {'company_vectors': company_vectors, 'species_list': species_list})
 
-
 def add_to_cart(request):
     # 这里只能是POST请求，因为GET请求是查看购物车
     if request.method == 'POST':
@@ -51,17 +51,11 @@ def add_to_cart(request):
         vector_id = data.get("vectorId")
         species_id = data.get("speciesId")
         gene_table = data.get("genetable")
-        print("vector_id: ", vector_id)
-        print("species_id: ", species_id)
-        print("gene_table: ", gene_table)
+        
         vector = Vector.objects.get(id=vector_id)
-        print("you selected vector_name :",vector.vector_name)
         species = Species.objects.get(id=species_id)
-        print("you selected species_name :",species.species_name)
         nc5 = vector.NC5
         nc3 = vector.NC3
-        print("NC5: ", nc5)
-        print("NC3: ", nc3)
 
         for row in gene_table:
             # row[0], row[1], row[2]
@@ -116,6 +110,26 @@ def gene_edit(request, gene_id):
     gene_object.save()
     return redirect(f'/user_center/gene_detail/')
 
+def gene_validation(request):
+    ''' when user click the "Re-analyze" button, this function will be called. '''
+    try:
+        user = request.user
+        data = json.loads(request.body.decode('utf-8'))
+        saved_seq = data.get("sequence")
+        gene_name = data.get("gene")
+        gene_object = GeneInfo.objects.get(user=user, gene_name=gene_name)
+        original_seq = gene_object.combined_seq
+        if original_seq == saved_seq:
+            return JsonResponse({'status': 'error', 'message': 'No changes made.'})
+        
+        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, gene_object.forbid_seq, gene_object)
+
+        return JsonResponse({'status': 'success', 'message': 'Validation process finished'})
+    except Vector.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Vector not found'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+    
 def gene_delete(request, gene_id):
     if request.method == 'POST':
         gene = GeneInfo.objects.get(user=request.user, id=gene_id)
@@ -127,10 +141,13 @@ def gene_delete(request, gene_id):
 def view_cart(request):
     # 这里的逻辑是展示shopping cart. 也就是用户还没有提交订单，但是已经添加了一些Gene的情况
     gene_infos = GeneInfo.objects.filter(user=request.user)
-
-    # 将这些gene的添加到Cart中
+    # gene_infos 是一个QuerySet，里面包含了所有的GeneInfo对象
     for gene in gene_infos:
-        Cart.objects.get_or_create(user=request.user, genes=gene)
+        # gene是一个GeneInfo对象
+        # 如果这个GeneInfo对象没有被添加到购物车，就添加到购物车
+        cart, created = Cart.objects.get_or_create(user=request.user)
+        if not created:
+            cart.genes.add(gene)
     
     cart = Cart.objects.get(user=request.user)
     shopping_cart = cart.genes.all()
@@ -408,6 +425,7 @@ def vector_validation(request, vector_id):
 @login_required
 def vector_add(request):
     if request.method == 'POST':
+        
         data = json.loads(request.body)
         for row in data:
             if any(cell is not None for cell in row):
@@ -458,15 +476,33 @@ def vector_delete(request, vector_id):
     else:
         return render(request, 'user_center/manage_vector.html')
         
+def vector_download(request, vector_id):
+    # user只能下载自己的vector和公司的vector，不能下载别人的vector，所以需要验证
+    try:
+        # 获取当前用户的vector或公司的vector
+        vector_object = Vector.objects.get(user=request.user, id=vector_id)
+    except Vector.DoesNotExist:
+        # 如果当前用户没有这个vector，检查是否为公司的vector
+        vector_object = get_object_or_404(Vector, id=vector_id, user=None)
 
-# def download_pdf(request, order_id):
-#     data = {}
-#     pdf = render_to_pdf('template.html', data)
-#     response = HttpResponse(pdf, content_type='application/pdf')
-#     filename = "your_file_name.pdf"
-#     content = f"attachment; filename='{filename}'"
-#     response['Content-Disposition'] = content
-#     return response
+    # 从vector_object中提取数据
+    vector_name = vector_object.vector_name
+    NC5 = vector_object.NC5
+    NC3 = vector_object.NC3
+    vector_map = vector_object.vector_map
+
+    data = {
+        'vector_name': vector_name,
+        'NC5': NC5,
+        'NC3': NC3,
+        'vector_map': vector_map,
+    }
+    # 生成PDF文件
+    pdf_buffer = render_to_pdf(data)
+
+    response = HttpResponse(pdf_buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{vector_name}.pdf"'
+    return response
 
 @login_required
 def validation_save(request, vector_or_gene, id):

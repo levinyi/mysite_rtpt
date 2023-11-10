@@ -25,10 +25,10 @@
             <div class="text-end d-flex flex-wrap">
                 <!-- 用户认证逻辑 -->
                 {% if user.is_authenticated %}
-                <div class="dropdown">
+                <div class="dropdown" style="color:#FFFFFF;">
                     <a href="#" class="d-flex align-items-center link-body-emphasis text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="{% static 'images/user_icon.jpg' %}" alt="" width="32" height="32" class="rounded-circle me-2">
-                        <strong>{{ user.username }}</strong>
+                        <strong style="color:#FFFFFF;">{{ user.username }}</strong>
                       </a>
                     <ul class="dropdown-menu text-small shadow" aria-labelledby="dropdownMenuLink">
                         <li><a class="dropdown-item" href="{% url 'user_center:dashboard' %}">User Center</a></li>

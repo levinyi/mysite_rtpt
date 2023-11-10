@@ -10,6 +10,7 @@ urlpatterns = [
     path('gene_detail/', views.gene_detail, name='gene_detail'),
     path('gene_edit/<int:gene_id>/', views.gene_edit, name='gene_edit'),
     path('gene_delete/<int:gene_id>/', views.gene_delete, name='gene_delete'),
+    path('gene_validation/', views.gene_validation, name='gene_validation'),
     path('view_cart/', views.view_cart, name='view_cart'),
     path('checkout/', views.checkout, name='checkout'),
     # path('submit_order/<int:shopping_id>/', views.submit_order, name='submit_order'),
@@ -25,6 +26,7 @@ urlpatterns = [
     path('vector_delete/<int:vector_id>/', views.vector_delete, name='vector_delete'),
     path('vector_validation/<int:vector_id>/', views.vector_validation, name='vector_validation'),
     path('validation_save/<str:vector_or_gene>/<int:id>/', views.validation_save, name='validation_save'),
+    path('vector_download/<int:vector_id>/', views.vector_download, name='vector_download'),
     # path('download_pdf/<int:order_id>/', views.download_pdf, name='download_pdf'),
 
 ]
