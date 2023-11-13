@@ -1,0 +1,48 @@
+/* Copy icon */
+.copy-container {
+    display: flex;
+    justify-content: space-between; /* 确保文本和图标分布在两端 */
+    align-items: center; /* 垂直居中 */
+    max-width: 150px;
+    width: 100%; /* 占满td的宽度 */
+    margin: auto; /* 如果内容不够宽，则居中 */
+}
+
+.text-truncate {
+    flex-grow: 1; /* 让文本占据多余的空间 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.copy-icon {
+    flex-shrink: 0; /* 防止图标大小被压缩 */
+    cursor: pointer;
+    margin-left: 8px; /* 在图标和文本之间留一些空间 */
+    display: none;
+}
+.copy-container:hover .copy-icon {
+    display: inline; /* 或者 display: block; 根据需要 */
+}
+
+/* CSS样式和动画 */
+.copy-success {
+    display: none;
+    position: fixed;
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 2000;
+    transition: opacity 0.6s ease-out;
+}
+.copy-success.fade-out {
+    opacity: 0;
+}
+
+/* 动画效果 */
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
