@@ -91,6 +91,16 @@ def add_to_cart(request):
                     }
                 )
                 print("this gene: ", this_gene.gene_name, this_gene.forbid_seq)
+                # 将gene添加到购物车中
+                # 这里的逻辑是展示shopping cart. 也就是用户还没有提交订单，但是已经添加了一些Gene的情况
+                # gene_infos = GeneInfo.objects.filter(user=request.user)
+                # gene_infos 是一个QuerySet，里面包含了所有的GeneInfo对象
+                # for gene in gene_infos:
+                # gene是一个GeneInfo对象
+                # 如果这个GeneInfo对象没有被添加到购物车，就添加到购物车
+                cart, created = Cart.objects.get_or_create(user=request.user)
+                if not created:
+                    cart.genes.add(this_gene)
         return JsonResponse({'status': 'success', "message": "Data saved successfully"})
     else:
         return render(request, 'user_center/manage_order_create.html')
@@ -138,17 +148,7 @@ def gene_delete(request, gene_id):
     else:
         return render(request, 'user_center/manage_order_create.html')
 
-def view_cart(request):
-    # 这里的逻辑是展示shopping cart. 也就是用户还没有提交订单，但是已经添加了一些Gene的情况
-    gene_infos = GeneInfo.objects.filter(user=request.user)
-    # gene_infos 是一个QuerySet，里面包含了所有的GeneInfo对象
-    for gene in gene_infos:
-        # gene是一个GeneInfo对象
-        # 如果这个GeneInfo对象没有被添加到购物车，就添加到购物车
-        cart, created = Cart.objects.get_or_create(user=request.user)
-        if not created:
-            cart.genes.add(gene)
-    
+def view_cart(request):    
     cart = Cart.objects.get(user=request.user)
     shopping_cart = cart.genes.all()
     return render(request, 'user_center/cart_view.html', {'shopping_cart': shopping_cart})
@@ -164,9 +164,7 @@ def checkout(request):
         # 如果没有选中的gene_id，返回一个错误消息
         return JsonResponse({'status': 'error', 'message': 'No gene selected'})
     
-    # 将选中的gene_id从GeneInfo中删除
-    # for gene_id in gene_ids:
-    #     GeneInfo.objects.filter(user=request.user, id=gene_id).delete()
+
     
     # 为选中的gene创建一个订单
     order = OrderInfo.objects.create(user=request.user)
@@ -176,6 +174,15 @@ def checkout(request):
     order.gene_infos.add(*genes)
     order.status = 'CREATED'
     order.save()
+
+    # 将选中的gene从购物车中删除
+    cart = Cart.objects.get(user=request.user)
+    cart.genes.remove(*genes)
+    cart.save()
+
+    # 将选中的gene_id从GeneInfo中删除
+    for gene_id in gene_ids:
+        GeneInfo.objects.filter(user=request.user, id=gene_id).delete()
 
     # 重定向到订单详情页面
     return JsonResponse({'status': 'success', 'message': 'Order created successfully', 'redirect_url': f'/user_center/manage_order/'})
@@ -423,9 +430,8 @@ def vector_validation(request, vector_id):
         return JsonResponse({'status': 'error', 'message': str(e)})
 
 @login_required
-def vector_add(request):
+def vector_add_table(request):
     if request.method == 'POST':
-        
         data = json.loads(request.body)
         for row in data:
             if any(cell is not None for cell in row):
@@ -455,11 +461,32 @@ def vector_add(request):
         return render(request, 'user_center/manage_vector_create.html')
 
 @login_required
+def vector_add_file(request):
+    if request.method == 'POST':
+        vector_file = request.FILES.get('vector_file')
+        vector_name = request.POST.get('vector_name')
+        print("vector_file", vector_file, vector_name)
+        this_vector, created = Vector.objects.update_or_create(
+            user=request.user,
+            vector_name=vector_name,
+            vector_map=vector_file,
+            defaults={
+                'status': 'uploaded',
+            }
+        )
+        return render(request, 'user_center/manage_vector_create.html')
+    else:
+        return render(request, 'user_center/manage_vector_create.html')
+
+
+# delete?
+@login_required
 def vector_detail(request, vector_id):
     ''' when user click the "Edit" button, this function will be called.'''
     vector_object = Vector.objects.get(user=request.user, id=vector_id)
     return render(request, 'user_center/vector_detail.html', {'vector': vector_object})
 
+# delete?
 @login_required
 def vector_edit(request, vector_id):
     ''' when user click the "Edit" button, this function will be called.'''
@@ -467,6 +494,7 @@ def vector_edit(request, vector_id):
     vector_object.status = "validated"
     vector_object.save()
     return redirect(f'/user_center/vector_detail/{vector_id}')
+
 
 def vector_delete(request, vector_id):
     if request.method == 'POST':
@@ -476,7 +504,7 @@ def vector_delete(request, vector_id):
     else:
         return render(request, 'user_center/manage_vector.html')
         
-def vector_download(request, vector_id):
+def vector_download(request, vector_id, file_type):
     # user只能下载自己的vector和公司的vector，不能下载别人的vector，所以需要验证
     try:
         # 获取当前用户的vector或公司的vector
@@ -497,12 +525,28 @@ def vector_download(request, vector_id):
         'NC3': NC3,
         'vector_map': vector_map,
     }
-    # 生成PDF文件
-    pdf_buffer = render_to_pdf(data)
 
-    response = HttpResponse(pdf_buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{vector_name}.pdf"'
-    return response
+    if file_type == 'pdf':
+        # 生成PDF文件
+        pdf_buffer = render_to_pdf(data)
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{vector_name}.pdf"'
+        return response
+    elif file_type == 'txt':
+        response = HttpResponse(content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="{vector_name}.txt"'
+        response.write(f"Vector Name: {vector_name}\n")
+        response.write(f"NC5: {NC5}\n")
+        response.write(f"NC3: {NC3}\n")
+        response.write(f"Vector Map: {vector_map}\n")
+        return response
+    elif file_type == 'dna':
+        response = HttpResponse(content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="{vector_name}.dna"'
+        response.write(f"{NC5}{vector_map}{NC3}")
+        return response
+    else:
+        return HttpResponse("File type not supported")
 
 @login_required
 def validation_save(request, vector_or_gene, id):

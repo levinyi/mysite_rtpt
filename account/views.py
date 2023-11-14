@@ -7,7 +7,7 @@ from .forms import RegistrationForm, UserProfileForm
 from .models import UserProfile
 
 # Create your views here.
-def register(request):
+def register_old(request):
     if request.user.is_authenticated:
         return HttpResponseRedirect(reverse('home'))
     if request.method == 'POST':
@@ -51,7 +51,7 @@ def myself_edit(request):
 
 def register(request):
     if request.user.is_authenticated:
-        return HttpResponseRedirect(reverse('home'))
+        return HttpResponseRedirect(reverse('/user_center/dashboard/'))
     if request.method == 'POST':
         user_form = RegistrationForm(request.POST)
         # userprofile_form = UserProfileForm(request.POST)

@@ -26,8 +26,7 @@
                     <th scope="col">create at</th>
                     <th scope="col">Forbidden Seqs</th>
                     <th scope="col">GC %</th>
-                    <th scope="col">Modify</th>
-                    <th scope="col">Delete</th>
+                    <th scope="col">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -45,14 +44,14 @@
                     <td>{{ gene.forbid_seq }}</td>
                     <td>{{ gene.gc_content|floatformat:2 }}</td>
                     <td>
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}">
-                            <i class="bi bi-journal-code"></i>
-                        </a>
-                    </td>
-                    <td>
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="{% url 'user_center:gene_delete' gene.id %}">
-                            <i class="bi bi-trash"></i>
-                        </a>
+                        <div class="hstack gap-3">
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="{% url 'user_center:gene_delete' gene.id %}">
+                                <i class="bi bi-trash text-danger"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}

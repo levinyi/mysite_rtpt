@@ -47,13 +47,15 @@
                 <!-- Upload DNA Sequence File Tab Pane -->
                 <div class="tab-pane fade" id="upload-dna" role="tabpanel" aria-labelledby="upload-dna-tab">
                     <h5 class="card-title mt-3">Upload DNA Sequence File (.dna)</h5>
-                    <div class="form-control">
-                        <form action="{% url 'user_center:vector_add' %}" method="post" enctype="multipart/form-data">
-                            {% csrf_token %}
-                            <input type="file" name="file" class="form-control">
-                            <button type="submit" class="btn btn-primary mt-4">Submit & Analyze Sequences</button>
-                        </form>
-                    </div>
+                    <form action="{% url 'user_center:vector_add_file' %}" method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <label for="vector_name" class="form-label mt-3">Vector Name</label>
+                        <input type="text" name="vector_name" class="form-control" placeholder="Enter vector name, eg. Vector1">
+
+                        <label for="vector_file" class="form-label mt-3">Select a DNA file</label>
+                        <input type="file" name="vector_file" class="form-control">
+                        <button type="submit" class="btn btn-primary mt-4">Submit & Analyze Sequences</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -62,11 +64,10 @@
 </div>
 {% endblock %}
 {% block javascript %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const container = document.querySelector('#example');
     const hot = new Handsontable(container, {
-        colHeaders: ['VectorName*', 'Sequence*','Description(Optional)'],
+        colHeaders: ['Vector Name*', 'Sequence*','Description(Optional)'],
         rowHeaders: true,
         colWidths: [300, 600, 300],  // 设置每列的宽度
         columns: [
@@ -79,6 +80,7 @@
         licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
     });
 
+    // PostData函数
     function postData() {
         // 获取Handsontable中的数据
         const data = hot.getData();
@@ -98,7 +100,7 @@
         }
 
         // 使用fetch API发送数据到服务器
-        fetch('/user_center/vector_add/', {
+        fetch('/user_center/vector_add_table/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

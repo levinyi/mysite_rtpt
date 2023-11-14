@@ -1,6 +1,13 @@
 {% extends "user_center/base.html" %}
 {% load static %}
 {% block title %}Manage Vectors{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'user_center/css/vector.css' %}">
+{% endblock %}
+{% block nav_manage_vectors %}active{% endblock %}
+{% block breadcrumb %}
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <!-- Company Vectors -->
@@ -20,30 +27,41 @@
                 <thead>
                     <tr>
                         <th scope="col">Vector Name</th>
-                        <th scope="col">Ready_To_Use</th>
-                        <th scope="col">Map</th>
-                        <th scope="col">5NC</th>
-                        <th scope="col">3NC</th>
+                        <th scope="col">Upstream of Insert</th>
+                        <th scope="col">Downstream of Insert</th>
+                        <th scope="col">Download Map</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for vector in company_vectors %}
                     <tr>
                         <td>{{ vector.vector_name }}</td>
-                        <td>{{ vector.status }}</td>
-                        <td class="text-truncate" style="max-width: 150px;">
-                            <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" href="{% url 'user_center:vector_download' vector.id %}"><i class="bi bi-filetype-pdf"></i></a>
-                            <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download TXT" href="{% url 'user_center:vector_download' vector.id %}"><i class="bi bi-filetype-txt"></i></a>
-                            <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id %}"><i class="bi bi-file-earmark-binary"></i></a>
+                        <td>
+                            <div class="copy-container">
+                                <span class="text-truncate">{{ vector.NC5 }}</span>
+                                <i class="bi bi-clipboard2 copy-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy" onclick="copyToClipboard(this, event)"></i>
+                            </div>
                         </td>
-                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
-                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
+                        <td>
+                            <div class="copy-container">
+                                <span class="text-truncate">{{ vector.NC3 }}</span>
+                                <i class="bi bi-clipboard2 copy-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy" onclick="copyToClipboard(this, event)"></i>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="hstack gap-3 justify-content-center">
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" href="{% url 'user_center:vector_download' vector.id 'pdf' %}"><i class="bi bi-filetype-pdf"></i></a>
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download TXT" href="{% url 'user_center:vector_download' vector.id 'txt' %}"><i class="bi bi-filetype-txt"></i></a>
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id 'dna' %}"><i class="bi bi-file-earmark-binary"></i></a>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+    <div id="copy-success" class="copy-success">Copied!</div>
     <!-- My Vectors -->
     <div class="card mt-4">
         <div class="card-header">
@@ -52,7 +70,7 @@
                     <h4><i class="bi bi-list-ul"></i> My Vectors</h4>
                 </div>
                 <div class="col-6 text-end">
-                    <a type="button" href="{% url 'user_center:vector_add' %}" class="btn btn-primary"><i class="bi bi-plus-circle-dotted"></i> Create New Vector</a>
+                    <a type="button" href="{% url 'user_center:vector_add_table' %}" class="btn btn-primary"><i class="bi bi-plus-circle-dotted"></i> Create New Vector</a>
                 </div>
             </div>
         </div>
@@ -63,27 +81,30 @@
             <table class="table table-striped table-hover" style="text-align:center">
                 <thead>
                     <tr>
-                        <th scope="col">Name</th>
+                        <th scope="col">Vector Name</th>
                         <th scope="col">Ready_To_Use</th>
-                        <th scope="col">Map</th>
-                        <th scope="col">5NC</th>
-                        <th scope="col">3NC</th>
-                        <th scope="col">Edit</th>
+                        <th scope="col">Upstream of Insert</th>
+                        <th scope="col">Downstream of Insert</th>
+                        <th scope="col">Download Map</th>
                         <th scope="col">Delete</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for vector in user_vectors %}
                     <tr>
-                        <td class="text-truncate" style="max-width: 150px;">
-                            <a type="button" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" class="text-decoration-none" href="{% url 'user_center:vector_download' vector.id %}">{{ vector.vector_name }}</a>
-                        </td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</a></td>
                         <td>{{ vector.status }}</td>
-                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_map }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
-                        <td><a type="button"  data-bs-toggle="tooltip" data-bs-placement="top" title="Edit item" href="{% url 'user_center:vector_detail' vector.id %}" class="text-primary"><i class="bi bi-pencil-square"></i></a></td>
-                        <td><form method="post" action="{% url 'user_center:vector_delete' vector.id %}">
+                        <td>
+                            <div class="hstack gap-3 justify-content-center">
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" href="{% url 'user_center:vector_download' vector.id 'pdf' %}"><i class="bi bi-filetype-pdf"></i></a>
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download TXT" href="{% url 'user_center:vector_download' vector.id 'txt' %}"><i class="bi bi-filetype-txt"></i></a>
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id 'dna' %}"><i class="bi bi-file-earmark-binary"></i></a>
+                            </div>
+                        </td>
+                        <td>
+                            <form method="post" action="{% url 'user_center:vector_delete' vector.id %}">
                                 {% csrf_token %}
                                 <a type="submit" class="text-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete item"><i class="bi bi-trash"></i></a>
                             </form>
@@ -103,4 +124,44 @@
     return new bootstrap.Tooltip(tooltipTriggerEl)
     })
 </script>
+<script>
+    function copyToClipboard(element, event) {
+        let text = element.parentElement.innerText;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => {
+                console.log('Text copied to clipboard');
+                showCopySuccess(event);
+            }).catch(err => {
+                console.error('Error in copying text: ', err);
+            });
+        } else {
+            // 备选方法
+            let textarea = document.createElement("textarea");
+            textarea.textContent = text;
+            textarea.style.position = "fixed";  // 避免滚动到底部
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand("copy");  // 现代浏览器应已废弃
+                console.log('Text copied to clipboard');
+                showCopySuccess(event);
+            } catch (err) {
+                console.error('Error in copying text: ', err);
+            }
+            document.body.removeChild(textarea);
+        }
+    }
+
+    function showCopySuccess(event) {
+        let copySuccess = document.getElementById("copy-success");
+        copySuccess.style.display = "block";
+        copySuccess.style.left = (event.clientX + 20) + "px";
+        copySuccess.style.top = (event.clientY + 20) + "px";
+
+        setTimeout(() => {
+            copySuccess.style.display = "none";
+        }, 2000);
+    }
+</script>
+
 {% endblock %}

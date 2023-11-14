@@ -6,23 +6,30 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{% block title %} {% endblock %}</title>
         <style>
+            body {
+                font-family: 'Courier New', Courier, monospace;
+            }
+            .monospace-text {
+                font-family: 'Consolas', 'Lucida Console', monospace;
+            }
+            
             /* 设置固定链接的样式 */
             #report-bug-link {
-            position: fixed; /* 固定定位 */
-            bottom: 20px;    /* 距离底部20px */
-            right: 20px;     /* 距离右侧20px */
-            z-index: 1000;   /* 在最上层 */
+                position: fixed; /* 固定定位 */
+                bottom: 20px;    /* 距离底部20px */
+                right: 20px;     /* 距离右侧20px */
+                z-index: 1000;   /* 在最上层 */
             }
 
             #report-bug-link img {
-            display: block;  /* 块状元素，防止链接下有空隙 */
-            width: 50px;     /* 图标的宽度 */
-            height: 50px;    /* 图标的高度 */
+                display: block;  /* 块状元素，防止链接下有空隙 */
+                width: 50px;     /* 图标的宽度 */
+                height: 50px;    /* 图标的高度 */
             }
 
             /* 可选：悬浮状态下的样式变化 */
             #report-bug-link:hover {
-            opacity: 0.8; /* 悬浮时的透明度变化 */
+                opacity: 0.8; /* 悬浮时的透明度变化 */
             }
         </style>
         <!-- Preload CSS files -->

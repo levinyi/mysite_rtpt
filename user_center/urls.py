@@ -20,13 +20,14 @@ urlpatterns = [
 
     path('manage_order/', views.manage_order, name='manage_order'),
     path('manage_vector/', views.manage_vector, name='manage_vector'),
-    path('vector_add/', views.vector_add, name='vector_add'),
+    path('vector_add_file/', views.vector_add_file, name='vector_add_file'),
+    path('vector_add_table/', views.vector_add_table, name='vector_add_table'),
     path('vector_detail/<int:vector_id>/', views.vector_detail, name='vector_detail'),
     path('vector_edit/<int:vector_id>/', views.vector_edit, name='vector_edit'),
     path('vector_delete/<int:vector_id>/', views.vector_delete, name='vector_delete'),
     path('vector_validation/<int:vector_id>/', views.vector_validation, name='vector_validation'),
     path('validation_save/<str:vector_or_gene>/<int:id>/', views.validation_save, name='validation_save'),
-    path('vector_download/<int:vector_id>/', views.vector_download, name='vector_download'),
+    path('vector_download/<int:vector_id>/<str:file_type>/', views.vector_download, name='vector_download'),
     # path('download_pdf/<int:order_id>/', views.download_pdf, name='download_pdf'),
 
 ]

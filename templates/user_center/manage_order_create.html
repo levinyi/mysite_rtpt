@@ -38,13 +38,13 @@
                 Choose Vector
                 {% comment %} <small>Choose the vector you want to use</small> {% endcomment %}
             </div>
-            <div class="workflow-step">
+            {% comment %} <div class="workflow-step">
                 <div class="workflow-icon mb-3">
                     <i class="bi bi-display"></i>
                 </div>
                 Choose Species
                 {% comment %} <small>Choose the species you want to use</small> {% endcomment %}
-            </div>
+            {% comment %} </div> {% endcomment %}
             <div class="workflow-step">
                 <div class="workflow-icon mb-3">
                     <i class="bi bi-folder-check"></i>
@@ -88,7 +88,7 @@
                 <option value="{{ vector.id }}" class="text-info">{{ vector.vector_name }} (user)</option>
                 {% endfor %}
             </select>
-            <div class="card-title mb-3 mt-5">
+            {% comment %} <div class="card-title mb-3 mt-5">
                 <h3><i class="bi bi-2-circle"></i> Choose Species (Optional)</h3>
                 <p class="mt-3">We have listed <span class="text-primary">{{species_list.count}}</span> species below, you can choose one species.</p>
                 <p>The Species is used for codon optimizer, If you can't find the species you want, you can contact us to add it. <span class="text-danger">Or leave it blank.</span></p>
@@ -98,13 +98,50 @@
                 {% for species in species_list %}
                 <option value="{{ species.id }}">{{ species.species_name }}</option>
                 {% endfor %}
-            </select>
+            </select> {% endcomment %}
+            
             <div class="card-title mb-3 mt-5">
-                <h3><i class="bi bi-3-circle"></i> Submit Sequence</h3> <span class="text-danger">(Currently, we only support nucleotide sequences; amino acid sequence is still in the testing phase.)</span>
-                <p class="mt-3">Provide the gene name, nucleotide or amino acid sequence, and forbidden sequences for each sequence.</p>
-            </div>
-            <div id="excelTable" class="mt-3">
-                <button onclick="postData()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit & Analyze Sequences</button>
+                <h3><i class="bi bi-2-circle"></i> Submit Sequence</h3> 
+                <div class="card-body">
+                    <!-- Tab navigation -->
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="nt_sequence_tab" data-bs-toggle="tab" data-bs-target="#nt_sequence" type="button" role="tab" aria-controls="nt_sequence" aria-selected="true">
+                            For DNA Sequence</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="aa_sequence_tab" data-bs-toggle="tab" data-bs-target="#aa_sequence" type="button" role="tab" aria-controls="aa_sequence" aria-selected="false">
+                            For Protein Sequence</button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab content -->
+                    <div class="tab-content" id="myTabContent">
+                        <!-- Fill Vector Info Tab Pane -->
+                        <div class="tab-pane fade show active" id="nt_sequence" role="tabpanel" aria-labelledby="nt_sequence_tab">            
+                            <p class="mt-3">Provide the gene name, nucleotide or amino acid sequence, and forbidden sequences for each sequence.</p>
+                            <div id="excelTable" class="mt-3">
+                                <button onclick="postDataFromNtSequence()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit & Analyze Sequences</button>
+                            </div>
+                        </div>
+
+                        <!-- Upload DNA Sequence File Tab Pane -->
+                        <div class="tab-pane fade" id="aa_sequence" role="tabpanel" aria-labelledby="aa_sequence_tab">
+                            <p class="mt-3">Provide the gene name, amino acid sequence, species, forbidden sequence.</p>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="inlineRadioOptions" id="inlineRadio1" value="option1" checked>
+                                <label class="form-check-label" for="inlineRadio1">Default not check sequence</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="inlineRadioOptions" id="inlineRadio2" value="option2">
+                                <label class="form-check-label" for="inlineRadio2">Check sequence</label>
+                            </div>
+                            <div id="excelTable2" class="mt-3">
+                                <button onclick="postDataFromAaSequence()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit & Analyze Sequences</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -112,50 +149,88 @@
 {% endblock %}
 {% block javascript %}
 <script>
-    const container = document.querySelector('#excelTable');
-    const hot = new Handsontable(container, {
-        colHeaders: ['Gene Name', 'NT|AA Sequence', 'ForbiddenSeqs'],
-        rowHeaders: true,
-        colWidths: [300, 600, 300],  // 设置每列的宽度
-        columns: [
-            { data: 'GeneName' },
-            { data: 'Sequence' },
-            { data: 'forbiddenSeqs' },
-        ],
-        height: 'auto',
-        licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+    let hot1, hot2; // 在更高作用域声明变量以便在postData函数中使用
+    let hot1Initialized = false;
+    let hot2Initialized = false;
+
+    // Tab切换事件监听
+    $('#myTab button').on('shown.bs.tab', function (e) {
+        const target = $(e.target).data("bs-target");
+
+        if (target === '#nt_sequence' && !hot1Initialized) {
+            initHot1();
+            console.log('init hot1');
+            hot1Initialized = true;
+        } else if (target === '#aa_sequence' && !hot2Initialized) {
+            initHot2();
+            console.log('init hot2');
+            hot2Initialized = true;
+        }
     });
 
-    function postData() {
-        // console.log('postData function is called.')
-        // 获取Handsontable中的数据
-        const hotData = hot.getData();
-        // console.log('hotData:', hotData);
+    function initHot1() {
+        const container1 = document.querySelector('#excelTable');
+        hot1 = new Handsontable(container1, {
+            // 配置
+            colHeaders: ['Gene Name', 'Sequence'],
+            rowHeaders: true,
+            colWidths: [300, 600],  // 设置每列的宽度
+            columns: [
+                { data: 'GeneName' },
+                { data: 'Sequence' },
+            ],
+            height: 'auto',
+            width: 'auto',
+            licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+        });
+    }
 
+    function initHot2() {
+        const container2 = document.querySelector('#excelTable2');
+        hot2 = new Handsontable(container2, {
+            // 配置
+            colHeaders: ['Gene Name*', 'AA Sequence*', 'Species*', 'Forbidden Sequence', '5NC', '3NC'],
+            rowHeaders: true,
+            colWidths: [100, 300, 100, 200, 200,200],  // 设置每列的宽度
+            columns: [
+                { data: 'GeneName' },
+                { data: 'Sequence' },
+                { data: 'Species' },
+                { data: 'ForbiddenSequence' },
+                { data: '5NC' },
+                { data: '3NC' },
+            ],
+            height: 'auto',
+            width: 'auto',
+            licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+        });
+    }
+
+    // 页面加载时初始化第一个Tab的Handsontable
+    initHot1();
+    hot1Initialized = true;
+
+    function postDataFromNtSequence() {
+        // 获取当前活动Tab的Handsontable数据
+        const hotData = hot1.getData();
+       
         // 获取下拉菜单的值
         const vectorSelect = document.querySelector('#vector_id');
         const vectorId = vectorSelect.options[vectorSelect.selectedIndex].value;
-        const speciesSelect = document.querySelector('#species_name');
-        const speciesId = speciesSelect.options[speciesSelect.selectedIndex].value;
-        // console.log(vectorId, speciesId);
-
-        // 检查是否选择了vector和species
+        
+        // 检查是否选择了vector
         if (!vectorId) {
             alert('Please select a vector.');
-            return;
-        }
-
-        if (!speciesId) {
-            alert('Please select a species.');
             return;
         }
 
         // 构建数据
         const data = {
             'vectorId': vectorId,
-            'speciesId': speciesId,
-            'genetable': hotData
+            'genetable': hotData,
+            'isChecked': isChecked,
         };
+        console.log(data);
 
         // 检查数据是否为空
         let isEmpty = true;
@@ -185,7 +260,54 @@
             console.log('Success:', data);
             if(data.status == 'error') {
                 alert(data.message);
-    
+            } else {
+                // 跳转到载体分析页面
+                window.location.href = '/user_center/gene_detail/';
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert('An Error occurred while sending the data:', error);
+        });
+    }
+    function postDataFromAASequence() {
+        const hotData = hot2.getData();
+        const vectorSelect = document.querySelector('#vector_id');
+        const vectorId = vectorSelect.options[vectorSelect.selectedIndex].value;
+        const checkbox = document.querySelector('#inlineRadio2');
+        const isChecked = checkbox.checked;
+        const data = {
+            'vectorId': vectorId,
+            'genetable': hotData,
+            'isChecked': isChecked,
+        };
+        console.log(data);
+        let isEmpty = true;
+        for (let row of hotData) {
+            if (row.some(cell => cell !== null && cell !== '')) {
+                isEmpty = false;
+                break;
+            }
+        }
+        if (isEmpty) {
+            alert('Cannot submit an empty table.');
+            return;
+        }
+
+        // 使用fetch API发送数据到服务器
+        fetch('/user_center/add_to_cart/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Success:', data);
+            if(data.status == 'error') {
+                alert(data.message);
             } else {
                 // 跳转到载体分析页面
                 window.location.href = '/user_center/gene_detail/';
