@@ -54,6 +54,8 @@ class Vector(models.Model):
     vector_map = models.TextField(verbose_name="Vector_Seq")
     NC5 = models.TextField(verbose_name="5NC")
     NC3 = models.TextField(verbose_name="3NC")
+    iu20 = models.TextField(verbose_name="iu20", null=True, blank=True)
+    id20 = models.TextField(verbose_name="id20", null=True, blank=True)
 
     create_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=255, default='Need_To_Validate')

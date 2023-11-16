@@ -9,6 +9,7 @@ urlpatterns = [
     path('add_to_cart/', views.add_to_cart, name='add_to_cart'),
     path('gene_detail/', views.gene_detail, name='gene_detail'),
     path('gene_edit/<int:gene_id>/', views.gene_edit, name='gene_edit'),
+    path('protein_edit/<int:gene_id>/', views.protein_edit, name='protein_edit'),
     path('gene_delete/<int:gene_id>/', views.gene_delete, name='gene_delete'),
     path('gene_validation/', views.gene_validation, name='gene_validation'),
     path('view_cart/', views.view_cart, name='view_cart'),
@@ -16,6 +17,7 @@ urlpatterns = [
     # path('submit_order/<int:shopping_id>/', views.submit_order, name='submit_order'),
     # path('shopping_cart/', views.shopping_cart, name='shopping_cart'),
     # path('shopping_cart_remove/', views.shopping_cart_remove, name='shopping_cart_remove'),
+    path('submit_notification/', views.submit_notification, name='submit_notification'),
 
 
     path('manage_order/', views.manage_order, name='manage_order'),

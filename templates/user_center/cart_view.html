@@ -35,7 +35,7 @@
                     <td>
                         <input type="checkbox" name="gene_id" value="{{ gene.id }}">
                     </td>
-                    <td>{{ gene.id }}</td>
+                    <td>{{ forloop.counter }}</td>
                     <td>{{ gene.gene_name }}</td>
                     <td>{{ gene.vector }}</td>
                     <td>{{ gene.species }}</td>
@@ -45,9 +45,15 @@
                     <td>{{ gene.gc_content|floatformat:2 }}</td>
                     <td>
                         <div class="hstack gap-3">
+                            {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See evaluation results" href="{% url 'user_center:protein_edit' gene.id %}">
+                                {% comment %} <i class="bi bi-pencil-square"></i> {% endcomment %}See Detail
+                            </a>
+                            {% else %}
                             <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
+                            {% endif %}
                             <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="{% url 'user_center:gene_delete' gene.id %}">
                                 <i class="bi bi-trash text-danger"></i>
                             </a>

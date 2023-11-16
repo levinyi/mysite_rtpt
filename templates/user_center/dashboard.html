@@ -82,13 +82,13 @@
                                  justify-content: center; 
                                  font-size: larger;
                                  align-items: center;">
-                        {{ order_number_in_cart }}
+                        {{ gene_number_in_cart }}
                     </span>
                     <!-- Badge Code Ends Here -->
                     <img class="card-img-top mx-auto d-block" src="{% static 'user_center/img/shopping_cart.png' %}" alt="Card image cap" style="width:100px;">
                 </div>
                 <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
-                    <h5><strong>{{ order_number_in_cart }}</strong> order(s) in Cart</h5>
+                    <h5><strong>{{ gene_number_in_cart }}</strong> item(s) in Cart</h5>
                     <br><br>
                     <a href="{% url 'user_center:view_cart' %}" class="btn btn-primary stretched-link">Shopping Cart</a>
                 </div>

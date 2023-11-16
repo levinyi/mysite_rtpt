@@ -27,125 +27,81 @@
         cursor: pointer;
         transform: translateY(-50%) scale(1.1); /* 轻微放大 */
     }
-    /* 旋转动画 */
-    @keyframes spin {
-        0% { transform: translateY(-50%) rotate(0deg); }
-        100% { transform: translateY(-50%) rotate(360deg); }
-    }
 </style>
 {% endblock %}
 {% block content %}
-<!-- 悬浮的 "Report Bug" 图标 -->
-<img src="{% static 'images/prohibition_and_risks.png' %}" alt="Report Bug" class="fixed-image" data-bs-toggle="offcanvas" data-bs-target="#offcanvasWithBothOptions" aria-controls="offcanvasWithBothOptions"/>
-<!-- Offcanvas Element -->
-<div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="offcanvasWithBothOptions" aria-labelledby="offcanvasWithBothOptionsLabel">
-    <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="offcanvasWithBothOptionsLabel">Prohibition and Risk</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body">
-        <!-- Tier 1 Warning -->
-        <h4 class="bg-secondary text-white p-2">Tier 1 Warning:</h4>
-        <p class="p-2"><span class="bg-danger text-white">Red color</span> highlighted sequences are <span class="text-danger">NOT</span> allowed for synthesis. Ordering will not proceed until approved by our SequenceAnalyzer.</p>
-        <ul>
-            <li>Overall GC% across the entire sequence is &le; 20% or &ge; 80%.</li>
-            <li>Presence of forbidden sequences in the inquiry form.</li>
-        </ul>
-
-        <!-- Tier 2 Warning -->
-        <h4 class="bg-secondary text-white p-2">Tier 2 Warning:</h4>
-        <p class="p-2"><span class="bg-warning text-dark">Yellow color</span> highlighted sequences are <span class="text-warning">AT RISK</span> for synthesis. Modifications are recommended.</p>
-        <p>We understand some sequences may not be editable. In this case, ordering can proceed, but it may affect the gene's success rate.</p>
-        <ul>
-            <li>Overall GC% across the entire sequence is within (20%, 30%] or [70%, 80%).</li>
-            <li>Extremely high local GC content.</li>
-            <li>Presence of long consecutive A/T/G/C.</li>
-        </ul>
-    </div>
-</div>
-
 
 <div class="container-fluid" style="padding-left:50px;">
     <div class="row mt-3">
-        <h2>Editing Gene Sequences</h2>
+        <h2>Evaluation Results</h2>
         {% for gene in gene_list %}
-        <!-- First Row -->
-        <div class="row mt-5">
-            <div class="col-4">
-                <p> Gene Name: {{ gene.gene_name }}</p>
-                <p> Overall GC content: {{ gene.gc_content|floatformat:2 }}%</p>
-            </div>
-            <div class="col-6">
-                <p>Forbidden check list <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="The underlined sequences are avoided by default to assist subsequent cloning process"></i> : {{ gene.forbidden_check_list }}. </p>
-                <p> And found : {{ gene.contained_forbidden_list }}</p>
-            </div>
-            <div class="col-2">
-                <h4> {% if gene.status == 'validated' %} <button type="button" class="btn btn-success disabled">Validated</button>{% endif %}</h4>
-            </div>
-        </div>
-        <!-- Second Row -->
-        <div class="row mb-5 mt-3">
             <!-- First Column -->
-            <div class="col-md-5 col-12">
-                <p>Original sequences:</p>
-                <!-- Add your sequences content here -->
-                <div class="card">
-                    <div {% if gene.status == 'saved' %} class="card-body text-truncate" {% else %} class="card-body monospace-text" {% endif %} id="sequence">
-                        {{ gene.combined_seq|safe}}
+            <div class="col-6">
+                <!-- first row -->
+                <div class="row mt-5">
+                    <div class="col">
+                        <li> Gene Name: {{ gene.gene_name }}</li>
+                    </div>
+                    <div class="col">
+                        <li>Forbidden check list <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="The underlined sequences are avoided by default to assist subsequent cloning process"></i> : {{ gene.forbidden_check_list }}. </li>
+                        <li> And found : {{ gene.contained_forbidden_list }}</li>
+                    </div>
+                </div>
+                <!-- second row -->
+                <div class="row mb-5 mt-3">
+                    <!-- First Column -->
+                    <div class="col">
+                        <p>Original sequences:</p>
+                        <div class="card">
+                            <div {% if gene.status == 'saved' %} class="card-body text-truncate" {% else %} class="card-body monospace-text" {% endif %} id="sequence">
+                                {{ gene.combined_seq|safe}}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <!-- Second Column -->
-            <div class="col-md-5 col-12">
-                <p class="monospace-text">Edited sequences:</p>
-                <div class="card">
-                    <div {% if gene.status == 'saved' %} class="card-body text-truncate" contenteditable="false"{% else %} class="card-body monospace-text" contenteditable="true" {% endif %} id="edited_sequence">
-                        {{ gene.saved_seq|safe }}
-                    </div>
-                </div>
-            </div>
-            <!-- Third Column -->
-            <div class="col-md-2 col-12">
-                {% if gene.status != "saved" %}
-                <p>Codons shown in boxes:</p>
-                {% endif %}
-                <div class="mt-3">
-                    {% if gene.status == 'forbidden' %}
-                        <label for="frameshiftSelector">Choose frameshift:</label>
-                        <select id="frameshiftSelector">
-                            <option value="0" selected>0</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                        </select>
-                        <button class="btn btn-warning toggle-btn mt-3">Toggle Codon Boxes</button>
-                        <button class="btn btn-primary mt-3 analysis-btn" data-gene-name="{{ gene.gene_name }}">Re-analyze</button>
-                        <button class="btn btn-secondary mt-3" disabled>UnSaved</button>
-                    {% elif gene.status == "saved" %}
-                        <a class="btn btn-primary mt-4" style="width:100px;" href="{% url 'user_center:gene_edit' gene.id %}">Edit</a>
-                    {% elif gene.status == "validated" %}
-                        <label for="frameshiftSelector">Choose frameshift:</label>
-                        <select id="frameshiftSelector">
-                            <option value="0" selected>0</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                        </select>
-                        <button class="btn btn-warning toggle-btn mt-3 min-width">Toggle Codon Boxes</button>
-                        <button class="btn btn-primary mt-3 analysis-btn" data-gene-name="{{ gene.gene_name }}">Re-analyze</button>
-                        <a class="btn btn-success mt-3" href="{% url 'user_center:validation_save' 'gene' gene.id %}">Save</a>
+            <div class="col-6 mt-3">
+                <div class="row mt-3">
+                    {% if gene.status == 'optimized' %}
+                        <h3>Congrats!</h3>
+                        <p>Your amino acid sequence are confirmed for synthesis. Please go back to your shopping cart to submit it for synthesis.</p>
+                        <div style="width: fit-content;">
+                            <a class="btn btn-success" href="{% url 'user_center:view_cart' %}">Go back</a>
+                        </div>
+                        <p class="mt-3">Review an example of the codon optimized seuqence. Please note that codons may be subjected to reoptimization before being sent into our gene synthesis factory.</p>
+                        <p class="">
+                            <a class="text-decoration-none text-secondary" data-bs-toggle="collapse" href="#multiCollapseExample1" role="button" aria-expanded="false" aria-controls="multiCollapseExample1" 
+                            data-bs-toggle="tooltip" data-bs-replacement="top" title="Review an example of the codon optimized sequence">Review NT Example</a>
+                        </p>
+                        <div class="row">
+                            <div class="col">
+                                <div class="collapse multi-collapse" id="multiCollapseExample1">
+                                    <div class="card card-body monospace-text">
+                                        {{ gene.saved_seq|safe }}
+                                    </div>
+                                    <p>*If you insist to synthesize this example sequence, please go back to the User Center and Create New Order to submit it as DNA sequence. 
+                                    Please note, this usually is NOT recommended, and may jeopardize your gene synthesis success rate.</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% elif gene.status == 'optimizing' %}
+                        <h3>Optimizing...</h3>
+                        <p>Pleae come back in 10-20 minutes to check the result and finish your ordering.</p>
+                        <p>A notification email will be sent to you once the optimization is done.</p>
+                        <div style="width: fit-content;">
+                            <a class="btn btn-success" href="{% url 'user_center:view_cart' %}">Go back</a>
+                        </div>
+                    {% elif gene.status == 'failed' %}
+                        <h3>Sorry!</h3>
+                        <p>Your sequence is not suitable for synthesis. Please contact us for further assistance.</p>
+                        <div style="width: fit-content;">
+                            <a class="btn btn-success" href="{% url 'user_center:view_cart' %}">Go back</a>
+                        </div>
                     {% endif %}
                 </div>
             </div>
-        </div>
         {% endfor %}
-    </div>
-    <div class="row">
-        <div class="col text-center">
-            <!-- 如果全部status为saved，则显示order now按钮 -->
-            {% if gene_list|check_status:"saved" %}
-            <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-cart-plus"></i> Add more Genes</a>
-            <a href="{% url 'user_center:view_cart' %}" class="btn btn-primary"><i class="bi bi-cart3"></i> Save to Cart</a>
-            {% endif %}
-        </div>
     </div>
 </div>
 {% endblock %}
