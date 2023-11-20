@@ -36,35 +36,24 @@
                     <i class="bi bi-journal-text"></i>
                 </div>
                 Choose Vector
-                {% comment %} <small>Choose the vector you want to use</small> {% endcomment %}
             </div>
-            {% comment %} <div class="workflow-step">
-                <div class="workflow-icon mb-3">
-                    <i class="bi bi-display"></i>
-                </div>
-                Choose Species
-                {% comment %} <small>Choose the species you want to use</small> {% endcomment %}
-            {% comment %} </div> {% endcomment %}
             <div class="workflow-step">
                 <div class="workflow-icon mb-3">
                     <i class="bi bi-folder-check"></i>
                 </div>
                 Submit Sequence
-                {% comment %} <small>Submit the sequence you want to synthesis</small> {% endcomment %}
             </div>
             <div class="workflow-step">
                 <div class="workflow-icon mb-3">
                     <i class="bi bi-person-check"></i>
                 </div>
                 Sequence Validation
-                {% comment %} <small>Check the sequence you submitted</small> {% endcomment %}
             </div>
             <div class="workflow-step">
                 <div class="workflow-icon mb-3">
                     <i class="bi bi-check-lg"></i>
                 </div>
                 Order Complete
-                {% comment %} <small>Order complete and pay</small> {% endcomment %}
             </div>
         </div>
     </div>
@@ -88,63 +77,41 @@
                 <option value="{{ vector.id }}" class="text-info">{{ vector.vector_name }} (user)</option>
                 {% endfor %}
             </select>
-            {% comment %} <div class="card-title mb-3 mt-5">
-                <h3><i class="bi bi-2-circle"></i> Choose Species (Optional)</h3>
-                <p class="mt-3">We have listed <span class="text-primary">{{species_list.count}}</span> species below, you can choose one species.</p>
-                <p>The Species is used for codon optimizer, If you can't find the species you want, you can contact us to add it. <span class="text-danger">Or leave it blank.</span></p>
-            </div>
-            <select class="form-select" size="8" aria-label="Multiple select example" id="species_name">
-                <option selected value="">Choose a species</option>
-                {% for species in species_list %}
-                <option value="{{ species.id }}">{{ species.species_name }}</option>
-                {% endfor %}
-            </select> {% endcomment %}
-            
             <div class="card-title mb-3 mt-5">
                 <h3><i class="bi bi-2-circle"></i> Submit Sequence</h3> 
                 <div class="card-body">
                     <!-- Tab navigation -->
                     <ul class="nav nav-tabs" id="myTab" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="nt_sequence_tab" data-bs-toggle="tab" data-bs-target="#nt_sequence" type="button" role="tab" aria-controls="nt_sequence" aria-selected="true">
-                            For DNA Sequence</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="aa_sequence_tab" data-bs-toggle="tab" data-bs-target="#aa_sequence" type="button" role="tab" aria-controls="aa_sequence" aria-selected="false">
+                            <button class="nav-link active" id="aa_sequence_tab" data-bs-toggle="tab" data-bs-target="#aa_sequence" type="button" role="tab" aria-controls="aa_sequence" aria-selected="true">
                             For Protein Sequence</button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="nt_sequence_tab" data-bs-toggle="tab" data-bs-target="#nt_sequence" type="button" role="tab" aria-controls="nt_sequence" aria-selected="false">
+                            For DNA Sequence</button>
+                        </li>
                     </ul>
-
                     <!-- Tab content -->
                     <div class="tab-content" id="myTabContent">
-                        <!-- Fill Vector Info Tab Pane -->
-                        <div class="tab-pane fade show active" id="nt_sequence" role="tabpanel" aria-labelledby="nt_sequence_tab">            
+                        <!-- For AA Sequence Tab Pane -->
+                        <div class="tab-pane fade show active" id="aa_sequence" role="tabpanel" aria-labelledby="aa_sequence_tab">
+                            <p class="mt-3">Provide your gene names, amino acid (AA) sequences, host species for codon optimization,  and forbidden sequences in the table. 
+                            <br>Then click "Submit" for sequence evaluation.</p>
+                            <div id="excelTable2" class="mt-3">
+                                <button id="addRowBtn2" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
+                            
+                                <i class="bi bi-asterisk"></i> Fields marked with an asterisk (*) are mandatory. <br>
+                                <i class="bi bi-question-circle"></i> Entries in the 'Forbidden Sequence' column must follow the specified format. 1) Separate multiple forbidden sequences using ';' and 2) please do <strong>NOT</strong> leave space. For example: AAATTT;GGGCCC;AAAAAA.
+                    
+                                <button onclick="postDataFromAaSequence()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit</button>
+                            </div>
+                        </div>
+                        <!-- For NT Sequence Tab Pane -->
+                        <div class="tab-pane fade" id="nt_sequence" role="tabpanel" aria-labelledby="nt_sequence_tab">   
                             <p class="mt-3">Provide your gene names and DNA sequences in the table. Then click "Submit" for sequence evaluation.</p>
                             <div id="excelTable" class="mt-3">
                                 <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
                                 <button onclick="postDataFromNtSequence()" class="btn btn-primary mt-3"><i class="bi bi-clipboard-pulse"></i> Submit</button>
-                            </div>
-                        </div>
-
-                        <!-- Upload DNA Sequence File Tab Pane -->
-                        <div class="tab-pane fade" id="aa_sequence" role="tabpanel" aria-labelledby="aa_sequence_tab">
-                            <p class="mt-3">Provide your gene names, amino acid (AA) sequences, host species for codon optimization,  and forbidden sequences in the table. 
-                            <br>Then click "Submit" for sequence evaluation.</p>
-                            {% comment %} <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="inlineRadioOptions" id="inlineRadio1" value="option1" checked>
-                                <label class="form-check-label" for="inlineRadio1">Default not check sequence</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="inlineRadioOptions" id="inlineRadio2" value="option2">
-                                <label class="form-check-label" for="inlineRadio2">Check sequence</label>
-                            </div> {% endcomment %}
-                            <div id="excelTable2" class="mt-3">
-                                <button id="addRowBtn2" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
-                                <ul>
-                                    <li>Fields marked with an asterisk (*) are mandatory.</li>
-                                    <li>Entries in the 'Forbidden Sequence' column must follow the specified format. 1) Separate multiple forbidden sequences using ';' and 2) please do <strong>NOT</strong> leave space. For example: AAATTT;GGGCCC;AAAAAA.</li>
-                                </ul>
-                                <button onclick="postDataFromAaSequence()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit</button>
                             </div>
                         </div>
                     </div>
@@ -207,14 +174,14 @@
         const container2 = document.querySelector('#excelTable2');
         hot2 = new Handsontable(container2, {
             // 配置
-            colHeaders: ['Gene Name*', 'AA Sequence*', 'Species*', '<span data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA">Forbidden Sequence</span>', "5' Non-coding Sequence", "3' Non-coding Sequence"],
+            colHeaders: ['Gene Name*', 'AA Sequence*', 'Species*', 'Forbidden Sequence <i class="bi bi-question-circle"></i>', "5' Non-coding Sequence", "3' Non-coding Sequence"],
             rowHeaders: true,
             colWidths: [100, 300, 100, 200, 200,200],  // 设置每列的宽度
             columns: [
                 { data: 'GeneName' },
                 { data: 'Sequence' },
                 { type: 'dropdown', source: speciesList, data: 'Species' },
-                { type: 'text', tooltip: 'here', title:'Forbidden Sequence', data: 'ForbiddenSequence' },
+                { data: 'ForbiddenSequence' },
                 { data: '5NC' },
                 { data: '3NC' },
             ],
@@ -234,8 +201,8 @@
     }
 
     // 页面加载时初始化第一个Tab的Handsontable
-    initHot1();
-    hot1Initialized = true;
+    initHot2();
+    hot2Initialized = true;
 
     function postDataFromNtSequence() {
         // 获取当前活动Tab的Handsontable数据
@@ -272,7 +239,7 @@
         }
 
         // 使用fetch API发送数据到服务器
-        fetch('/user_center/add_to_cart/', {
+        fetch('/user_center/order_create/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -326,7 +293,7 @@
         }
 
         // 使用fetch API发送数据到服务器
-        fetch('/user_center/add_to_cart/', {
+        fetch('/user_center/order_create/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -10,16 +10,18 @@
                 <thead>
                     <tr>
                         <th scope="col">ID</th>
-                        <th scope="col">Genes</th>
+                        <th scope="col">Inquiry ID</th>
+                        <th scope="col">Gene numbers</th>
                         <th scope="col">Status</th>
-                        <th scope="col">Create time</th>
+                        <th scope="col">Creation time</th>
                         {% comment %} <th scope="col">Details</th> {% endcomment %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for order in order_list %}
                     <tr>
-                        <td>{{ order.id }}</td>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ order.inquiry_id }}</td>
                         <td>{{ order.gene_infos.count }}</td>
                         <td>{{ order.status }}</td>
                         <td>{{ order.order_time }}</td>

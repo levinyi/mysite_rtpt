@@ -1,6 +1,9 @@
 {% extends "user_center/base.html" %}
 {% load static %}
 {% block title %}Shopping Cart{% endblock %}
+{% block extra_head %}
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
@@ -23,9 +26,6 @@
                     <th scope="col">vector</th>
                     <th scope="col">Species</th>
                     <th scope="col">status</th>
-                    <th scope="col">create at</th>
-                    <th scope="col">Forbidden Seqs</th>
-                    <th scope="col">GC %</th>
                     <th scope="col">Action</th>
                 </tr>
             </thead>
@@ -33,28 +33,26 @@
                 {% for gene in shopping_cart %}
                 <tr>
                     <td>
-                        <input type="checkbox" name="gene_id" value="{{ gene.id }}">
+                        <input type="checkbox" name="gene_id" value="{{ gene.id }}"
+                        {% if gene.status != 'optimized' and gene.status != 'saved' and gene.status != 'validated' %} disabled {% endif %}>
                     </td>
                     <td>{{ forloop.counter }}</td>
                     <td>{{ gene.gene_name }}</td>
                     <td>{{ gene.vector }}</td>
                     <td>{{ gene.species }}</td>
                     <td>{{ gene.status }}</td>
-                    <td>{{ gene.create_date }}</td>
-                    <td>{{ gene.forbid_seq }}</td>
-                    <td>{{ gene.gc_content|floatformat:2 }}</td>
                     <td>
                         <div class="hstack gap-3">
                             {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
-                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See evaluation results" href="{% url 'user_center:protein_edit' gene.id %}">
-                                {% comment %} <i class="bi bi-pencil-square"></i> {% endcomment %}See Detail
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="comming soon" href="#">
+                                <i class="bi bi-eye"></i>
                             </a>
                             {% else %}
                             <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             {% endif %}
-                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="{% url 'user_center:gene_delete' gene.id %}">
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="javascript:" onclick="del_gene(this, {{ gene.id }})">
                                 <i class="bi bi-trash text-danger"></i>
                             </a>
                         </div>
@@ -63,6 +61,9 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% comment %} <ul class='pagination'>
+            {{ page_string}}
+        </ul> {% endcomment %}
         <div class="col-12">
             <button id="checkoutButton" class="btn btn-primary"><i class="bi bi-bag-check"></i> Submit</button>
         </div>
@@ -75,7 +76,10 @@
     document.getElementById("selectAll").addEventListener('click', function() {
         const checkboxes = document.querySelectorAll('input[name="gene_id"]');
         checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
+            // 只有当复选框未被禁用时，才改变其选中状态
+            if (!checkbox.disabled) {
+                checkbox.checked = this.checked;
+            }
         });
     });
 
@@ -125,5 +129,42 @@
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl)
     })
+</script>
+<script>
+    function del_gene(the, gene_id) {
+        layer.open({
+            type : 1,
+            skin : 'layui-layer-rim',
+            area : [ '420px', '240px' ],
+            title: 'Delete',
+            content : '<div style="padding: 20px 80px;">Are you sure to delete this item?</div>',
+            btn : [ 'Yes', 'No' ],
+            btnAlign : 'c',
+            yes : function(index, layero) {
+                $.ajax({
+                    url: "{% url 'user_center:gene_delete' %}",
+                    type: "POST",
+                    data: {
+                        'csrfmiddlewaretoken': '{{ csrf_token }}',
+                        'gene_id': gene_id,
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        if (data.status === 'success') {
+                            layer.msg('Delete successfully!', {icon: 1});
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg(data.message, {icon: 2});
+                        }
+                    },
+                    error: function (xhr, errmsg, err) {
+                        layer.msg('Delete failed!', {icon: 2});
+                    }
+                });
+            },
+        })
+    }
 </script>
 {% endblock %}

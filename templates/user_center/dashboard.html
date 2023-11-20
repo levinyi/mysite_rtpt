@@ -3,14 +3,14 @@
 {% block title %}User Center{% endblock %}
 {% block content %}
 <div> 
-    <div class="row mt-5 pt-4">
+    <div class="row mt-4 pt-4">
         <h4>Welcome to your RootPath User Center! </h4>
         <br>
         <h4>We help you elevate the throughput of protein functional interrogation.  </h5>
     </div>
 
-    <div class="row mt-5">
-        <div class="col-md-4">
+    <div class="row mt-4">
+        <div class="col-md-4 mt-3">
             <div class="card" style="width:18rem;">
                 <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
                     <!-- Badge Code Starts Here -->
@@ -34,11 +34,11 @@
                 <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
                     <h5> <strong>{{ order_number_in_production }} </strong> order(s) in Production</h5>
                     <br><br>
-                    <a href="{% url 'user_center:manage_order' %}" class="btn btn-primary stretched-link">View Order History</a>
+                    <a href="{% url 'user_center:manage_order' %}" class="btn btn-primary stretched-link">View Order Status</a>
                 </div>
             </div>
-        </div>        
-        <div class="col-md-4" >
+        </div> 
+        <div class="col-md-4 mt-3" >
             <div class="card" style="width:18rem;">
                 <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
                     <!-- Badge Code Starts Here -->
@@ -58,15 +58,16 @@
                     </span>
                     <!-- Badge Code Ends Here -->
                     <img class="card-img-top mx-auto d-block" src="{% static 'user_center/img/shipment.png' %}" alt="Card image cap" style="width:105px">
+                    {% comment %} <i class="bi bi-cart3"></i> {% endcomment %}
                 </div>
                 <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
-                    <h5><strong>{{ order_number_in_shipment }}</strong> order(s) in Shipment </h5>
+                    <h5>Submit your sequence</h5>
                     <br><br>
-                    <a href="{% url 'user_center:order_create' %}" class="btn btn-primary stretched-link">Start New Order</a>
+                    <a href="{% url 'user_center:order_create' %}" class="btn btn-primary stretched-link">Create New Order</a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 mt-3">
             <div class="card" style="width:18rem;">
                 <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
                     <!-- Badge Code Starts Here -->
