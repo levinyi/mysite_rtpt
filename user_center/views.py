@@ -49,9 +49,9 @@ def order_create(request):
         response_message = ""
 
         for row in gene_table:
-            if not any(cell is not None for cell in row):
+            if not all(cell is not None for cell in row):
                 continue
-
+            
             gene_name = row[0]
             original_seq = row[1]
             species = None
@@ -94,6 +94,7 @@ def order_create(request):
                 status = seq_status
 
             # 创建或更新GeneInfo对象
+  
             this_gene, created = GeneInfo.objects.update_or_create(
                 user=request.user,
                 gene_name=gene_name,
@@ -223,7 +224,7 @@ def view_cart(request):
 @login_required
 @require_POST
 def checkout(request):
-    # 获取所有选中的gene_ids
+    # 获取所有选中的gene_ids, 提交订单。
     gene_ids = request.POST.getlist('gene_ids')
     print("you selected these genes id: ", gene_ids)
     if not gene_ids:
@@ -268,8 +269,6 @@ def manage_vector(request):
     '''list vectors of the company and the user'''
     company_vectors = Vector.objects.filter(user=None)
     user_vectors = Vector.objects.filter(user=request.user)
-    # for vector in Vector.objects.all():
-    #     print(vector.user, vector.vector_name, vector.combined_seq, vector.forbid_seq, vector.NC5, vector.NC3, vector.vector_map, vector.status)
     return render(request, 'user_center/manage_vector.html', {'company_vectors': company_vectors, 'user_vectors': user_vectors})
 
 def check_forbiden_seq(seq, seq_length, customer_forbidden_list=None):
@@ -331,7 +330,6 @@ def merge_overlapping_positions(all_positions):
 
     return merged_positions
 
-
 def check_S8W8G6_sequence(sequence):
     '''consecutive NTs
     如果含有 S8 W8 G6结构的需要标注成Warning
@@ -354,7 +352,6 @@ def check_S8W8G6_sequence(sequence):
 
     return all_positions
 
-# checked
 def calculate_gc_content(sequence):
     gc_count = sequence.count('G') + sequence.count('C')
     total_count = len(sequence)
@@ -449,13 +446,21 @@ def process_sequence(seq, forbid_seq, vector_object=None):
     ##################################################
     tagged_seq = ""
     current_position = 0
+    print("all positions: ", all_positions)
     for start, end in all_positions:
         tagged_seq += seq[current_position:start]
 
+        tagged_seq += '<i class="text-warning">'
         if (start, end) in forbidden_positions:
-            tagged_seq += '<i class="bg-danger">' + seq[start:end] + '</i>'
+            # tagged_seq += '<i class="bg-danger">' + seq[start:end] + '</i>'
+            for i in range(start, end):
+                tagged_seq += '<i class="bg-danger">' + seq[i] + '</i>'
         else:
-            tagged_seq += '<em class="text-warning">' + seq[start:end] + '</em>' 
+            # tagged_seq += '<em class="text-warning">' + seq[start:end] + '</em>' 
+            for i in range(start, end):
+                tagged_seq += '<em class="text-warning">' + seq[i] + '</em>'
+        tagged_seq += '</i>'
+        
         current_position = end
     
     tagged_seq += seq[current_position:]  # Add the remaining sequence
@@ -477,27 +482,7 @@ def process_sequence(seq, forbid_seq, vector_object=None):
 
     return tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, GC_content
 
-# not used
-def vector_validation(request, vector_id):
-    ''' when user click the "Re-analyze" button, this function will be called. '''
-    try:
-        user = request.user
-        data = json.loads(request.body.decode('utf-8'))
-        saved_seq = data.get("sequence")
-        gene_id = data.get("gene")
-        vector_object = Vector.objects.get(user=user, id=vector_id, vector_name=gene_id)
-        original_seq = vector_object.combined_seq
-        if original_seq == saved_seq:
-            return JsonResponse({'status': 'error', 'message': 'No changes made.'})
-        
-        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, vector_object.forbid_seq, vector_object)
-
-        return JsonResponse({'status': 'success', 'message': 'Validation process finished'})
-    except Vector.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'Vector not found'})
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
-
+# delete?
 @login_required
 def vector_add_table(request):
     if request.method == 'POST':
@@ -519,7 +504,7 @@ def vector_add_table(request):
         return JsonResponse({'status': 'success', "message": "Data saved successfully"})
     else:
         return render(request, 'user_center/manage_vector_create.html')
-
+# delete?
 @login_required
 def vector_add_file(request):
     if request.method == 'POST':
@@ -538,29 +523,33 @@ def vector_add_file(request):
     else:
         return render(request, 'user_center/manage_vector_create.html')
 
-
-# delete?
+# checked
 @login_required
-def vector_detail(request, vector_id):
-    ''' when user click the "Edit" button, this function will be called.'''
-    vector_object = Vector.objects.get(user=request.user, id=vector_id)
-    return render(request, 'user_center/vector_detail.html', {'vector': vector_object})
-
-# delete?
-@login_required
-def vector_edit(request, vector_id):
-    ''' when user click the "Edit" button, this function will be called.'''
-    vector_object = Vector.objects.get(user=request.user, id=vector_id)
-    vector_object.status = "validated"
-    vector_object.save()
-    return redirect(f'/user_center/vector_detail/{vector_id}')
-
-
-def vector_delete(request, vector_id):
+def vector_upload(request):
     if request.method == 'POST':
+        vector_file = request.FILES.get('vector_file')
+        vector_name = request.POST.get('vector_name')
+        print("vector_file", vector_file, vector_name)
+        this_vector, created = Vector.objects.update_or_create(
+            user=request.user,
+            vector_name=vector_name,
+            vector_map=vector_file,
+            defaults={
+                'status': 'Received',
+            }
+        )
+        return redirect('user_center:manage_vector')
+    else:
+        return redirect('user_center:manage_vector')
+
+# checked
+@login_required
+def vector_delete(request):
+    if request.method == 'POST':
+        vector_id = request.POST.get('vector_id')
         vector = Vector.objects.get(user=request.user, id=vector_id)
         vector.delete()
-        return redirect('/user_center/manage_vector/')
+        return JsonResponse({'status': 'success', 'message': 'Gene deleted successfully'})
     else:
         return render(request, 'user_center/manage_vector.html')
         

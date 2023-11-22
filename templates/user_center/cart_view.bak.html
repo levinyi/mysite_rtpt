@@ -12,8 +12,7 @@
                 <h4 class="mb-3"><i class="bi bi-list-ul"></i> Shopping Cart</h4>
             </div>
             <div class="col-6 text-end">
-                <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-plus"></i> Add
-                    More</a>
+                <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-plus"></i> Add More</a>
             </div>
         </div>
         <table class="table table-striped table-hover" style="text-align:center">
@@ -34,7 +33,8 @@
                 {% for gene in shopping_cart %}
                 <tr>
                     <td>
-                        <input type="checkbox" name="gene_id" value="{{ gene.id }}">
+                        <input type="checkbox" name="gene_id" value="{{ gene.id }}"
+                        {% if gene.status != 'optimized' and gene.status != 'saved' and gene.status != 'validated' %} disabled {% endif %}>
                     </td>
                     <td>{{ forloop.counter }}</td>
                     <td>{{ gene.gene_name }}</td>
@@ -42,50 +42,30 @@
                     <td>{{ gene.species }}</td>
                     <td>{{ gene.status }}</td>
                     <td>
-                        {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="comming soon" href="#" class="text-decoration-none">
-                            <i class="bi bi-eye me-2"></i>
-                        </a>
-                        {% else %}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}" 
-                            class="text-decoration-none">
-                            <i class="bi bi-pencil-square me-2"></i>
-                        </a>
-                        {% endif %}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="javascript:"
-                            onclick="del_gene(this, {{ gene.id }})" class="text-decoration-none">
-                            <i class="bi bi-trash text-danger me-2"></i>
-                        </a>
+                        <div class="hstack gap-3">
+                            {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="comming soon" href="#">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% else %}
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            {% endif %}
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="javascript:" onclick="del_gene(this, {{ gene.id }})">
+                                <i class="bi bi-trash text-danger"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <!-- Button trigger modal -->
+        {% comment %} <ul class='pagination'>
+            {{ page_string}}
+        </ul> {% endcomment %}
         <div class="col-12">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
-                <i class="bi bi-check2-square me-1"></i>Submit
-            </button>
-        </div>
-
-        <!-- Modal -->
-        <div class="modal fade" id="staticBackdrop" data-bs-keyboard="false" tabindex="-1"
-            aria-labelledby="staticBackdropLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h1 class="modal-title fs-5" id="staticBackdropLabel">Warning！</h1>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body" style="min-height: 80;margin-top: 20;">
-                        Once your genes are submitted, they can NOT be cancelled!
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="button" id="checkoutButton" class="btn btn-primary">Continue</button>
-                    </div>
-                </div>
-            </div>
+            <button id="checkoutButton" class="btn btn-primary"><i class="bi bi-bag-check"></i> Submit</button>
         </div>
     </div>
 </div>
@@ -93,15 +73,18 @@
 {% block javascript %}
 <script>
     // 为全选复选框添加点击事件
-    document.getElementById("selectAll").addEventListener('click', function () {
+    document.getElementById("selectAll").addEventListener('click', function() {
         const checkboxes = document.querySelectorAll('input[name="gene_id"]');
         checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
+            // 只有当复选框未被禁用时，才改变其选中状态
+            if (!checkbox.disabled) {
+                checkbox.checked = this.checked;
+            }
         });
     });
 
     // 为提交按钮添加点击事件
-    document.getElementById('checkoutButton').addEventListener('click', function () {
+    document.getElementById('checkoutButton').addEventListener('click', function() {
         const checkboxes = document.querySelectorAll('input[name="gene_id"]');
         const gene_ids = [];
         checkboxes.forEach(checkbox => {
@@ -121,14 +104,14 @@
             formData.append('gene_ids', gene_id);
         });
         // 打印表单数据
-        for (let [key, value] of formData.entries()) {
+        for (let [key, value] of formData.entries()) { 
             console.log(key, value);
         }
         // 使用 fetch API 发起请求
         fetch('{% url "user_center:checkout" %}', {
-            method: 'POST',
-            body: formData,
-        })
+                method: 'POST',
+                body: formData,
+            })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
@@ -138,7 +121,7 @@
                     alert(data['message']);
                 }
             })
-            .catch(error => console.error(error));
+            .catch(error => console.error(error));    
     });
 </script>
 <script>
@@ -150,14 +133,14 @@
 <script>
     function del_gene(the, gene_id) {
         layer.open({
-            type: 1,
-            skin: 'layui-layer-rim',
-            area: ['420px', '240px'],
+            type : 1,
+            skin : 'layui-layer-rim',
+            area : [ '420px', '240px' ],
             title: 'Delete',
-            content: '<div style="padding: 20px 80px;">Are you sure to delete this item?</div>',
-            btn: ['Yes', 'No'],
-            btnAlign: 'c',
-            yes: function (index, layero) {
+            content : '<div style="padding: 20px 80px;">Are you sure to delete this item?</div>',
+            btn : [ 'Yes', 'No' ],
+            btnAlign : 'c',
+            yes : function(index, layero) {
                 $.ajax({
                     url: "{% url 'user_center:gene_delete' %}",
                     type: "POST",
@@ -168,16 +151,16 @@
                     dataType: "json",
                     success: function (data) {
                         if (data.status === 'success') {
-                            layer.msg('Delete successfully!', { icon: 1 });
+                            layer.msg('Delete successfully!', {icon: 1});
                             setTimeout(function () {
                                 window.location.reload();
                             }, 1000);
                         } else {
-                            layer.msg(data.message, { icon: 2 });
+                            layer.msg(data.message, {icon: 2});
                         }
                     },
                     error: function (xhr, errmsg, err) {
-                        layer.msg('Delete failed!', { icon: 2 });
+                        layer.msg('Delete failed!', {icon: 2});
                     }
                 });
             },
