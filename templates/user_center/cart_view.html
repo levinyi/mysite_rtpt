@@ -34,7 +34,8 @@
                 {% for gene in shopping_cart %}
                 <tr>
                     <td>
-                        <input type="checkbox" name="gene_id" value="{{ gene.id }}">
+                        <input type="checkbox" name="gene_id" value="{{ gene.id }}"
+                        {% if gene.status != 'saved' and gene.status != 'validated' %} disabled {% endif %}>
                     </td>
                     <td>{{ forloop.counter }}</td>
                     <td>{{ gene.gene_name }}</td>
@@ -93,10 +94,13 @@
 {% block javascript %}
 <script>
     // 为全选复选框添加点击事件
-    document.getElementById("selectAll").addEventListener('click', function () {
+    document.getElementById("selectAll").addEventListener('click', function() {
         const checkboxes = document.querySelectorAll('input[name="gene_id"]');
         checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
+            // 只有当复选框未被禁用时，才改变其选中状态
+            if (!checkbox.disabled) {
+                checkbox.checked = this.checked;
+            }
         });
     });
 
@@ -109,6 +113,7 @@
                 gene_ids.push(checkbox.value);
             }
         });
+   
 
         if (gene_ids.length === 0) {
             alert('Please select at least one item!');

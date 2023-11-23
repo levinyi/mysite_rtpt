@@ -47,6 +47,10 @@ class ExpressionScale(models.Model):
     def __str__(self):
         return self.scale
 
+def user_directory_path(instance, filename):
+    # 文件将被上传到 MEDIA_ROOT/user_<id>/vector_file/<filename>
+    return 'user_{0}/vector_file/{1}'.format(instance.user.id, filename)
+
 class Vector(models.Model):
     user = models.ForeignKey(User, verbose_name="User", on_delete=models.SET_NULL, null=True, blank=True)
     vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
@@ -58,15 +62,12 @@ class Vector(models.Model):
     id20 = models.TextField(verbose_name="id20", null=True, blank=True)
 
     create_date = models.DateTimeField(default=timezone.now)
-    status = models.CharField(max_length=255, default='Need_To_Validate')
+    status = models.CharField(max_length=255, default='Received')
 
-    forbid_seq = models.CharField(max_length=255, null=True, blank=True)
     combined_seq = models.TextField(null=True, blank=True)
     saved_seq = models.TextField(null=True, blank=True)
+    vector_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
 
-    forbidden_check_list = models.CharField(max_length=255, null=True, blank=True)
-    contained_forbidden_list = models.CharField(max_length=255, null=True, blank=True)
-    gc_content = models.FloatField(null=True, blank=True)
 
     def is_company_vector(self):
         return self.user is None

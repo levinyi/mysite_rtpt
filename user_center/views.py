@@ -1,5 +1,6 @@
 import json
 import re
+import os
 from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from product.models import GeneSynEnzymeCutSite, Species, Vector
@@ -33,7 +34,7 @@ def order_create(request):
         data = json.loads(request.body.decode('utf-8'))
         vector_id = data.get("vectorId")
         gene_table = data.get("genetable")
-
+        # print(gene_table)
         if not gene_table:
             return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
 
@@ -49,7 +50,8 @@ def order_create(request):
         response_message = ""
 
         for row in gene_table:
-            if not all(cell is not None for cell in row):
+            if not any(cell is not None for cell in row):
+                # print("Empty row")
                 continue
             
             gene_name = row[0]
@@ -87,7 +89,7 @@ def order_create(request):
                 original_seq = f'<span class="text-lowercase">{nc5}</span>{original_seq}<span class="text-lowercase">{nc3}</span>'
                 combined_seq = nc5 + row[1] + nc3
                 tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(combined_seq, forbid_seq)
-                print("seq_status: ", seq_status, "forbidden_check_list: ", forbidden_check_list, "contained_forbidden_list: ", contained_forbidden_list)
+                # print("seq_status: ", seq_status, "forbidden_check_list: ", forbidden_check_list, "contained_forbidden_list: ", contained_forbidden_list)
                 if seq_status in ['Protein', 'Invalid Protein']:
                     return JsonResponse({'status': 'error', 'message': f'{seq_status} sequence is not allowed.'})
                 saved_seq = tagged_seq
@@ -169,6 +171,7 @@ def protein_edit(request, gene_id):
     return render(request, 'user_center/protein_detail.html', {'gene_list': gene_list})
 
 
+@login_required
 def gene_validation(request):
     ''' when user click the "Re-analyze" button, this function will be called. '''
     try:
@@ -181,8 +184,17 @@ def gene_validation(request):
         if original_seq == saved_seq:
             return JsonResponse({'status': 'error', 'message': 'No changes made.'})
         
-        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, gene_object.forbid_seq, gene_object)
-
+        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, gene_object.forbid_seq)
+        # print(seq_status)
+        if seq_status in ['Protein', 'Invalid Protein']:
+            return JsonResponse({'status': 'error', 'message': 'Squence is not allowed. Your sequence may has '+ seq_status + ' sequence.'})
+        gene_object.status = seq_status
+        gene_object.saved_seq = tagged_seq
+        gene_object.gc_content = gc_content
+        gene_object.forbidden_check_list = forbidden_check_list
+        gene_object.contained_forbidden_list = contained_forbidden_list
+        gene_object.combined_seq = saved_seq
+        gene_object.save()
         return JsonResponse({'status': 'success', 'message': 'Validation process finished'})
     except Vector.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Vector not found'})
@@ -191,13 +203,50 @@ def gene_validation(request):
 
 @login_required
 def validation_save(request, id):
-    gene_object = GeneInfo.objects.get(user=request.user, id=id)
-    gene_object.status = 'saved'
-    gene_object.save()
-    return JsonResponse({'status': 'success', 'message': 'gene saved successfully'})
+    ''' when user click the "Save" button, this function will be called. '''
+    def validation_and_save_seq(request, id):
+        user = request.user
+        data = json.loads(request.body.decode('utf-8'))
+        saved_seq = data.get("sequence")
+        gene_object = GeneInfo.objects.get(user=user, id=id)
+        original_seq = gene_object.combined_seq
+        if original_seq == saved_seq:
+            if gene_object.status == 'validated' :
+                gene_object.status = 'saved'
+                gene_object.save()
+                return True
+            else:
+                return False
+            
+        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, gene_object.forbid_seq)
+        gene_object.saved_seq = tagged_seq
+        gene_object.gc_content = gc_content
+        gene_object.forbidden_check_list = forbidden_check_list
+        gene_object.contained_forbidden_list = contained_forbidden_list
+        gene_object.combined_seq = saved_seq
+        if seq_status == 'validated':
+            gene_object.status = 'saved'
+            gene_object.save()
+            return True
+        else:
+            gene_object.status = seq_status
+            gene_object.save()
+            return False
 
+    try:
+        if(validation_and_save_seq(request, id)):
+            return JsonResponse({'status': 'success', 'message': 'Gene saved successfully'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Please check your sequence and analysis first.'})
+    except Vector.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Vector not found'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
 
+# checked
+@login_required
 def gene_delete(request):
+    '''从shopping cart中删除gene'''
     if request.method == 'POST':
         gene_id = request.POST.get('gene_id')
         gene = GeneInfo.objects.get(user=request.user, id=gene_id)
@@ -226,7 +275,7 @@ def view_cart(request):
 def checkout(request):
     # 获取所有选中的gene_ids, 提交订单。
     gene_ids = request.POST.getlist('gene_ids')
-    print("you selected these genes id: ", gene_ids)
+    # print("you selected these genes id: ", gene_ids)
     if not gene_ids:
         return JsonResponse({'status': 'error', 'message': 'No gene selected'})
     
@@ -423,8 +472,11 @@ def identify_sequence(seq):
         else:
             return "Invalid or unknown sequence"
 
-def process_sequence(seq, forbid_seq, vector_object=None):
+def process_sequence(seq, forbid_seq):
     seq = seq.upper().replace(" ", "")
+    seq = re.sub(r'[^a-zA-Z]', '', seq)
+    seq = seq[:20].lower() + seq[20:-20]  + seq[-20:].lower() # Add lower case to the first and last 20 bases
+    # 删除所有非字母的字符
     # 如果seq是氨基酸序列，则不需要检查forbid_seq，不需要计算gc_content，不需要检查consecutive NTs，直接返回
     if identify_sequence(seq) == "Protein sequence":
         return seq, "Protein", None, None, None
@@ -446,7 +498,7 @@ def process_sequence(seq, forbid_seq, vector_object=None):
     ##################################################
     tagged_seq = ""
     current_position = 0
-    print("all positions: ", all_positions)
+    # print("all positions: ", all_positions)
     for start, end in all_positions:
         tagged_seq += seq[current_position:start]
 
@@ -462,66 +514,17 @@ def process_sequence(seq, forbid_seq, vector_object=None):
         tagged_seq += '</i>'
         
         current_position = end
-    
+
     tagged_seq += seq[current_position:]  # Add the remaining sequence
-    print(tagged_seq)
+
     ##################################################
-    # print(tagged_seq)
     if len(contained_forbidden_list) > 0:
         seq_status = "forbidden"
     else:
         seq_status = "validated"
 
-    if vector_object is not None:
-        vector_object.status = seq_status
-        vector_object.saved_seq = tagged_seq
-        vector_object.gc_content = GC_content
-        vector_object.forbidden_check_list = forbidden_check_list
-        vector_object.contained_forbidden_list = contained_forbidden_list
-        vector_object.save()
-
     return tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, GC_content
 
-# delete?
-@login_required
-def vector_add_table(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        for row in data:
-            if any(cell is not None for cell in row):
-                vector_name = row[0]
-                vector_seq = row[1]
-                # vector status: received, In_Preparation, Ready_to_Use.
-                this_vector, created = Vector.objects.update_or_create(
-                    user=request.user,
-                    vector_name=vector_name,
-                    defaults={
-                        'vector_map': vector_seq,
-                        'status': 'Received',
-                    }
-                )
-                print(this_vector.vector_name)
-        return JsonResponse({'status': 'success', "message": "Data saved successfully"})
-    else:
-        return render(request, 'user_center/manage_vector_create.html')
-# delete?
-@login_required
-def vector_add_file(request):
-    if request.method == 'POST':
-        vector_file = request.FILES.get('vector_file')
-        vector_name = request.POST.get('vector_name')
-        print("vector_file", vector_file, vector_name)
-        this_vector, created = Vector.objects.update_or_create(
-            user=request.user,
-            vector_name=vector_name,
-            vector_map=vector_file,
-            defaults={
-                'status': 'Received',
-            }
-        )
-        return render(request, 'user_center/manage_vector_create.html')
-    else:
-        return render(request, 'user_center/manage_vector_create.html')
 
 # checked
 @login_required
@@ -529,11 +532,11 @@ def vector_upload(request):
     if request.method == 'POST':
         vector_file = request.FILES.get('vector_file')
         vector_name = request.POST.get('vector_name')
-        print("vector_file", vector_file, vector_name)
+        # print("vector_file", vector_file, vector_name)
         this_vector, created = Vector.objects.update_or_create(
             user=request.user,
             vector_name=vector_name,
-            vector_map=vector_file,
+            vector_file=vector_file,
             defaults={
                 'status': 'Received',
             }
@@ -548,6 +551,12 @@ def vector_delete(request):
     if request.method == 'POST':
         vector_id = request.POST.get('vector_id')
         vector = Vector.objects.get(user=request.user, id=vector_id)
+
+        # 删除与之关联的文件
+        file_path = vector.vector_file.path
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
         vector.delete()
         return JsonResponse({'status': 'success', 'message': 'Gene deleted successfully'})
     else:
@@ -567,6 +576,7 @@ def vector_download(request, vector_id, file_type):
     NC5 = vector_object.NC5
     NC3 = vector_object.NC3
     vector_map = vector_object.vector_map
+    vector_file = vector_object.vector_file
 
     data = {
         'vector_name': vector_name,
@@ -594,6 +604,14 @@ def vector_download(request, vector_id, file_type):
         response['Content-Disposition'] = f'attachment; filename="{vector_name}.dna"'
         response.write(f"{NC5}{vector_map}{NC3}")
         return response
+    elif file_type == 'map':
+        # 把vector_map文件直接返回
+        if vector_file:
+            response = HttpResponse(vector_file, content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="{vector_file.name}"'
+            return response
+        else:
+            return HttpResponse("No vector map found")
     else:
         return HttpResponse("File type not supported")
 

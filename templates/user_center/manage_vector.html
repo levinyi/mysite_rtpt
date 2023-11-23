@@ -96,6 +96,7 @@
                                 <span class="text-truncate">{{ vector.NC3 }}</span>
                                 <i class="bi bi-clipboard2 copy-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy" onclick="copyToClipboard(this, event)"></i>
                             </div>
+                            <div id="copy-success" class="copy-success">Copied!</div>
                         </td>
                         <td>
                             <div class="hstack gap-3 justify-content-center">
@@ -110,7 +111,6 @@
             </table>
         </div>
     </div>
-    <div id="copy-success" class="copy-success">Copied!</div>
     <!-- My Vectors -->
     <div class="card mt-4">
         <div class="card-header">
@@ -131,6 +131,7 @@
                 <thead>
                     <tr>
                         <th scope="col">Vector Name</th>
+                        <th scope="col">Vector ID</th>
                         <th scope="col">Status</th>
                         <th scope="col">Upstream of Insert</th>
                         <th scope="col">Downstream of Insert</th>
@@ -141,22 +142,28 @@
                 <tbody>
                     {% for vector in user_vectors %}
                     <tr>
-                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</a></td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</td>
+                        <td></td>
                         <td>{{ vector.status }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
                         <td>
+                            {% if vector.status == 'Received' %}
+
+                            <div class="hstack gap-3 justify-content-center">
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download File" 
+                                href="{% url 'user_center:vector_download' vector.id 'map' %}"><i class="bi bi-download"></i></a>
+                
+                            </div>
+                            {% else %}
                             <div class="hstack gap-3 justify-content-center">
                                 <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" href="{% url 'user_center:vector_download' vector.id 'pdf' %}"><i class="bi bi-filetype-pdf"></i></a>
                                 <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download TXT" href="{% url 'user_center:vector_download' vector.id 'txt' %}"><i class="bi bi-filetype-txt"></i></a>
                                 <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id 'dna' %}"><i class="bi bi-file-earmark-binary"></i></a>
                             </div>
+                            {% endif %}
                         </td>
                         <td>
-                            {% comment %} <form method="post" action="{% url 'user_center:vector_delete' vector.id %}">
-                                {% csrf_token %}
-                                <a type="submit" class="text-danger" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete item"><i class="bi bi-trash"></i></a>
-                            </form> {% endcomment %}
                             <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="javascript:"
                                 onclick="del_vector(this, {{ vector.id }})">
                                 <i class="bi bi-trash text-danger"></i>
