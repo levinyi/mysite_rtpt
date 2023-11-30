@@ -24,9 +24,9 @@
                     </th>
                     <th scope="col">ID</th>
                     <th scope="col">Name</th>
-                    <th scope="col">vector</th>
+                    <th scope="col">Vector</th>
                     <th scope="col">Species</th>
-                    <th scope="col">status</th>
+                    <th scope="col">Status</th>
                     <th scope="col">Action</th>
                 </tr>
             </thead>
@@ -35,7 +35,7 @@
                 <tr>
                     <td>
                         <input type="checkbox" name="gene_id" value="{{ gene.id }}"
-                        {% if gene.status != 'saved' and gene.status != 'validated' %} disabled {% endif %}>
+                        {% if gene.status != 'saved' and gene.status != 'validated' and gene.status != 'optimizing' %} disabled {% endif %}>
                     </td>
                     <td>{{ forloop.counter }}</td>
                     <td>{{ gene.gene_name }}</td>

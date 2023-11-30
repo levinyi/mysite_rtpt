@@ -106,47 +106,61 @@
                 <p class="monospace-text">Original sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. This only provides a view for insertion site, which is not counted for charging"></i> :</p>
                 <!-- Add your sequences content here -->
                 <div class="card">
-                    <div {% if gene.status == 'saved' %} class="card-body text-truncate" {% else %} class="card-body monospace-text" {% endif %} id="sequence">{{ gene.combined_seq|safe}}</div>
+                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate">{{ gene.combined_seq|safe}}</div>
+                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %}  class="card-body monospace-text first_col_full" id="sequence">{{ gene.combined_seq|safe}}</div>
                 </div>
             </div>
             <!-- Second Column -->
-            <div class="col-md-5 col-12">
+            <div class="col-md-5 col-12 .second_col">
                 <p class="monospace-text">Edited sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. This only provides a view for insertion site, which is not counted for charging"></i> :</p>
                 <div class="card">
-                    <div {% if gene.status == 'saved' %} class="card-body text-truncate" contenteditable="false"{% else %} class="card-body monospace-text" contenteditable="true" {% endif %} id="edited_sequence">{{ gene.saved_seq|safe }}</div>
+                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate second_col_trun" contenteditable="false" id="edited-sequence-trun">{{ gene.saved_seq|safe }}</div>
+                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="card-body monospace-text second_col_full" contenteditable="true" id="edited-sequence">{{ gene.saved_seq|safe }}</div>
                 </div>
             </div>
             <!-- Third Column -->
-            <div class="col-md-2 col-12">
-                {% if gene.status != "saved" %}
-                    <p>Choose Species:</p>
-                    <div style="max-width:182px;">
-                        <select class="form-select" aria-label="Default select example">
+
+            <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="col-md-2 col-12 edit-buttons">
+                <p>Choose Species:</p>
+
+                    <!-- 上面的select 部分修改成下面的select部分 -->
+                    <!-- dushiyi修改的部分：species的值是从数据库中获取，如果没有获取到，就显示的是Choose a species，
+                    此时，用户选择一个物种。通过javascript函数保存到数据库中。 js在底部写了。-->
+                <div class="mt-3 species-select-container" style="max-width:182px;">
+                        <select class="form-select species-select" id="species_select_{{ gene.id }}"  name="species_select">
+                            <option value="" {% if not gene.species or not gene.species.species_name %}selected{% endif %}>Choose a species</option>
+                            {% for species in species_names %}
+                                <!-- 检查当前gene的species是否等于循环中的species -->
+                                <option value="{{ species }}" {% if gene.species and species == gene.species.species_name %}selected{% endif %}>{{ species }}</option>
+                            {% endfor %}
                         </select>
-                    </div>
-                {% endif %}
+                        <!-- 将gene.id传递到后端 -->
+                        <input type="hidden" class="gene-id" value="{{ gene.id }}">
+                </div>
+                    <!-- 修改结束 -->
 
                 <div class="mt-3">
-                    {% if gene.status != 'saved' %}
                     <label for="frameshiftSelector">Choose frameshift:</label>
                     <select id="frameshiftSelector">
                         <option value="0" selected>0</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                     </select>
-                    <button class="btn btn-warning toggle-btn mt-3">Toggle Codon Boxes</button>
+                    <button class="btn btn-warning toggle-btn mt-3" data-displayed="false">Toggle Codon Boxes</button>
                     <button class="btn btn-primary mt-3 analysis-btn" data-gene-name="{{ gene.gene_name }}">Re-analyze</button>
-                    {% endif %}
 
-                    {% if gene.status == "saved" %}
-                        <button class="btn btn-primary mt-4" style="width:100px;" id="editButton" data-url="{% url 'user_center:gene_edit' gene.id %}">Edit</button>
-                    {% elif gene.status == "validated" %}
-                        <button class="btn btn-success mt-3" id="saveButton" data-url="{% url 'user_center:validation_save' gene.id %}">Save</button>
-                    {% else %}
-                        <button class="btn btn-secondary mt-3" disabled>Save</button>
-                    {% endif %}
+                    
+                    <button {% if gene.status != "validated" %}  style="display:none" {% endif %} class="btn btn-success mt-3 canSave" data-url="{% url 'user_center:validation_save' gene.id %}">Save</button>
+                    <button {% if gene.status == "validated" %}  style="display:none" {% endif %} class="btn btn-secondary mt-3 noSave" disabled>Save</button>
+                </div>
+                
+            </div>
+            <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="col-md-2 col-12 saved-button">
+                <div class="mt-3">
+                    <button class="btn btn-primary mt-4 editButton" style="width:100px;" data-url="{% url 'user_center:gene_edit' gene.id %}">Edit</button>
                 </div>
             </div>
+
         </div>
         {% endfor %}
     </div>
@@ -166,80 +180,38 @@
 <script src="{% static 'species/amino_acid_data.js' %}"></script>
 <script src="{% static 'species/species_data.js' %}"></script>
 <script>
-
-    function clickNewCodon(e, event) {
-        // 替换codon
-        console.log(e);
-        e.setAttribute("aria-current", "true");
-        console.log(e);
-        e.parentElement.parentElement.parentElement.childNodes[0].innerText = e.innerText;
-    }
-
-    // 点击Toggle Codon Boxes按钮时，显示或隐藏codon框
-    document.addEventListener("DOMContentLoaded", function() {
-        // 默认从species_data.json中获取全部物种名称
-        function get_specie_names() {
-            var specie_names = Object.keys(species);
-            return specie_names;
-        }
-        
-        const specie_names = get_specie_names();
-        const specieSelector = $('.form-select');
-        // 遍历specie_names，添加到specieSelector中
-        specie_names.forEach(function(specie_name) {
-            specieSelector.append(`<option value="${specie_name}">${specie_name}</option>`);
-        });
-
-
-        function getCodonDetail(specie_name, codon) {
-            if(species[specie_name].hasOwnProperty(codon)) {
-                const acid = species[specie_name][codon]["Amino acid"];
-                if(aminoAcid[specie_name].hasOwnProperty(acid)) {
-                    list = aminoAcid[specie_name][acid];
-                    return list;
-                }
+    function getTagTextByHTML(html) {
+        var tagged_seq = '';
+        html.childNodes.forEach(function(item) {
+            if(item.nodeType===Node.TEXT_NODE)  {
+                tagged_seq += item.textContent;
+                return;
             }
-            return null;
-        }
-        
-        // 添加事件监听器
-        function addCodonBoxEventListeners(codonBox, selector) {
-            codonBox.addEventListener("click", function(e, event) {
-                const codon = codonBox.childNodes[0].textContent;
-                const list = getCodonDetail(selector.value, codon);
-                const item_begin = `<li><a class="dropdown-item small-dropdown-item" onclick="clickNewCodon(this,event)">`;
-                const item_end = `</a></li>`;
-                var ul = codonBox.querySelector("ul");
-                ul.innerHTML = ""
-                if(list.length > 0) {
-                    console.log(list.length);
-                    for (let i = 0; i < list.length; i++) {
-                        // 追加列表元素
-                        ul.innerHTML += (item_begin + list[i]["Triplet"] + item_end)
+            if(item.childNodes[0] === undefined)
+                return;
+            item.childNodes[0].childNodes.forEach(function(item) {
+                if(item.nodeType === Node.TEXT_NODE) {
+                    tagged_seq += item.textContent;
+                }
+                else {
+                    var tmp = item.innerText;
+                    for(var i = 0;i < tmp.length;i++) {
+                        item.innerText = tmp[i];
+                        tagged_seq += item.outerHTML;
                     }
                 }
             });
-            codonBox.addEventListener("mouseenter", function(e, event) {
-                const codon = e.srcElement.innerText;
-                const list = getCodonDetail(selector.value, codon);
-                if (list === null) {
-                    codonBox.setAttribute('title', "Unknown");
-                }
-                else{
-                    // var text = 'Triplet(' + list[0]["Amino acid"] + ')   Frequency  Fraction \n'
-                    var text = ' \t\t  ' + list[0]["Amino acid"] + ' \t   Frequency  Fraction \n'
-                    list.forEach(function(item) {
-                        var fre = item["Frequency"].toFixed(2).padEnd(9, ' ');
-                        var fra = item["Fraction"].toFixed(2).padEnd(9, ' ');
-                        // 尽量对齐，不足加空格
-                        text += ('  ' + item["Triplet"] + " :").padEnd(13, ' ') + "  " + fre + "\t" + fra + '\n';
-                    });
-                    codonBox.setAttribute('title', text);
-                }
-            });
-        }
+        });
+        return tagged_seq;
+    }
 
-        function displayCodonBoxes(editedSequenceDiv, shift, originalSeqContent) {
+    function clickNewCodon(e, event) {
+        // 替换codon
+        e.setAttribute("aria-current", "true");
+        e.parentElement.parentElement.parentElement.childNodes[0].innerText = e.innerText;
+    }
+
+    function displayCodonBoxes(editedSequenceDiv, shift, originalSeqContent) {
             let currentIndex = 0;
             let wrappedSeq = '';
             // 使用DOM解析器处理原始内容
@@ -250,7 +222,8 @@
             function processNode(node, index, length) {
                 const begin = `<span class="codon"><span data-bs-toggle="dropdown">`;
                 const end = `</span><ul class="dropdown-menu small-dropdown-menu"></ul></span></span>`;
-                var len = node.nodeType === Node.TEXT_NODE? node.textContent.length : node.childNodes.length;
+                
+                var len = node.nodeType === Node.TEXT_NODE? node.textContent.length : 1;
                     // 处理文本节点
                 for (let i = 0; i < len; i++) {
                     var content;
@@ -259,10 +232,8 @@
                         content = node.textContent[i];
                     }
                     else{
-                        if(!/[a-zA-Z]/.test(node.childNodes[i].innerText)) continue;
-                        // if(currentIndex < 20)
-                        //    node.childNodes[i].innerText = node.childNodes[i].innerText.toLowerCase();
-                        content = node.childNodes[i].outerHTML;
+                        if(!/[a-zA-Z]/.test(node.innerText)) continue;
+                        content = node.outerHTML;
                     }
                     // 跳过非字母节点
                     if ((currentIndex - shift) % 3 === 0) {
@@ -287,7 +258,108 @@
                 addCodonBoxEventListeners(codonBox, selector);
 
             });
+    }
+
+    function getCodonDetail(specie_name, codon) {
+        if(species[specie_name].hasOwnProperty(codon)) {
+            const acid = species[specie_name][codon]["Amino acid"];
+            if(aminoAcid[specie_name].hasOwnProperty(acid)) {
+                list = aminoAcid[specie_name][acid];
+                return list;
+            }
         }
+        return null;
+    }
+
+
+        // 添加事件监听器
+    function addCodonBoxEventListeners(codonBox, selector) {
+            codonBox.addEventListener("click", function(e, event) {
+                const codon = codonBox.childNodes[0].textContent;
+                const list = getCodonDetail(selector.value, codon);
+                const item_begin = `<li><a class="dropdown-item small-dropdown-item" onclick="clickNewCodon(this,event)">`;
+                const item_end = `</a></li>`;
+                var ul = codonBox.querySelector("ul");
+                if(list === null)
+                    return;
+                ul.innerHTML = ""
+                if(list.length > 0) {
+                    for (let i = 0; i < list.length; i++) {
+                        // 追加列表元素
+                        ul.innerHTML += (item_begin + list[i]["Triplet"] + item_end)
+                    }
+                }
+            });
+            codonBox.addEventListener("mouseenter", function(e, event) {
+                const codon = e.srcElement.innerText.toUpperCase();
+                const list = getCodonDetail(selector.value, codon);
+                if (list === null) {
+                    codonBox.setAttribute('title', "Unknown");
+                }
+                else{
+                    // var text = 'Triplet(' + list[0]["Amino acid"] + ')   Frequency  Fraction \n'
+                    var text = '\t ' + list[0]["Amino acid"] + ' \t Frequency  Fraction \n'
+                    list.forEach(function(item) {
+                        var fre = item["Frequency"].toFixed(2).padEnd(9, ' ');
+                        var fra = item["Fraction"].toFixed(2).padEnd(9, ' ');
+                        // 尽量对齐，不足加空格
+                        text += ('  ' + item["Triplet"] + " :").padEnd(13, ' ') + "  " + fre + "\t" + fra + '\n';
+                    });
+                    codonBox.setAttribute('title', text);
+                }
+            });
+    }
+
+    // 点击species_select按钮时，保存物种名称到数据库中, 这部分功能是完整的。
+    document.querySelectorAll('.species-select').forEach(function(selectElement) {
+        selectElement.addEventListener('change', function() {
+            const species = this.value;
+            const geneContainer = this.closest('.species-select-container');
+            const geneId = geneContainer.querySelector('.gene-id').value;
+
+            console.log(species);
+            console.log(geneId);
+
+            // 这里发送您的AJAX请求...
+            $.ajax({
+                url: '/user_center/save_species/',
+                type: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                data:JSON.stringify({
+                    species: species,
+                    gene_id: geneId,
+                }),
+                success: function(response) {
+                    if(response.status === 'success') {
+                        // alert(response.message); // 或其他方式显示成功消息
+                        // location.reload();
+                        console.log(response);
+                    } else {
+                        console.log(response);
+                        alert(response.message); // 或其他方式显示错误消息
+                    }
+                },
+                error: function() {
+                    alert('请求失败'); // 或其他方式显示错误消息
+                }
+            });
+        });
+    });
+
+    // 点击Toggle Codon Boxes按钮时，显示或隐藏codon框
+    document.addEventListener("DOMContentLoaded", function() {
+        // 默认从species_data.json中获取全部物种名称
+        function get_specie_names() {
+            var specie_names = Object.keys(species);
+            return specie_names;
+        }
+        
+        const specie_names = get_specie_names();
+        const specieSelector = $('.form-select');  // dushiyi故意修改的部分
+        // 遍历specie_names，添加到specieSelector中
+        specie_names.forEach(function(specie_name) {
+            specieSelector.append(`<option value="${specie_name}">${specie_name}</option>`);
+        });
 
         const toggleButtons = document.querySelectorAll(".toggle-btn");
         const selectors = document.querySelectorAll(".form-select");
@@ -296,28 +368,25 @@
 
         // 为每个Toggle Codon Boxes按钮添加事件监听器
         toggleButtons.forEach(function(toggleButton) {
-            const editedSequenceDiv = toggleButton.closest('.col-md-2').previousElementSibling.querySelector("#edited_sequence");
-            console.log(editedSequenceDiv);
+            const editedSequenceDiv = toggleButton.closest('.col-md-2').previousElementSibling.querySelector("#edited-sequence");
             const frameshiftSelector = toggleButton.closest('.col-md-2').querySelector("#frameshiftSelector");
 
-            let isCodonDisplayed = false;
-            const originalSeqContent = editedSequenceDiv.innerHTML;
-
-            frameshiftSelector.addEventListener("change", function() {
-                if (isCodonDisplayed) {
-                    displayCodonBoxes(editedSequenceDiv, parseInt(frameshiftSelector.value), originalSeqContent);
+            frameshiftSelector.addEventListener("change", function(e, event) {
+                if (toggleButton.dataset.displayed === "true") {
+                    displayCodonBoxes(editedSequenceDiv, parseInt(frameshiftSelector.value), getTagTextByHTML(editedSequenceDiv));
                 }
             });
 
             toggleButton.addEventListener("click", function() {
-                if (isCodonDisplayed) {
+                console.log("click", toggleButton.dataset.displayed);
+                if (toggleButton.dataset.displayed === "true") {
                     // 隐藏codon框
-                    editedSequenceDiv.innerHTML = originalSeqContent;
-                    isCodonDisplayed = false;
+                    editedSequenceDiv.innerHTML = getTagTextByHTML(editedSequenceDiv);
+                    toggleButton.dataset.displayed="false";
                 } else {
                     // 显示codon框
-                    displayCodonBoxes(editedSequenceDiv, parseInt(frameshiftSelector.value), originalSeqContent);
-                    isCodonDisplayed = true;
+                    displayCodonBoxes(editedSequenceDiv, parseInt(frameshiftSelector.value), editedSequenceDiv.innerHTML);
+                    toggleButton.dataset.displayed="true";
                 }
             });
         });
@@ -332,9 +401,12 @@
 
         analysisButtons.forEach(function(analysisButton) {
             analysisButton.addEventListener("click", function() {
-                const editedSequenceDiv = analysisButton.closest('.col-md-2').previousElementSibling.querySelector(".card-body");
+                const editedSequenceDiv = analysisButton.closest('.col-md-2').previousElementSibling.querySelector("#edited-sequence");
                 const geneName = analysisButton.getAttribute("data-gene-name");
-
+                const toggleButton = analysisButton.closest('.col-md-2').querySelector(".toggle-btn");
+                const frameshiftSelector = analysisButton.closest('.col-md-2').querySelector("#frameshiftSelector");
+                const canSaveButton = analysisButton.closest('.col-md-2').querySelector(".canSave");
+                const noSaveButton = analysisButton.closest('.col-md-2').querySelector(".noSave");
                 // 获取editedSequenceDiv的内容和geneName
                 const sequenceContent = editedSequenceDiv.innerText;
         
@@ -343,7 +415,7 @@
                     sequence: sequenceContent,
                     gene: geneName,
                 };
-                console.log("data: ", data);
+                // console.log("data: ", data);
                 // 创建一个新的XMLHttpRequest对象
                 const xhr = new XMLHttpRequest();
 
@@ -361,7 +433,19 @@
                         if(response.status === 'success') {
                             // 弹窗提示
                             alert('Re-analyzed!');
-                            location.reload();
+                            if(toggleButton.dataset.displayed === "true") {
+                                displayCodonBoxes(editedSequenceDiv, parseInt(frameshiftSelector.value), response.new_seq);
+                            }
+                            else
+                                editedSequenceDiv.innerHTML = response.new_seq;
+                            if(response.seq_status === 'validated') {
+                                canSaveButton.style.display = "";
+                                noSaveButton.style.display = "none";
+                            }
+                            else {
+                                canSaveButton.style.display = "none";
+                                noSaveButton.style.display = "";
+                            }
                         } else if (response.status === 'error') {
                             alert(response.message);
                         }
@@ -377,11 +461,20 @@
 <script>
 // for save button
 $(document).ready(function() {
-    $('#saveButton').on('click', function(e, event) {
+    $('.canSave').on('click', function(e, event) {
         const url = $(this).data('url');
-        console.log(e.target);
-        const editedSequenceDiv = e.target.closest('.col-md-2').previousElementSibling.querySelector(".card-body");
+        const tmp = e.target.closest('.col-md-2')
+        const tmp2 = e.target.closest('.mb-5')
 
+        const editedSequenceDiv = tmp.previousElementSibling.querySelector("#edited-sequence");
+        const toggleButton = tmp.querySelector(".toggle-btn");
+        const frameshiftSelector = tmp.querySelector("#frameshiftSelector");
+        const editButtons = e.target.closest('.edit-buttons')
+        const savedButton = tmp2.querySelector('.saved-button')
+        const first_col_trun = tmp2.querySelector('.first_col_trun')
+        const first_col_full = tmp2.querySelector('.first_col_full')
+        const second_col_trun = tmp2.querySelector('.second_col_trun')
+        const second_col_full = tmp2.querySelector('.second_col_full')
         // 获取editedSequenceDiv的内容和geneName
         const sequenceContent = editedSequenceDiv.innerText;
         
@@ -396,7 +489,14 @@ $(document).ready(function() {
             success: function(response) {
                 if(response.status === 'success') {
                     // alert(response.message); // 或其他方式显示成功消息
-                    location.reload();
+                    alert('Save success!');
+                    editedSequenceDiv.innerHTML = response.new_seq;
+                    editButtons.style.display = "none";
+                    savedButton.style.display = "";
+                    first_col_full.style.display = "none";
+                    first_col_trun.style.display = "";
+                    second_col_full.style.display = "none";
+                    second_col_trun.style.display = "";
                 } else {
                     console.log(response);
                     alert(response.message); // 或其他方式显示错误消息
@@ -410,9 +510,17 @@ $(document).ready(function() {
 });
 // for edit button
 $(document).ready(function() {
-    $('#editButton').on('click', function() {
+    $('.editButton').on('click', function(e, event) {
         const url = $(this).data('url');
 
+        const savedButton = e.target.closest('.saved-button')
+        const tmp = e.target.closest('.mb-5')
+
+        const editButtons = tmp.querySelector('.edit-buttons')
+        const first_col_trun = tmp.querySelector('.first_col_trun')
+        const first_col_full = tmp.querySelector('.first_col_full')
+        const second_col_trun = tmp.querySelector('.second_col_trun')
+        const second_col_full = tmp.querySelector('.second_col_full')
         $.ajax({
             url: url,
             type: 'POST',
@@ -420,7 +528,12 @@ $(document).ready(function() {
             success: function(response) {
                 if(response.status === 'success') {
                     // alert(response.message); // 或其他方式显示成功消息
-                    location.reload();
+                    editButtons.style.display = "";
+                    savedButton.style.display = "none";
+                    first_col_full.style.display = "";
+                    first_col_trun.style.display = "none";
+                    second_col_full.style.display = "";
+                    second_col_trun.style.display = "none";
                 } else {
                     alert(response.message); // 或其他方式显示错误消息
                 }

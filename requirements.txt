@@ -9,3 +9,4 @@ django-widget-tweaks
 pandas
 django-cors-headers
 reportlab
+django-import-export

@@ -54,21 +54,24 @@ def register(request):
         return HttpResponseRedirect(reverse('/user_center/dashboard/'))
     if request.method == 'POST':
         user_form = RegistrationForm(request.POST)
-        # userprofile_form = UserProfileForm(request.POST)
+        userprofile_form = UserProfileForm(request.POST)
         if user_form.is_valid():
             new_user = user_form.save(commit=False)
             new_user.set_password(user_form.cleaned_data['password'])
             new_user.save()
-            # new_profile = userprofile_form.save(commit=False)
-            # new_profile.user = new_user
-            # new_profile.save()
+            new_profile = userprofile_form.save(commit=False)
+            new_profile.user = new_user
+            new_profile.save()
             return HttpResponseRedirect(reverse('account:user_login'))
         else:
             return HttpResponse('sorry, your username or password is not right')
     else:
         user_form = RegistrationForm()
-        # userprofile_form = UserProfileForm()
-        return render(request, 'account/register.html',{'form':user_form,})
+        userprofile_form = UserProfileForm()
+        return render(request, 'account/register.html',{'form':user_form, "profile":userprofile_form})
     
 def settings(request):
     return render(request, 'account/settings.html')
+
+def contact_us(request):
+    return render(request, 'account/contact_us.html')

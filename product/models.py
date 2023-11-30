@@ -56,8 +56,9 @@ class Vector(models.Model):
     vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
 
     vector_map = models.TextField(verbose_name="Vector_Seq")
-    NC5 = models.TextField(verbose_name="5NC")
-    NC3 = models.TextField(verbose_name="3NC")
+    vector_id = models.CharField(verbose_name="Vector_ID", max_length=20, null=True, blank=True)
+    NC5 = models.TextField(verbose_name="v5NC")
+    NC3 = models.TextField(verbose_name="v3NC")
     iu20 = models.TextField(verbose_name="iu20", null=True, blank=True)
     id20 = models.TextField(verbose_name="id20", null=True, blank=True)
 
@@ -67,7 +68,6 @@ class Vector(models.Model):
     combined_seq = models.TextField(null=True, blank=True)
     saved_seq = models.TextField(null=True, blank=True)
     vector_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
-
 
     def is_company_vector(self):
         return self.user is None

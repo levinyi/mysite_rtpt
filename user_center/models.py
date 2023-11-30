@@ -51,6 +51,7 @@ class OrderInfo(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     gene_infos = models.ManyToManyField(GeneInfo)
     order_time = models.DateTimeField(auto_now_add=True)
+    inquiry_id = models.CharField(max_length=100, null=True, blank=True)
     status = models.CharField(max_length=100, default='Pending')
 
     def __str__(self):

@@ -7,6 +7,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('order_create/', views.order_create, name='order_create'),
     path('gene_detail/', views.gene_detail, name='gene_detail'),
+    path('save_species/', views.save_species, name='save_species'),
     path('gene_edit/<int:gene_id>/', views.gene_edit, name='gene_edit'),
     path('protein_edit/<int:gene_id>/', views.protein_edit, name='protein_edit'),
     path('gene_delete/', views.gene_delete, name='gene_delete'),

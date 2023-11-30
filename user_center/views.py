@@ -131,7 +131,7 @@ def order_create(request):
 
         # 如果用户已登录
         if request.user.is_authenticated:
-            customer_vectors = Vector.objects.filter(user=request.user)
+            customer_vectors = Vector.objects.filter(user=request.user, status="ReadyToUse")
             return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_names_json': species_names_json})
         # 如果用户未登录
         else:
@@ -149,7 +149,22 @@ def submit_notification(request):
 def gene_detail(request):
     ''' when user click the "submit & analysis" button, this function will be called.'''
     gene_list = GeneInfo.objects.filter(user=request.user).exclude(status='submitted').exclude(status='optimizing')
-    return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list})
+    
+    species_list = Species.objects.all()
+    # 假设 species_list 是您的物种模型列表
+    species_names = [species.species_name for species in species_list]
+
+    return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names':species_names})
+
+def save_species(request):
+    data = json.loads(request.body.decode('utf-8'))
+    species = data['species']
+    gene_id = data['gene_id']
+    this_gene = GeneInfo.objects.get(user=request.user, id=gene_id)
+    this_gene.species = Species.objects.get(species_name=species)
+    this_gene.save()
+    print(this_gene.species)
+    return JsonResponse({'status': 'success', 'message': 'Species saved successfully'})
 
 @login_required
 def gene_edit(request, gene_id):
@@ -195,7 +210,7 @@ def gene_validation(request):
         gene_object.contained_forbidden_list = contained_forbidden_list
         gene_object.combined_seq = saved_seq
         gene_object.save()
-        return JsonResponse({'status': 'success', 'message': 'Validation process finished'})
+        return JsonResponse({'status': 'success', 'message': 'Validation process finished', 'new_seq': tagged_seq, 'seq_status': seq_status})
     except Vector.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Vector not found'})
     except Exception as e:
@@ -204,11 +219,7 @@ def gene_validation(request):
 @login_required
 def validation_save(request, id):
     ''' when user click the "Save" button, this function will be called. '''
-    def validation_and_save_seq(request, id):
-        user = request.user
-        data = json.loads(request.body.decode('utf-8'))
-        saved_seq = data.get("sequence")
-        gene_object = GeneInfo.objects.get(user=user, id=id)
+    def validation_and_save_seq(gene_object, saved_seq):
         original_seq = gene_object.combined_seq
         if original_seq == saved_seq:
             if gene_object.status == 'validated' :
@@ -232,10 +243,14 @@ def validation_save(request, id):
             gene_object.status = seq_status
             gene_object.save()
             return False
-
+        
     try:
-        if(validation_and_save_seq(request, id)):
-            return JsonResponse({'status': 'success', 'message': 'Gene saved successfully'})
+        user = request.user
+        data = json.loads(request.body.decode('utf-8'))
+        saved_seq = data.get("sequence")
+        gene_object = GeneInfo.objects.get(user=user, id=id) 
+        if(validation_and_save_seq(gene_object, saved_seq)):
+            return JsonResponse({'status': 'success', 'message': 'Gene saved successfully', 'new_seq': gene_object.saved_seq})
         else:
             return JsonResponse({'status': 'error', 'message': 'Please check your sequence and analysis first.'})
     except Vector.DoesNotExist:
@@ -286,7 +301,9 @@ def checkout(request):
     
     # 将gene添加到订单中
     order.gene_infos.add(*genes)
-    order.status = 'CREATED'
+    order.status = 'Created'
+    time_strf = order.order_time.strftime('%Y%m%d')[2:]
+    order.inquiry_id = f'IQ{time_strf}{order.id:02d}'
     order.save()
     # print("order.gene_infos.all(): ", order.gene_infos.all())
 
@@ -502,7 +519,7 @@ def process_sequence(seq, forbid_seq):
     for start, end in all_positions:
         tagged_seq += seq[current_position:start]
 
-        tagged_seq += '<i class="text-warning">'
+        # tagged_seq += '<i class="text-warning">'
         if (start, end) in forbidden_positions:
             # tagged_seq += '<i class="bg-danger">' + seq[start:end] + '</i>'
             for i in range(start, end):
@@ -511,7 +528,7 @@ def process_sequence(seq, forbid_seq):
             # tagged_seq += '<em class="text-warning">' + seq[start:end] + '</em>' 
             for i in range(start, end):
                 tagged_seq += '<em class="text-warning">' + seq[i] + '</em>'
-        tagged_seq += '</i>'
+        # tagged_seq += '</i>'
         
         current_position = end
 
@@ -538,7 +555,7 @@ def vector_upload(request):
             vector_name=vector_name,
             vector_file=vector_file,
             defaults={
-                'status': 'Received',
+                'status': 'Submitted',
             }
         )
         return redirect('user_center:manage_vector')

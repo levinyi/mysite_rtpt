@@ -16,7 +16,7 @@
         <div class="col-md-6">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <form method="post" role="form" class="needs-validation">
+                    <form method="post" role="form" class="needs-validation" autocomplete="off">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
@@ -34,6 +34,7 @@
                 <div class="card-footer text-center">
                     <p class="mb-0">Don’t have an account yet? <a href="{% url 'account:user_register' %}" class="text-decoration-none">Register here.</a></p>
                     {% comment %} <p class="mb-0">Forgot your password? <a href="{% url 'account:password_reset' %}" class="text-decoration-none">Reset here</a> {% endcomment %}
+                    <p class="mb-0">Forgot your password? <a href="{% url 'account:contact_us' %}"  class="text-decoration-none" >Contact us.</a>
                 </div>
             </div>
         </div>

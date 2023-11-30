@@ -20,4 +20,5 @@ urlpatterns = [
     path('myself_edit/', views.myself_edit, name='myself_edit'),
 
     path('settings/', views.settings, name='settings'),
+    path('contact_us/', views.contact_us, name='contact_us'),
 ]
