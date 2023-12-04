@@ -26,4 +26,5 @@ urlpatterns = [
     path('product/', include('product.urls', namespace='product')),
     path('user_center/', include('user_center.urls', namespace=' ')),
     path('tools/', include('tools.urls', namespace='tools')),
+    path('super_manage/',include('super_manage.urls', namespace='super_manage'))
 ]

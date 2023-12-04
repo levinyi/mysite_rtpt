@@ -1,0 +1,336 @@
+{% extends "super_manage/base.html" %}
+{% load static %}
+{% block title %}Order Manage{% endblock %}
+{% block extra_head %}
+    <style>
+        .row-button {
+            padding: 0 4px 0 4px;
+        }
+
+        .tab-table .nav-item {
+            width: 130px;
+            text-align: center;
+        }
+
+        .tab-table .nav-link {
+            color: black;
+        }
+
+        .input-td {
+            position: relative;min-width: 120px;
+        }
+
+        .input-td input {
+            border:0px;
+            outline:none;
+            position: absolute;
+            left:0;
+            top: 0px;
+            height: 100%;
+            width: 100%;
+        }
+
+        .input-td input::placeholder  { /* Mozilla Firefox 19+ */
+            color: #c5c5c5;
+
+        }
+    </style>
+{% endblock %}
+{% block manage_content %}
+    <template id="tmp-table-row">
+        <tr>
+            <th scope="row">1</th>
+            <td>PO001</td>
+            <td>PSG</td>
+            <td>2</td>
+            <td>18/3/2022</td>
+            <td>18/3/2022</td>
+            <td>
+                <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">pdf</a>
+                <button disabled type="button" class="btn btn-link row-button">pdf</button>
+            </td>
+            <td>
+                <div>
+                    <button type="button" style="color: crimson" class="btn btn-link row-button"
+                            onclick="clickDelReport(this)">delete
+                    </button>
+                    <a href="" onclick="alert('已添加入下载队列');return false;">pdf</a>
+                </div>
+                <button type="button" class="btn btn-link row-button upload" onclick="clickUpReport(this)">upload
+                </button>
+            </td>
+            <td>
+                <button type="button" class="btn btn-link row-button" onclick="clickRevoke(this)">revoke</button>
+                <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
+                <button type="button" class="btn btn-link row-button" onclick="clickShip(this)">ship</button>
+            </td>
+            <td class="input-td">
+                <input type="text" class="align-middle" placeholder="Please input..."/>
+            </td>
+        </tr>
+    </template>
+    <template id="page-number">
+        <li class="page-item"><a class="page-link" href="#" onclick="clickPage(this)">1</a></li>
+    </template>
+
+    <div class="tab-table" style="margin-top: 20px;">
+        <ul style="margin-bottom: 15px;" class="nav nav-tabs" id="select-tab">
+            <li class="nav-item">
+                <a class="nav-link active" href="#" onclick="clickTab(this,0)">All</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="clickTab(this,1)">Created</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="clickTab(this,2)">Synthesizing</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="clickTab(this,3)">Shipped</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="clickTab(this,4)">Completed</a>
+            </li>
+        </ul>
+
+        <table class="table table-hover table-bordered align-middle text-center">
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">ID</th>
+                <th scope="col">Custom</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Create</th>
+                <th scope="col">Modify</th>
+                <th scope="col">Export</th>
+                <th scope="col">Report</th>
+                <th scope="col" style="width: 226px;">Status</th>
+                <th scope="col">Url</th>
+            </tr>
+            </thead>
+            <tbody class="table-group-divider">
+            </tbody>
+        </table>
+
+        <nav aria-label="Page navigation example">
+            <ul class="pagination justify-content-center">
+                <li class="page-item">
+                    <a class="page-link" href="#" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="#" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    <script>
+        const TmpRow = document.querySelector("#tmp-table-row"),
+            TmpTd = TmpRow.content.querySelectorAll("td"),
+            tableBody = document.querySelector("tbody");
+        const ROW_MAX = 10;
+        let SelectedTab = 0;
+        let PageMax = 10;
+        let Rows = [
+            {
+                "id": "PO001",
+                "custom": "PSG",
+                "quantity": "2",
+                "create": "18/3/2022",
+                "modify": "18/3/2022",
+                "export": {},
+                "report": "",
+                "status": "Created",
+                "url": ""
+            },
+            {
+                "id": "PO002",
+                "custom": "PBG",
+                "quantity": "5",
+                "create": "18/3/2022",
+                "modify": "18/3/2022",
+                "export": {"pdf": "https://test.com"},
+                "report": "",
+                "status": "Completed",
+                "url": "https://www.baidu.com/"
+            },
+            {
+                "id": "PO003",
+                "custom": "PBG",
+                "quantity": "3",
+                "create": "18/3/2022",
+                "modify": "18/3/2022",
+                "export": {"xlsx": "test"},
+                "report": "https://test.com",
+                "status": "Synthesizing",
+                "url": "https://www.baidu.com/"
+            },
+        ];
+
+        // 清除表
+        function clearTable() {
+            tableBody.innerHTML = "";
+        }
+
+        // 往表中添加一行
+        function getTableRow(rowNum, rowJson) {
+            let clone = document.importNode(TmpRow.content, true);
+            let td = clone.querySelectorAll("td");
+            clone.querySelectorAll("th")[0].textContent = rowNum;
+            td[0].textContent = rowJson['id'];
+            td[1].textContent = rowJson['custom'];
+            td[2].textContent = rowJson['quantity'];
+            td[3].textContent = rowJson['create'];
+            td[4].textContent = rowJson['modify'];
+
+            let ep = td[5].getElementsByTagName("a"), un = td[5].getElementsByTagName("button");
+            if ('pdf' in rowJson['export'])
+                ep[0].href = rowJson['export']['pdf'];
+            td[6].querySelector("a").href = rowJson['report'];
+            td[7].querySelector("span").textContent = rowJson['status'];
+            td[8].querySelector("input").value = rowJson['url'];
+            {#setInput(td[8].getElementsByTagName("p")[0], );#}
+            {# 设置Export的显示 #}
+            if ('pdf' in rowJson['export'] && rowJson['export']['pdf'].length) {
+                un[0].hidden = true;
+                ep[0].hidden = false;
+            } else {
+                un[0].hidden = false;
+                ep[0].hidden = true;
+            }
+
+            {# 设置Report的显示 #}
+            td[6].querySelector("div").hidden = rowJson['report'].length == 0;
+            td[6].querySelector(".upload").hidden = rowJson['report'].length != 0;
+
+            {# 设置Status的显示 #}
+            let bns = td[7].getElementsByTagName("button");
+            bns[0].disabled = bns[1].disabled = false;
+            bns[0].disabled = rowJson['status'] == "Created";
+            bns[1].disabled = rowJson['status'] == "Completed";
+
+            {# 设置Status的显示 #}
+            // 上面setInput已经设置好样式
+
+            return clone
+        }
+
+        // 获取行
+        function getRows(start) {
+            // 根据selectedTab获取rows
+            // 通过请求获取rows
+            {#$.ajax({#}
+            {#    url: "{% url 'super_manage:order_manage' %}",#}
+            {#    type: "GET",#}
+            {#    data: {#}
+            {#        "start": start,#}
+            {#        "tab": selectedTab#}
+            {#    },#}
+            {#    async: false,#}
+            {#    success: function (data) {#}
+            {#        tmp = data;#}
+            {#        // 添加到rows中#}
+            {#        rows = rows.concat(tmp);#}
+            {#    }#}
+            // });
+        }
+
+        // 设置表，page：第几页，pageLen：每页长度
+        function setTable(page, pageLen) {
+            // 根据page和pageLen设置表格
+            // 先计算出需要显示的行数
+            // page从1开始
+            clearTable();
+            let start = (page - 1) * pageLen, end = page * pageLen;
+            if (end > Rows.length)
+                end = Rows.length;
+            if (start > Rows.length)
+                getRows(start);
+            for (let i = start; i < end; i++) {
+                const c = getTableRow(i + 1, Rows[i]);
+                tableBody.appendChild(c);
+            }
+        }
+
+        // 点击底部页项
+        function clickPage(e) {
+            let page = parseInt(e.textContent);
+            setTable(page, ROW_MAX);
+        }
+
+        // 设置底部页项显示，start：开始项，len：长度
+        function setPageItems(start, len) {
+            const pn = document.querySelector("#page-number").content.querySelector('li');
+            const items = document.querySelectorAll('.page-item'), last = items[items.length - 1];
+            const fragment = document.createDocumentFragment()
+            for (let i = start; i <= start + len - 1 && i <= PageMax; i++) {
+                let c = document.importNode(pn, true);
+                c.querySelector('a').textContent = i.toString();
+                fragment.appendChild(c);
+            }
+            last.parentElement.insertBefore(fragment, last);
+            if(start == 1)
+                items[0].hidden = true;
+            else
+                items[0].hidden = false;
+            if(start + len > PageMax)
+                last.hidden = true;
+            else
+                last.hidden = false;
+
+        }
+
+        // 点击顶部Tab
+        function clickTab(e, id) {
+            if (id == SelectedTab)
+                return;
+            document.querySelector('#select-tab').querySelectorAll('a')[SelectedTab].classList.remove('active');
+            SelectedTab = id;
+            e.classList.add('active')
+            clearTable();
+        }
+
+        // 点击Ship按钮
+        function clickShip(e) {
+            console.log('clickShip', e);
+        }
+
+        // 点击Revoke按钮
+        function clickRevoke(e) {
+            console.log('clickRevoke', e);
+        }
+
+        // 点击report delete按钮
+        function clickDelReport(e) {
+            console.log('clickDelReport', e);
+        }
+
+        // 点击report update按钮
+        function clickUpReport(e) {
+            console.log('clickUpReport', e);
+        }
+
+
+        $(document).ready(function () {  //里面是需要加载的js
+            // 通过检查来测试浏览器是否支持 HTML 模板元素
+            if ("content" in document.createElement("template")) {
+                setPageItems(1,10);
+                setTable(1, 10);
+            } else {
+                // 找到另一种方法来添加行到表，因为不支持 HTML 模板元素。
+                alert("请更新浏览器")
+            }
+
+        });
+
+    </script>
+
+
+{% endblock %}
