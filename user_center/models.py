@@ -48,11 +48,19 @@ class GeneInfo(models.Model):
         return self.gene_name
 
 class OrderInfo(models.Model):
+    def user_directory_path(instance, filename):
+        # 文件将被上传到 MEDIA_ROOT/user_<id>/vector_file/<filename>
+        return 'user_{0}/report_file/{1}'.format(instance.id, filename)
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     gene_infos = models.ManyToManyField(GeneInfo)
     order_time = models.DateTimeField(auto_now_add=True)
     inquiry_id = models.CharField(max_length=100, null=True, blank=True)
     status = models.CharField(max_length=100, default='Pending')
+
+    quantity = models.PositiveSmallIntegerField(default=1, blank=True)
+    url = models.URLField(blank=True)
+    report_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
 
     def __str__(self):
         return f"Order {self.id} by {self.user.username}"
