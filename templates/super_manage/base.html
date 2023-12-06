@@ -10,6 +10,12 @@
                     <hr>
                     <ul class="nav nav-pills flex-column mb-auto">
                         <li>
+                            <a href="{% url 'super_manage:user_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/user_manage/' %}active{% endif %}">
+                                <i class="bi bi-people-fill me-2"></i>
+                                <span class="link-text">User Manage</span>
+                            </a>
+                        </li>
+                        <li>
                             <a href="{% url 'super_manage:order_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/order_manage/' %}active{% endif %}">
                                 <i class="bi bi-speedometer2 me-2"></i>
                                 <span class="link-text">Order Manage</span>

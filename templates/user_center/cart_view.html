@@ -34,7 +34,7 @@
                 {% for gene in shopping_cart %}
                 <tr>
                     <td>
-                        <input type="checkbox" name="gene_id" value="{{ gene.id }}"
+                        <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}"
                         {% if gene.status != 'saved' and gene.status != 'validated' and gene.status != 'optimizing' %} disabled {% endif %}>
                     </td>
                     <td>{{ forloop.counter }}</td>
@@ -65,7 +65,10 @@
         <!-- Button trigger modal -->
         <div class="col-12">
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#staticBackdrop">
-                <i class="bi bi-check2-square me-1"></i>Submit
+                <i class="bi bi-check2-square me-1"></i>Submit Selected
+            </button>
+            <button type="button" class="btn btn-danger" onclick="deleteSelected()">
+                <i class="bi bi-check2-square me-1"></i>Delete Selected
             </button>
         </div>
 
@@ -189,4 +192,56 @@
         })
     }
 </script>
+<script>
+    function deleteSelected() {
+        var selectedGenes = [];
+
+        // Iterate through selected checkboxes
+        $('.gene-checkbox:checked').each(function () {
+            selectedGenes.push($(this).val());
+        });
+
+        if (selectedGenes.length === 0) {
+            alert('Please select at least one item to delete.');
+            return;
+        }
+
+        var url = "{% url 'user_center:gene_delete' %}" ;
+
+        layer.open({
+            type: 1,
+            skin: 'layui-layer-rim',
+            area: ['420px', '240px'],
+            title: 'Delete',
+            content: '<div style="padding: 20px 80px;">Are you sure to delete selected items?</div>',
+            btn: ['Yes', 'No'],
+            btnAlign: 'c',
+            yes: function (index, layero) {
+                $.ajax({
+                    url: url,
+                    type: "POST",
+                    data: {
+                        'csrfmiddlewaretoken': '{{ csrf_token }}',
+                        'gene_ids': selectedGenes,
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        if (data.status === 'success') {
+                            layer.msg('Delete successfully!', { icon: 1 });
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg(data.message, { icon: 2 });
+                        }
+                    },
+                    error: function (xhr, errmsg, err) {
+                        layer.msg('Delete failed!', { icon: 2 });
+                    }
+                });
+            },
+        });
+    }
+</script>
+
 {% endblock %}

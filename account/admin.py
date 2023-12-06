@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Account, UserProfile
+from .models import UserProfile
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 
@@ -23,5 +23,5 @@ class UserProfileAdmin(ImportExportModelAdmin):
     search_fields = ('id','user','first_name', 'last_name','email','company','department', 'phone', 'register_time')
     resource_class = UserProfilereSource
 
-admin.site.register(Account)
+# admin.site.register(Account)
 admin.site.register(UserProfile,UserProfileAdmin)

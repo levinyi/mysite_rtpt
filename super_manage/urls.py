@@ -22,4 +22,7 @@ urlpatterns = [
 
     # added by dushiyi
     path('export_order_to_csv/<int:order_id>', views.export_order_to_csv, name='export_order_to_csv'),
+
+    # user management
+    path('user_manage/', views.user_manage, name='user_manage'),
 ]
