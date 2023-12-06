@@ -158,7 +158,7 @@
                             <div class="hstack gap-3 justify-content-center">
                                 <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download PDF" href="{% url 'user_center:vector_download' vector.id 'pdf' %}"><i class="bi bi-filetype-pdf"></i></a>
                                 <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download TXT" href="{% url 'user_center:vector_download' vector.id 'txt' %}"><i class="bi bi-filetype-txt"></i></a>
-                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id 'dna' %}"><i class="bi bi-file-earmark-binary"></i></a>
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download DNA" href="{% url 'user_center:vector_download' vector.id 'dna' %}" download=""><i class="bi bi-file-earmark-binary"></i></a>
                             </div>
                             {% endif %}
                         </td>
@@ -198,7 +198,6 @@
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             <button type="submit" class="btn btn-primary" onclick="submitFile(this,event)">Submit</button>
-
         </div>
     </div>
 </div>

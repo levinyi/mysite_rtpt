@@ -35,7 +35,7 @@
             width: 100%;
         }
 
-        .input-td input::placeholder  { /* Mozilla Firefox 19+ */
+        .input-td input::placeholder { /* Mozilla Firefox 19+ */
             color: #c5c5c5;
         }
     </style>
@@ -46,34 +46,36 @@
             <th scope="row">1</th>
             <td>PSG</td>
             <td class="input-td">
-                <input type="text" class="align-middle" placeholder="Please input..."/>
+                <input onchange="changeInput(this)" type="text" class="align-middle" placeholder="Please input..."/>
             </td>
             <td class="input-td">
-                <input type="text" class="align-middle" placeholder="Please input..."/>
+                <input onchange="changeInput(this)" type="text" class="align-middle" placeholder="Please input..."/>
             </td>
             <td class="input-td">
-                <input type="text" class="align-middle" placeholder="Please input..."/>
+                <input onchange="changeInput(this)" type="text" class="align-middle" placeholder="Please input..."/>
             </td>
             <td class="input-td">
-                <input type="text" class="align-middle" placeholder="Please input..."/>
+                <input onchange="changeInput(this)" type="text" class="align-middle" placeholder="Please input..."/>
             </td>
             <td>
                 <button disabled type="button" class="btn btn-link row-button danger-button opr-bnt"
-                        onclick="cancelChange(this)">cancel
+                        onclick="clickCancel(this)">cancel
                 </button>
-                <button disabled type="button" class="btn btn-link row-button opr-bnt">submit</button>
+                <button disabled onclick="submitRowInput(this)" type="button" class="btn btn-link row-button opr-bnt">
+                    submit
+                </button>
             </td>
             <td>
                 <div>
                     <button type="button" style="color: crimson" class="btn btn-link row-button"
                             onclick="clickDelMap(this)">delete
                     </button>
-                    <a href="" onclick="alert('已添加入下载队列');return false;">download</a>
+                    <a href="">download</a>
                 </div>
                 <button type="button" class="btn btn-link row-button upload" onclick="clickUpMap(this)">upload
                 </button>
             </td>
-            <td>
+            <td hidden>
                 <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">pdf</a>
                 <button disabled type="button" class="btn btn-link row-button">pdf</button>
                 <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">xlsx</a>
@@ -109,7 +111,7 @@
                 <th scope="col">iU20</th>
                 <th scope="col">Operated</th>
                 <th scope="col">Map</th>
-                <th scope="col">File</th>
+                <th scope="col" hidden>File</th>
             </tr>
             </thead>
             <tbody class="table-group-divider">
@@ -136,66 +138,23 @@
 {% endblock %}
 
 {% block javascript %}
+    <script src="https://cdn.bootcss.com/jquery-cookie/1.4.1/jquery.cookie.js"></script>
+
     <script>
+
         const TmpRow = document.querySelector("#tmp-table-row"),
             TmpTd = TmpRow.content.querySelectorAll("td"),
             tableBody = document.querySelector("tbody");
-        const ROW_MAX = 10;
+        let RowMax = {{ max_row }};
         let SelectedTab = 0;
-        let PageMax = 10;
-        let Rows = [
-            {
-                "Custom": "PSG",
-                "File": {"pdf": "", "xlsx": "", "txt": ""},
-                "Map": "",
-                "Map seq": "",
-                "Vector ID": "",
-                "iD20": "",
-                "iU20": "test",
-                "Operated": "",
-                "id": 1
-            },
-            {
-                "Custom": "PSG",
-                "File": {"pdf": "https://hello.world", "xlsx": "", "txt": ""},
-                "Map": "https://test.com",
-                "Map seq": "",
-                "Vector ID": "",
-                "iD20": "",
-                "iU20": "",
-                "Operated": "",
-                "id": 2
-            },
-            {
-                "Custom": "PSG",
-                "File": {"pdf": "", "xlsx": "", "txt": ""},
-                "Map": "",
-                "Map seq": "",
-                "Vector ID": "",
-                "iD20": "",
-                "iU20": "test3",
-                "id": 3
-            },
-            {
-                "Custom": "PSG",
-                "File": {"pdf": "", "xlsx": "", "txt": ""},
-                "Map": "",
-                "Map seq": "",
-                "Vector ID": "",
-                "iD20": "",
-                "iU20": "",
-                "id": 4
-            },
-            {
-                "Custom": "PSG",
-                "File": {"pdf": "", "xlsx": "", "txt": ""},
-                "Map": "",
-                "Map seq": "",
-                "Vector ID": "",
-                "iD20": "",
-                "iU20": "",
-                "id": 5
-            }];
+        let PageMax = {{ max_page }};
+        let Rows = JSON.parse("{{ rows }}".replace(/\&quot;/g, '\"'));
+
+        function changeInput(e) {
+            e.parentElement.parentElement.querySelectorAll('.opr-bnt').forEach(btnElem => {
+                btnElem.disabled = false;
+            })
+        }
 
         // 清除表
         function clearTable() {
@@ -213,6 +172,7 @@
             td[3].querySelector('input').value = rowJson['iD20'];
             td[4].querySelector('input').value = rowJson['iU20'];
             td[6].querySelector("a").href = rowJson['Map'];
+
             let f = td[7].getElementsByTagName("a"), un = td[7].getElementsByTagName("button");
             if ('pdf' in rowJson['File'])
                 f[0].href = rowJson['File']['pdf'];
@@ -291,7 +251,7 @@
         // 点击底部页项
         function clickPage(e) {
             let page = parseInt(e.textContent);
-            setTable(page, ROW_MAX);
+            setTable(page, RowMax);
         }
 
         // 设置底部页项显示，start：开始项，len：长度
@@ -324,38 +284,113 @@
             SelectedTab = id;
             e.classList.add('active');
             clearTable();
+            let status
+            switch (id) {
+                case 0:
+                    status = 'all';
+                    break;
+                case 1:
+                    status = 'Created';
+                    break;
+                case 2:
+                    status = 'Synthesizing';
+                    break;
+                case 3:
+                    status = 'Shipped';
+                    break;
+                case 4:
+                    status = 'Completed';
+                    break;
+            }
+            $.ajax({
+                url: "{% url 'super_manage:get_rows' %}",
+                type: "GET",
+                data: {
+                    "status": status,
+                    "tableName": "vector"
+                },
+                async: false,
+                success: function (res) {
+                    console.log(res.newVal)
+                    if (res.status == 'error') {
+                        alert(res.data.message)
+                    } else {
+                        PageMax = res.data.max_page;
+                        RowMax = res.data.max_row;
+                        Rows = JSON.parse(res.data.rows.replace(/\&quot;/g, '\"'));
+                        setPageItems(1, PageMax);
+                        setTable(1, RowMax);
+                    }
+                },
+                error: function (res) {
+                    alert('Request error.' + res.toString())
+                }
+            });
+
         }
 
         function clickDelMap(e) {
             console.log("clickDelMap", e);
         }
 
-        function cancelChange(e) {
+        function clickCancel(e) {
             // 取消修改，获取第几行，然后重新设置表
             // 查找最近的tr父节点，不使用parentElement是因为可能有空白节点
             let row = e.closest('tr');
             let rowNum = parseInt(row.querySelector('th').textContent);
             row.replaceWith(getTableRow(rowNum, Rows[rowNum - 1]));
+        }
+
+        function submitRowInput(e) {
+            let row = e.closest('tr');
+            let inputs = row.querySelectorAll('input');
+            let rowNum = parseInt(row.querySelector('th').textContent);
+
+            let data = {
+                'id': Rows[rowNum - 1]['id'],
+                'Map seq': inputs[0].value,
+                'Vector ID': inputs[1].value,
+                'iD20': inputs[2].value,
+                'iU20': inputs[3].value,
+            }
+            // 添加token示例
+            $.ajax({
+                url: "{% url 'super_manage:submit_vector_data' %}",
+                type: "POST",
+                data: JSON.stringify(data),
+                contentType: 'application/json',
+                dataType: 'json',
+                headers:{ "X-CSRFToken": '{{ csrf_token }}' },
+                success: function (res) {
+                    if (res.status == 'error') {
+                        alert(res.message)
+                        return
+                    }
+                    Rows[rowNum - 1]['Map seq'] = data['Map seq'];
+                    Rows[rowNum - 1]['Vector ID'] = data['Vector ID'];
+                    Rows[rowNum - 1]['iD20'] = data['iD20'];
+                    Rows[rowNum - 1]['iU20'] = data['iU20'];
+                    // 设置按钮不可用
+                    e.disabled = true;
+                    e.previousElementSibling.disabled = true;
+                },
+                error: function (res) {
+                    console.log(res)
+                    alert('Request error.' + res.data)
+                }
+            });
 
         }
 
         $(document).ready(function () {  //里面是需要加载的js
             // 通过检查来测试浏览器是否支持 HTML 模板元素
             if ("content" in document.createElement("template")) {
-                setPageItems(1, 10);
-                setTable(1, 10);
+                setPageItems(1, PageMax);
+                setTable(1, RowMax);
             } else {
                 // 找到另一种方法来添加行到表，因为不支持 HTML 模板元素。
                 alert("请更新浏览器")
             }
-
-            document.querySelectorAll('.input-td').forEach(function (e) {
-                e.querySelector('input').addEventListener('change', function (inputElem) {
-                    e.parentElement.querySelectorAll('.opr-bnt').forEach(bntElem => {
-                        bntElem.disabled = false;
-                    });
-                });
-            });
         });
 
 
