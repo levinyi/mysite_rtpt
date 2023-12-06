@@ -17,20 +17,21 @@
         }
 
         .input-td {
-            position: relative;min-width: 120px;
+            position: relative;
+            min-width: 120px;
         }
 
         .input-td input {
-            border:0px;
-            outline:none;
+            border: 0px;
+            outline: none;
             position: absolute;
-            left:0;
+            left: 0;
             top: 0px;
             height: 100%;
             width: 100%;
         }
 
-        .input-td input::placeholder  { /* Mozilla Firefox 19+ */
+        .input-td input::placeholder { /* Mozilla Firefox 19+ */
             color: #c5c5c5;
 
         }
@@ -44,25 +45,39 @@
             <td>PSG</td>
             <td>2</td>
             <td>18/3/2022</td>
-            <td>18/3/2022</td>
+            <td hidden>18/3/2022</td>
             <td>
                 <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">xlsx</a>
                 <button disabled type="button" class="btn btn-link row-button">xlsx</button>
             </td>
             <td>
-                <div>
+                <div class="file-down">
                     <button type="button" style="color: crimson" class="btn btn-link row-button"
                             onclick="clickDelReport(this)">delete
                     </button>
-                    <a href="" onclick="alert('已添加入下载队列');return false;">pdf</a>
+                    <a href="" download="">pdf</a>
                 </div>
-                <button type="button" class="btn btn-link row-button upload" onclick="clickUpReport(this)">upload
+                <button type="button" class="btn btn-link row-button upload" onclick="clickUpReport(this)">
+                    upload
+                    <input type="file" style="display: none;" onchange="fileChange(this)">
                 </button>
+                <div class="pre-upload">
+                    <p style="margin: 0px;font-size: 13px;"></p>
+                    <button type="button" style="color: crimson" class="btn btn-link row-button"
+                            onclick="clickDelPreUpload(this)">delete
+                    </button>
+                    <button type="button" class="btn btn-link row-button upload" onclick="clickUpSubmit(this)">
+                        submit
+                    </button>
+                </div>
             </td>
             <td>
-                <button type="button" class="btn btn-link row-button" style="color: crimson" onclick="clickRevokeOrNext(this, 'revoke')">revoke</button>
+                <button type="button" class="btn btn-link row-button" style="color: crimson"
+                        onclick="clickRevokeOrNext(this, 'revoke')">revoke
+                </button>
                 <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
-                <button type="button" class="btn btn-link row-button" onclick="clickRevokeOrNext(this,'next')">next</button>
+                <button type="button" class="btn btn-link row-button" onclick="clickRevokeOrNext(this,'next')">next
+                </button>
             </td>
             <td class="input-td">
                 <input onchange="changeUrl(this)" type="text" class="align-middle" placeholder="Please input..."/>
@@ -100,10 +115,10 @@
                 <th scope="col">Custom</th>
                 <th scope="col">Quantity</th>
                 <th scope="col">Create</th>
-                <th scope="col">Modify</th>
+                <th scope="col" hidden>Modify</th>
                 <th scope="col">Export</th>
                 <th scope="col">Report</th>
-                <th scope="col" style="width: 226px;">Status</th>
+                <th scope="col" style="width: 230px;">Status</th>
                 <th scope="col">Url</th>
             </tr>
             </thead>
@@ -131,12 +146,47 @@
 {% endblock %}
 
 {% block javascript %}
-    <script>
+    <script>function clickDelPreUpload(e) {
+        let input = e.parentElement.parentElement.querySelector('input');
+        // 删除准备上传的文件
+        input.value = "";
+        setReport(e.parentElement.parentElement, "upload");
+    }
+
+    function clickUpSubmit(e){
+        // 提交准备上传的文件
+        let input = e.parentElement.parentElement.querySelector('input');
+        let row = get_row_content(e);
+        let formData = new FormData();
+        formData.append('id', row.id);
+        formData.append('file', input.files[0]);
+        $.ajax({
+            url: "{% url 'super_manage:upload_report' %}",
+            type: "POST",
+            data: formData,
+            async: false,
+            processData: false,
+            contentType: false,
+            success: function (res) {
+                console.log(res.newVal)
+                if (res.status == 'error') {
+                    alert(res.message)
+                } else {
+                    let newVal = res.newVal;
+                    setReport(e.parentElement.parentElement, "file-down",null ,newVal);
+                }
+            },
+            error: function (res) {
+                alert('Request error. ' + res.toString())
+            }
+        });
+    }
+
 
     const TmpRow = document.querySelector("#tmp-table-row"),
             TmpTd = TmpRow.content.querySelectorAll("td"),
             tableBody = document.querySelector("tbody");
-        let ROW_MAX = {{ max_row }};
+        let RowMax = {{ max_row }};
         let SelectedTab = 0;
         let PageMax = {{ max_page }};
         let Rows = JSON.parse("{{ rows }}".replace(/\&quot;/g, '\"'));
@@ -146,17 +196,18 @@
             tableBody.innerHTML = "";
         }
 
-        function setRowStatus(e, value){
+        function setRowStatus(e, value) {
             e.querySelector("span").textContent = value;
 
             {# 设置Status的显示 #}
             let bns = e.getElementsByTagName("button");
-            if(value.toLowerCase() == "created"){
+            if (value.toLowerCase() == "created") {
                 bns[0].disabled = true;
                 bns[0].style.removeProperty('color');
-            }
-            else
+            } else {
+                bns[0].disabled = false;
                 bns[0].style.color = 'crimson';
+            }
             bns[1].disabled = value.toLowerCase() == "completed";
         }
 
@@ -188,10 +239,39 @@
             }
 
             {# 设置Report的显示 #}
-            td[6].querySelector("div").hidden = rowJson['report'].length == 0;
-            td[6].querySelector(".upload").hidden = rowJson['report'].length != 0;
+            if (rowJson['report'].length) {
+                setReport(td[6], "file-down",null ,rowJson['report']);
+            }
+            else{
+                setReport(td[6], "upload");
+            }
 
             return clone
+        }
+
+        function setReport(e, status, filename=null, filepath=null){
+            const fileDown = e.querySelector('.file-down'),
+                upload = e.querySelector('.upload'),
+                preUpload = e.querySelector('.pre-upload');
+            if(status == "file-down"){
+                fileDown.hidden = false;
+                upload.hidden = true;
+                preUpload.hidden = true;
+                fileDown.querySelector('a').href = filepath;
+            }
+            else if(status == "upload"){
+                fileDown.hidden = true;
+                upload.hidden = false;
+                preUpload.hidden = true;
+            }
+            else if(status == "pre-upload"){
+                fileDown.hidden = true;
+                upload.hidden = true;
+                preUpload.hidden = false;
+                preUpload.querySelector('p').textContent = filename;
+            }
+            else
+                console.log("Unknown report element status",status,filename,filepath);
         }
 
         // 获取行
@@ -234,7 +314,7 @@
         // 点击底部页项
         function clickPage(e) {
             let page = parseInt(e.textContent);
-            setTable(page, ROW_MAX);
+            setTable(page, RowMax);
         }
 
         // 设置底部页项显示，start：开始项，len：长度
@@ -247,14 +327,14 @@
                 c.querySelector('a').textContent = i.toString();
                 fragment.appendChild(c);
             }
-            for(let i = 1; i < items.length - 1; i++)
+            for (let i = 1; i < items.length - 1; i++)
                 items[i].remove()
             last.parentElement.insertBefore(fragment, last);
-            if(start == 1)
+            if (start == 1)
                 items[0].hidden = true;
             else
                 items[0].hidden = false;
-            if(start + len > PageMax)
+            if (start + len > PageMax)
                 last.hidden = true;
             else
                 last.hidden = false;
@@ -262,10 +342,43 @@
         }
 
         // 行中元素获取整行数据
-        function get_row_content(e){
+        function get_row_content(e) {
             let row = e.closest('tr');
             let rowNum = parseInt(row.querySelector('th').textContent);
             return Rows[rowNum - 1];
+        }
+
+        function fileChange(target) {
+            let fileSize = 0;
+            const filepath = target.value;
+            const filemaxsize = 1024 * 2;//2M
+            console.log(target.files[0].name)
+            const isIE = navigator.userAgent.match(/MSIE/) != null;
+            if (isIE && !target.files) {
+                const fileSystem = new ActiveXObject("Scripting.FileSystemObject");
+                if (!fileSystem.FileExists(filePath)) {
+                    alert("File does not exist");
+                    return false;
+                }
+                const file = fileSystem.GetFile(filePath);
+                fileSize = file.Size;
+            } else {
+                fileSize = target.files[0].size;
+            }
+
+            const size = fileSize / 1024;
+            if (size > filemaxsize) {
+                alert("File cannot be larger than 2M");
+                target.value = "";
+                return false;
+            }
+            if (size <= 0) {
+                alert("File cannot be empty");
+                target.value = "";
+                return false;
+            }
+            target.parentElement
+            setReport(target.parentElement.parentElement, "pre-upload",target.files[0].name,filepath);
         }
 
         // 点击顶部Tab
@@ -277,32 +390,41 @@
             e.classList.add('active')
             clearTable();
             let status
-            switch (id)
-            {
-                case 0:status='all';break;
-                case 1:status='CREATED';break;
-                case 2:status='Pending';break;
-                case 3:status='Pending';break;
-                case 4:status='COMPLETED';break;
+            switch (id) {
+                case 0:
+                    status = 'all';
+                    break;
+                case 1:
+                    status = 'Created';
+                    break;
+                case 2:
+                    status = 'Synthesizing';
+                    break;
+                case 3:
+                    status = 'Shipped';
+                    break;
+                case 4:
+                    status = 'Completed';
+                    break;
             }
             $.ajax({
                 url: "{% url 'super_manage:get_rows' %}",
                 type: "GET",
                 data: {
-                    "status":status,
+                    "status": status,
+                    "tableName":"order"
                 },
                 async: false,
                 success: function (res) {
                     console.log(res.newVal)
                     if (res.status == 'error') {
                         alert(res.data.message)
-                    }
-                    else {
+                    } else {
                         PageMax = res.data.max_page;
-                        ROW_MAX = res.data.max_row;
+                        RowMax = res.data.max_row;
                         Rows = JSON.parse(res.data.rows.replace(/\&quot;/g, '\"'));
-                        setPageItems(1,10);
-                        setTable(1, 10);
+                        setPageItems(1, PageMax);
+                        setTable(1, RowMax);
                     }
                 },
                 error: function (res) {
@@ -317,8 +439,8 @@
                 url: "{% url 'super_manage:change_url' %}",
                 type: "GET",
                 data: {
-                    "id":row.id,
-                    "newVal":e.value
+                    "id": row.id,
+                    "newVal": e.value
                 },
                 async: false,
                 success: function (res) {
@@ -340,16 +462,17 @@
                 url: "{% url 'super_manage:change_status' %}",
                 type: "GET",
                 data: {
-                    "id":row.id,
-                    'opr':type
+                    "id": row.id,
+                    'opr': type
                 },
                 async: false,
                 success: function (res) {
                     console.log(res.newVal)
                     if (res.status == 'error') {
-                        alert(res.data.message)
-                    }
-                    else{
+                        alert(res.message)
+                    } else if (res.status == 'failed') {
+                        alert(res.message + ' Try to refresh this page.')
+                    } else {
                         let newVal = res.newVal;
                         setRowStatus(e.parentElement, newVal);
                     }
@@ -368,14 +491,15 @@
         // 点击report update按钮
         function clickUpReport(e) {
             console.log('clickUpReport', e);
+            e.querySelector('input').click()
         }
 
 
         $(document).ready(function () {  //里面是需要加载的js
             // 通过检查来测试浏览器是否支持 HTML 模板元素
             if ("content" in document.createElement("template")) {
-                setPageItems(1,10);
-                setTable(1, 10);
+                setPageItems(1, PageMax);
+                setTable(1, RowMax);
             } else {
                 // 找到另一种方法来添加行到表，因为不支持 HTML 模板元素。
                 alert("请更新浏览器")

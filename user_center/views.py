@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.models import User
+from urllib.parse import quote
 
 # Create your views here.
 @login_required(login_url='/account/login/')
@@ -20,8 +21,8 @@ def dashboard(request):
     shopping_cart = Cart.genes.through.objects.filter(cart__user=request.user)
     return render(request, 'user_center/dashboard.html', {
             'order_number_in_production': len(production_order),
-            'order_number_in_shipment': len(shipping_order), 
-            'gene_number_in_cart': len(shopping_cart), 
+            'order_number_in_shipment': len(shipping_order),
+            'gene_number_in_cart': len(shopping_cart),
             })
 
 @login_required
@@ -52,7 +53,7 @@ def order_create(request):
             if not any(cell is not None for cell in row):
                 # print("Empty row")
                 continue
-            
+
             gene_name = row[0]
             original_seq = row[1]
             species = None
@@ -95,7 +96,7 @@ def order_create(request):
                 status = seq_status
 
             # 创建或更新GeneInfo对象
-  
+
             this_gene, created = GeneInfo.objects.update_or_create(
                 user=request.user,
                 gene_name=gene_name,
@@ -148,7 +149,7 @@ def submit_notification(request):
 def gene_detail(request):
     ''' when user click the "submit & analysis" button, this function will be called.'''
     gene_list = GeneInfo.objects.filter(user=request.user).exclude(status='submitted').exclude(status='optimizing')
-    
+
     species_list = Species.objects.all()
     # 假设 species_list 是您的物种模型列表
     species_names = [species.species_name for species in species_list]
@@ -197,7 +198,7 @@ def gene_validation(request):
         original_seq = gene_object.combined_seq
         if original_seq == saved_seq:
             return JsonResponse({'status': 'error', 'message': 'No changes made.'})
-        
+
         tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, gene_object.forbid_seq)
         # print(seq_status)
         if seq_status in ['Protein', 'Invalid Protein']:
@@ -227,7 +228,7 @@ def validation_save(request, id):
                 return True
             else:
                 return False
-            
+
         tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(saved_seq, gene_object.forbid_seq)
         gene_object.saved_seq = tagged_seq
         gene_object.gc_content = gc_content
@@ -242,12 +243,12 @@ def validation_save(request, id):
             gene_object.status = seq_status
             gene_object.save()
             return False
-        
+
     try:
         user = request.user
         data = json.loads(request.body.decode('utf-8'))
         saved_seq = data.get("sequence")
-        gene_object = GeneInfo.objects.get(user=user, id=id) 
+        gene_object = GeneInfo.objects.get(user=user, id=id)
         if(validation_and_save_seq(gene_object, saved_seq)):
             return JsonResponse({'status': 'success', 'message': 'Gene saved successfully', 'new_seq': gene_object.saved_seq})
         else:
@@ -292,12 +293,12 @@ def checkout(request):
     # print("you selected these genes id: ", gene_ids)
     if not gene_ids:
         return JsonResponse({'status': 'error', 'message': 'No gene selected'})
-    
+
     # 为选中的gene创建一个订单
     order = OrderInfo.objects.create(user=request.user)
     # 获取所有选中的gene对象
     genes = get_list_or_404(GeneInfo, user=request.user, id__in=gene_ids)
-    
+
     # 将gene添加到订单中
     order.gene_infos.add(*genes)
     order.status = 'Created'
@@ -398,9 +399,9 @@ def check_forbiden_seq(seq, seq_length, customer_forbidden_list=None):
     if customer_forbidden_list and isinstance(customer_forbidden_list, str):
         formated_list = re.split(r'[;,]', customer_forbidden_list)
         forbidden_check_list.extend(formated_list)
-    
-    contained_forbidden_list = [forbiden_seq for forbiden_seq in forbidden_check_list if forbiden_seq in seq]    
-    
+
+    contained_forbidden_list = [forbiden_seq for forbiden_seq in forbidden_check_list if forbiden_seq in seq]
+
     # find start and end positions of contained forbidden sequences
     positions = []
     for forbidden in contained_forbidden_list:
@@ -503,7 +504,7 @@ def check_sequence(seq):
 def identify_sequence(seq):
     if not isinstance(seq, str):
         return "Invalid input, expected a string."
-    
+
     seq = seq.upper().replace(" ", "")
 
     if not seq:
@@ -512,7 +513,7 @@ def identify_sequence(seq):
     nucleotides_DNA = set("ATCG")
     nucleotides_RNA = set("AUCG")
     amino_acids = set("ACDEFGHIKLMNPQRSTVWY")
- 
+
     # 允许"*"出现，但必须出现在最后
     if seq.endswith("*"):
         seq = seq[:-1]
@@ -542,7 +543,7 @@ def process_sequence(seq, forbid_seq):
         return seq, "Invalid Protein", None, None, None
 
     contained_forbidden_list, forbidden_check_list, forbidden_positions = check_forbiden_seq(seq, len(seq), forbid_seq)
-    
+
     GC_content = calculate_gc_content(seq)
     gc_positions = check_sequence(seq)
 
@@ -550,7 +551,7 @@ def process_sequence(seq, forbid_seq):
 
     all_positions = merge_overlapping_positions(all_positions)
     all_positions.sort(key=lambda x: x[0])
-    
+
     # print("all_positions: in process sequence: ", all_positions)
 
     ##################################################
@@ -570,7 +571,7 @@ def process_sequence(seq, forbid_seq):
             for i in range(start, end):
                 tagged_seq += '<em class="text-warning">' + seq[i] + '</em>'
         # tagged_seq += '</i>'
-        
+
         current_position = end
 
     tagged_seq += seq[current_position:]  # Add the remaining sequence
@@ -619,16 +620,18 @@ def vector_delete(request):
         return JsonResponse({'status': 'success', 'message': 'Gene deleted successfully'})
     else:
         return render(request, 'user_center/manage_vector.html')
-        
-def vector_download(request, vector_id, file_type):
-    # user只能下载自己的vector和公司的vector，不能下载别人的vector，所以需要验证
-    try:
-        # 获取当前用户的vector或公司的vector
-        vector_object = Vector.objects.get(user=request.user, id=vector_id)
-    except Vector.DoesNotExist:
-        # 如果当前用户没有这个vector，检查是否为公司的vector
-        vector_object = get_object_or_404(Vector, id=vector_id, user=None)
 
+def vector_download(request, vector_id, file_type, is_admin=False):
+    # user只能下载自己的vector和公司的vector，不能下载别人的vector，所以需要验证
+    if not is_admin:
+        try:
+            # 获取当前用户的vector或公司的vector
+            vector_object = Vector.objects.get(user=request.user, id=vector_id)
+        except Vector.DoesNotExist:
+            # 如果当前用户没有这个vector，检查是否为公司的vector
+            vector_object = get_object_or_404(Vector, id=vector_id, user=None)
+    else:
+        vector_object = Vector.objects.get(id=vector_id)
     # 从vector_object中提取数据
     vector_name = vector_object.vector_name
     NC5 = vector_object.NC5
@@ -666,7 +669,9 @@ def vector_download(request, vector_id, file_type):
         # 把vector_map文件直接返回
         if vector_file:
             response = HttpResponse(vector_file, content_type='application/octet-stream')
-            response['Content-Disposition'] = f'attachment; filename="{vector_file.name}"'
+            name = vector_file.name.split('/')[-1]
+            # quote编码后下载的中文文件名可以正常显示
+            response.headers['Content-Disposition'] = "attachment; filename={}".format(quote(name))
             return response
         else:
             return HttpResponse("No vector map found")
