@@ -2,9 +2,10 @@ import json
 from math import ceil
 
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
+import pandas as pd
 
 from product.models import Vector
 from user_center.models import OrderInfo
@@ -33,7 +34,7 @@ def get_table_context(table_name, status=None, start=0):
             "create": data.order_time.strftime('%d/%m/%Y %H:%M:%S'),
             "modify": "",
             "export": {},
-            "report": data.report_file.url if data.inquiry_id is not None else '',
+            "report": data.report_file.url if data.report_file and data.inquiry_id is not None else '',
             "status": data.status,
             "url": data.url,
         }
@@ -164,3 +165,44 @@ def order_manage(request):
 @login_required
 def vector_manage(request):
     return render(request, 'super_manage/vector_manage.html', get_table_context("vector"))
+
+
+@login_required
+def export_order_to_csv(request, order_id):
+    # Retrieve the order
+    order = OrderInfo.objects.get(id=order_id)
+
+    # Create a list of dictionaries containing gene information
+    gene_info_list = [
+        {
+            'GeneName': gene_info.gene_name,
+            'Seq5NC': gene_info.vector.NC5,
+            'SeqAA': gene_info.saved_seq,
+            'Seq3NC': gene_info.vector.NC3,
+            'ForbiddenSeqs': gene_info.forbid_seq,
+            'VectorID': gene_info.vector.vector_id,
+            'Species': gene_info.species.species_name if gene_info.species else None,
+        }
+        for gene_info in order.gene_infos.all()
+    ]
+
+    # Create a DataFrame from the list
+    df = pd.DataFrame(gene_info_list)
+    # Convert datetime columns to timezone-unaware format
+    # df['create_date'] = df['create_date'].dt.tz_localize(None)
+    # Create a new column 'order_type' based on the condition
+    max_sequence_length = df['SeqAA'].str.len().max() + df['Seq5NC'].str.len().max() + df['Seq3NC'].str.len().max()
+
+    order_type = 2 if max_sequence_length > 650 else 1
+    
+    # Prepare response with CSV content
+    # response = HttpResponse(content_type='text/csv')
+    # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
+    # df.to_excel(path_or_buf=response, index=False)
+    
+    # Prepare response with Excel content
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
+    df.to_excel(excel_writer=response, index=False, engine='openpyxl')
+
+    return response
