@@ -1,14 +1,18 @@
 import json
+import os
 from math import ceil
+from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 
 from product.models import Vector
 from user_center.models import OrderInfo
-from user_center.views import vector_download as uc_vector_download
+from user_center.views import \
+    vector_download as uc_vector_download, \
+    vector_delete as uc_vector_delete
 
 
 def get_table_context(table_name, status=None, start=0):
@@ -27,13 +31,13 @@ def get_table_context(table_name, status=None, start=0):
     def order_line(data):
         return {
             'id': data.id,
-            'inquiry_id': data.inquiry_id if data.inquiry_id is not None else 'null',
+            'inquiry_id': data.inquiry_id if data.inquiry_id else 'null',
             "custom": data.user.username,
             "quantity": data.gene_infos.count(),
             "create": data.order_time.strftime('%d/%m/%Y %H:%M:%S'),
             "modify": "",
             "export": {},
-            "report": data.report_file.url if data.inquiry_id is not None else '',
+            "report": 'download_report/{}'.format(data.id) if data.report_file else '',
             "status": data.status,
             "url": data.url,
         }
@@ -77,9 +81,75 @@ def vector_download(request, vector_id, file_type):
 
 @login_required
 @require_POST
-def upload_report(request):
+def vector_upload(request):
+    vector_file = request.FILES.get('vector_file', default=None)
+    vector_id = request.POST.get('vector_id', default=None)
+    if vector_id is None or vector_file is None:
+        return JsonResponse(data={
+            'status': 'error',
+            'message': 'Invalid params'
+        })
+    Vector.objects.filter(id=vector_id).update(vector_file=vector_file)
     return JsonResponse(data={
         'status': 'success'
+    })
+
+
+@login_required
+@require_POST
+def vector_delete(request):
+    return uc_vector_delete(request, True)
+
+
+@login_required
+@require_POST
+def upload_report(request):
+    file = request.FILES.get('file', default=None)
+    order_id = request.POST.get('id', default=None)
+    if file is None or order_id is None:
+        return JsonResponse(data={
+            'status': 'error',
+            'message': 'Empty params.'
+        })
+    order = OrderInfo.objects.get(id=order_id)
+    order.report_file = file
+    order.save()
+    return JsonResponse(data={
+        'status': 'success',
+        'newVal': 'download_report/{}'.format(order_id)
+    })
+
+
+@login_required
+@require_GET
+def delete_report(request):
+    order_id = request.GET.get('id', default=None)
+    order = OrderInfo.objects.get(id=order_id)
+    if order.report_file:
+        file_path = order.report_file.path
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        order.report_file.delete()
+    return JsonResponse(data={
+        'status': 'success',
+    })
+
+
+@login_required
+def download_report(request, order_id):
+    print('down report {}'.format(order_id))
+    order = OrderInfo.objects.get(id=order_id)
+    file = order.report_file
+    if file:
+        response = HttpResponse(file, content_type='application/octet-stream')
+        name = order.report_file.name.split('/')[-1]
+        # quote编码后下载的中文文件名可以正常显示
+        response.headers['Content-Disposition'] = "attachment; filename={}".format(quote(name))
+        return response
+    else:
+        return JsonResponse(data={
+        'status': 'error',
+        'message':"Can't find the file."
     })
 
 

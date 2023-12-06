@@ -231,6 +231,13 @@
             // });
         }
 
+        // 行中元素获取整行数据
+        function get_row_content(e) {
+            let row = e.closest('tr');
+            let rowNum = parseInt(row.querySelector('th').textContent);
+            return Rows[rowNum - 1];
+        }
+
         // 设置表，page：第几页，pageLen：每页长度
         function setTable(page, pageLen) {
             // 根据page和pageLen设置表格
@@ -275,6 +282,7 @@
                 last.hidden = false;
 
         }
+
 
         // 点击顶部Tab
         function clickTab(e, id) {
@@ -331,6 +339,26 @@
 
         function clickDelMap(e) {
             console.log("clickDelMap", e);
+            const XHR = new XMLHttpRequest();
+            const FD = new FormData();
+            FD.append('vector_id', get_row_content(e)['id']);
+            FD.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+            // 定义数据成功发送并返回后执行的操作
+            XHR.addEventListener("load", (event) => {
+                console.log(event)
+                alert("耶！已发送数据并加载响应。");
+            });
+
+            // 定义发生错误时执行的操作
+            XHR.addEventListener("error", (event) => {
+                alert("Error" + event.toString());
+            });
+
+            // 设置请求地址和方法
+            XHR.open("POST", "{% url 'super_manage:vector_delete' %}");
+
+            // 发送这个 formData 对象，HTTP 请求头会自动设置
+            XHR.send(FD);
         }
 
         function clickCancel(e) {
@@ -360,7 +388,7 @@
                 data: JSON.stringify(data),
                 contentType: 'application/json',
                 dataType: 'json',
-                headers:{ "X-CSRFToken": '{{ csrf_token }}' },
+                headers: {"X-CSRFToken": '{{ csrf_token }}'},
                 success: function (res) {
                     if (res.status == 'error') {
                         alert(res.message)

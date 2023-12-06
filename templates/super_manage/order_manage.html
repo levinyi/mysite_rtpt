@@ -57,7 +57,7 @@
                     </button>
                     <a href="" download="">pdf</a>
                 </div>
-                <button type="button" class="btn btn-link row-button upload" onclick="clickUpReport(this)">
+                <button type="button" class="btn btn-link row-button upload" onclick="this.querySelector('input').click();">
                     upload
                     <input type="file" style="display: none;" onchange="fileChange(this)">
                 </button>
@@ -146,44 +146,9 @@
 {% endblock %}
 
 {% block javascript %}
-    <script>function clickDelPreUpload(e) {
-        let input = e.parentElement.parentElement.querySelector('input');
-        // 删除准备上传的文件
-        input.value = "";
-        setReport(e.parentElement.parentElement, "upload");
-    }
+    <script>
 
-    function clickUpSubmit(e){
-        // 提交准备上传的文件
-        let input = e.parentElement.parentElement.querySelector('input');
-        let row = get_row_content(e);
-        let formData = new FormData();
-        formData.append('id', row.id);
-        formData.append('file', input.files[0]);
-        $.ajax({
-            url: "{% url 'super_manage:upload_report' %}",
-            type: "POST",
-            data: formData,
-            async: false,
-            processData: false,
-            contentType: false,
-            success: function (res) {
-                console.log(res.newVal)
-                if (res.status == 'error') {
-                    alert(res.message)
-                } else {
-                    let newVal = res.newVal;
-                    setReport(e.parentElement.parentElement, "file-down",null ,newVal);
-                }
-            },
-            error: function (res) {
-                alert('Request error. ' + res.toString())
-            }
-        });
-    }
-
-
-    const TmpRow = document.querySelector("#tmp-table-row"),
+        const TmpRow = document.querySelector("#tmp-table-row"),
             TmpTd = TmpRow.content.querySelectorAll("td"),
             tableBody = document.querySelector("tbody");
         let RowMax = {{ max_row }};
@@ -240,38 +205,34 @@
 
             {# 设置Report的显示 #}
             if (rowJson['report'].length) {
-                setReport(td[6], "file-down",null ,rowJson['report']);
-            }
-            else{
-                setReport(td[6], "upload");
+                setRowReport(td[6], "file-down", null, rowJson['report']);
+            } else {
+                setRowReport(td[6], "upload");
             }
 
             return clone
         }
 
-        function setReport(e, status, filename=null, filepath=null){
+        function setRowReport(e, status, filename = null, filepath = null) {
             const fileDown = e.querySelector('.file-down'),
                 upload = e.querySelector('.upload'),
                 preUpload = e.querySelector('.pre-upload');
-            if(status == "file-down"){
+            if (status == "file-down") {
                 fileDown.hidden = false;
                 upload.hidden = true;
                 preUpload.hidden = true;
                 fileDown.querySelector('a').href = filepath;
-            }
-            else if(status == "upload"){
+            } else if (status == "upload") {
                 fileDown.hidden = true;
                 upload.hidden = false;
                 preUpload.hidden = true;
-            }
-            else if(status == "pre-upload"){
+            } else if (status == "pre-upload") {
                 fileDown.hidden = true;
                 upload.hidden = true;
                 preUpload.hidden = false;
                 preUpload.querySelector('p').textContent = filename;
-            }
-            else
-                console.log("Unknown report element status",status,filename,filepath);
+            } else
+                console.log("Unknown report element status", status, filename, filepath);
         }
 
         // 获取行
@@ -378,7 +339,7 @@
                 return false;
             }
             target.parentElement
-            setReport(target.parentElement.parentElement, "pre-upload",target.files[0].name,filepath);
+            setRowReport(target.parentElement.parentElement, "pre-upload", target.files[0].name, filepath);
         }
 
         // 点击顶部Tab
@@ -412,7 +373,7 @@
                 type: "GET",
                 data: {
                     "status": status,
-                    "tableName":"order"
+                    "tableName": "order"
                 },
                 async: false,
                 success: function (res) {
@@ -432,6 +393,44 @@
                 }
             });
         }
+
+        function clickDelPreUpload(e) {
+            let input = e.parentElement.parentElement.querySelector('input');
+            // 删除准备上传的文件
+            input.value = "";
+            setRowReport(e.parentElement.parentElement, "upload");
+        }
+
+        function clickUpSubmit(e) {
+            // 提交准备上传的文件
+            let input = e.parentElement.parentElement.querySelector('input');
+            let row = get_row_content(e);
+            let formData = new FormData();
+            formData.append('id', row.id);
+            formData.append('file', input.files[0]);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+            $.ajax({
+                url: "{% url 'super_manage:upload_report' %}",
+                type: "POST",
+                data: formData,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (res) {
+                    console.log(res.newVal)
+                    if (res.status == 'error') {
+                        alert(res.message)
+                    } else {
+                        let newVal = res.newVal;
+                        setRowReport(e.parentElement.parentElement, "file-down", null, newVal);
+                    }
+                },
+                error: function (res) {
+                    alert('Request error. ' + res.toString())
+                }
+            });
+        }
+
 
         function changeUrl(e) {
             let row = get_row_content(e);
@@ -485,13 +484,25 @@
 
         // 点击report delete按钮
         function clickDelReport(e) {
+            let row = get_row_content(e);
             console.log('clickDelReport', e);
-        }
+            $.ajax({
+                url: "{% url 'super_manage:delete_report' %}",
+                type: "GET",
+                data: {
+                    "id": row.id
+                },
+                async: false,
+                success: function (res) {
+                    if (res.status == 'success') {
+                        setRowReport(e.parentElement.parentElement,"upload")
+                    }
 
-        // 点击report update按钮
-        function clickUpReport(e) {
-            console.log('clickUpReport', e);
-            e.querySelector('input').click()
+                },
+                error: function (res) {
+                    alert('Request error.')
+                }
+            });
         }
 
 
