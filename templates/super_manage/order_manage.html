@@ -3,6 +3,11 @@
 {% block title %}Order Manage{% endblock %}
 {% block extra_head %}
     <style>
+        .icon-btn {
+            width: 2rem;
+            display: inline-block;
+        }
+
         .row-button {
             padding: 0 4px 0 4px;
         }
@@ -47,36 +52,35 @@
             <td>18/3/2022</td>
             <td hidden>18/3/2022</td>
             <td>
-                <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">xlsx</a>
-                <button disabled type="button" class="btn btn-link row-button">xlsx</button>
+                <a href="" class="row-button"><i class="bi bi-cloud-download"></i></a>
+                <button disabled type="button" class="btn btn-link row-button"><i class="bi bi-cloud-download"></i></button>
             </td>
             <td>
                 <div class="file-down">
-                    <button type="button" style="color: crimson" class="btn btn-link row-button"
-                            onclick="clickDelReport(this)">delete
+                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
+                            onclick="clickDelReport(this)">
                     </button>
-                    <a href="" download="">pdf</a>
+                    <a href="" class="bi bi-download icon-btn"></a>
                 </div>
-                <button type="button" class="btn btn-link row-button upload" onclick="this.querySelector('input').click();">
-                    upload
+                <button type="button" class="btn btn-link row-button upload bi-upload icon-btn" onclick="this.querySelector('input').click();">
                     <input type="file" style="display: none;" onchange="fileChange(this)">
                 </button>
                 <div class="pre-upload">
                     <p style="margin: 0px;font-size: 13px;"></p>
-                    <button type="button" style="color: crimson" class="btn btn-link row-button"
-                            onclick="clickDelPreUpload(this)">delete
+                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
+                            onclick="clickDelPreUpload(this)">
                     </button>
-                    <button type="button" class="btn btn-link row-button upload" onclick="clickUpSubmit(this)">
+                    <button type="button" class="btn btn-link row-button upload " onclick="clickUpSubmit(this)">
                         submit
                     </button>
                 </div>
             </td>
             <td>
-                <button type="button" class="btn btn-link row-button" style="color: crimson"
-                        onclick="clickRevokeOrNext(this, 'revoke')">revoke
+                <button type="button" class="btn btn-link row-button bi-box-arrow-left text-danger icon-btn"
+                        onclick="clickRevokeOrNext(this, 'revoke')">
                 </button>
                 <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
-                <button type="button" class="btn btn-link row-button" onclick="clickRevokeOrNext(this,'next')">next
+                <button type="button" class="btn btn-link row-button bi-box-arrow-right icon-btn" onclick="clickRevokeOrNext(this,'next')">
                 </button>
             </td>
             <td class="input-td">
@@ -161,58 +165,6 @@
             tableBody.innerHTML = "";
         }
 
-        function setRowStatus(e, value) {
-            e.querySelector("span").textContent = value;
-
-            {# 设置Status的显示 #}
-            let bns = e.getElementsByTagName("button");
-            if (value.toLowerCase() == "created") {
-                bns[0].disabled = true;
-                bns[0].style.removeProperty('color');
-            } else {
-                bns[0].disabled = false;
-                bns[0].style.color = 'crimson';
-            }
-            bns[1].disabled = value.toLowerCase() == "completed";
-        }
-
-        // 往表中添加一行
-        function getTableRow(rowNum, rowJson) {
-            let clone = document.importNode(TmpRow.content, true);
-            let td = clone.querySelectorAll("td");
-            clone.querySelectorAll("th")[0].textContent = rowNum;
-            td[0].textContent = rowJson['inquiry_id'];
-            td[1].textContent = rowJson['custom'];
-            td[2].textContent = rowJson['quantity'];
-            td[3].textContent = rowJson['create'];
-            td[4].textContent = rowJson['modify'];
-
-            let ep = td[5].getElementsByTagName("a"), un = td[5].getElementsByTagName("button");
-            if ('xlsx' in rowJson['export'])
-                ep[0].href = rowJson['export']['xlsx'];
-            td[6].querySelector("a").href = rowJson['report'];
-            setRowStatus(td[7], rowJson['status']);
-            td[8].querySelector("input").value = rowJson['url'];
-            {#setInput(td[8].getElementsByTagName("p")[0], );#}
-            {# 设置Export的显示 #}
-            if ('xlsx' in rowJson['export'] && rowJson['export']['xlsx'].length) {
-                un[0].hidden = true;
-                ep[0].hidden = false;
-            } else {
-                un[0].hidden = false;
-                ep[0].hidden = true;
-            }
-
-            {# 设置Report的显示 #}
-            if (rowJson['report'].length) {
-                setRowReport(td[6], "file-down", null, rowJson['report']);
-            } else {
-                setRowReport(td[6], "upload");
-            }
-
-            return clone
-        }
-
         function setRowReport(e, status, filename = null, filepath = null) {
             const fileDown = e.querySelector('.file-down'),
                 upload = e.querySelector('.upload'),
@@ -233,6 +185,59 @@
                 preUpload.querySelector('p').textContent = filename;
             } else
                 console.log("Unknown report element status", status, filename, filepath);
+        }
+
+        function setRowStatus(e, value) {
+            e.querySelector("span").textContent = value;
+
+            {# 设置Status的显示 #}
+            let bns = e.getElementsByTagName("button");
+            if (value.toLowerCase() == "created") {
+                bns[0].disabled = true;
+                bns[0].classList.remove('text-danger')
+            } else {
+                bns[0].disabled = false;
+                bns[0].classList.add('text-danger');
+            }
+            bns[1].disabled = value.toLowerCase() == "completed";
+        }
+
+        // 往表中添加一行
+        function getTableRow(rowNum, rowJson) {
+            let clone = document.importNode(TmpRow.content, true);
+            let td = clone.querySelectorAll("td");
+            clone.querySelectorAll("th")[0].textContent = rowNum;
+            td[0].textContent = rowJson['inquiry_id'];
+            td[1].textContent = rowJson['custom'];
+            td[2].textContent = rowJson['quantity'];
+            td[3].textContent = rowJson['create'];
+            td[4].textContent = rowJson['modify'];
+
+            let ep = td[5].getElementsByTagName("a"), un = td[5].getElementsByTagName("button");
+            ep[0].href = rowJson['export'];
+
+
+            setRowStatus(td[7], rowJson['status']);
+            td[8].querySelector("input").value = rowJson['url'];
+            {#setInput(td[8].getElementsByTagName("p")[0], );#}
+
+            {# 设置Export的显示 #}
+            if (rowJson['export'].length) {
+                un[0].hidden = true;
+                ep[0].hidden = false;
+            } else {
+                un[0].hidden = false;
+                ep[0].hidden = true;
+            }
+
+            {# 设置Report的显示 #}
+            if (rowJson['report'].length) {
+                setRowReport(td[6], "file-down", null, rowJson['report']);
+            } else {
+                setRowReport(td[6], "upload");
+            }
+
+            return clone
         }
 
         // 获取行

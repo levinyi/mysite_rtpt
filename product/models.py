@@ -49,7 +49,10 @@ class ExpressionScale(models.Model):
 
 def user_directory_path(instance, filename):
     # 文件将被上传到 MEDIA_ROOT/user_<id>/vector_file/<filename>
-    return 'user_{0}/vector_file/{1}'.format(instance.user.id, filename)
+    if not instance.user:
+        return 'user/vector_file/{1}'.format(filename)
+    else:
+        return 'user_{0}/vector_file/{1}'.format(instance.user.id, filename)
 
 class Vector(models.Model):
     user = models.ForeignKey(User, verbose_name="User", on_delete=models.SET_NULL, null=True, blank=True)
