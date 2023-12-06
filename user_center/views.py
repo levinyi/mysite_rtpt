@@ -1,6 +1,5 @@
-import json
-import re
-import os
+import json, re, os
+import pandas as pd
 from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from product.models import GeneSynEnzymeCutSite, Species, Vector
@@ -320,10 +319,52 @@ def checkout(request):
     return JsonResponse({'status': 'success', 'message': 'Order created successfully', 'redirect_url': f'/user_center/manage_order/'})
 
 # not used
+@login_required
 def view_order_detail(request, order_id):
-    # 这里的逻辑是展示订单详情
+    # retrieve the order
     order = OrderInfo.objects.get(id=order_id)
     return render(request, 'user_center/view_order_detail.html', {'order': order})
+
+@login_required
+def export_order_to_csv(request, order_id):
+    # Retrieve the order
+    order = OrderInfo.objects.get(id=order_id)
+
+    # Create a list of dictionaries containing gene information
+    gene_info_list = [
+        {
+            'GeneName': gene_info.gene_name,
+            'Seq5NC': gene_info.vector.NC5,
+            'SeqAA': gene_info.saved_seq,
+            'Seq3NC': gene_info.vector.NC3,
+            'ForbiddenSeqs': gene_info.forbid_seq,
+            'VectorID': gene_info.vector.vector_id,
+            'Species': gene_info.species.species_name if gene_info.species else None,
+        }
+        for gene_info in order.gene_infos.all()
+    ]
+
+    # Create a DataFrame from the list
+    df = pd.DataFrame(gene_info_list)
+    # Convert datetime columns to timezone-unaware format
+    # df['create_date'] = df['create_date'].dt.tz_localize(None)
+    # Create a new column 'order_type' based on the condition
+    max_sequence_length = df['SeqAA'].str.len().max() + df['Seq5NC'].str.len().max() + df['Seq3NC'].str.len().max()
+
+    order_type = 2 if max_sequence_length > 650 else 1
+    
+    # Prepare response with CSV content
+    # response = HttpResponse(content_type='text/csv')
+    # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
+    # df.to_excel(path_or_buf=response, index=False)
+    
+    # Prepare response with Excel content
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
+    df.to_excel(excel_writer=response, index=False, engine='openpyxl')
+
+    return response
+
 
 # checked
 def manage_order(request):

@@ -14,7 +14,7 @@
                         <th scope="col">Gene Numbers</th>
                         <th scope="col">Status</th>
                         <th scope="col">Creation Time</th>
-                        {% comment %} <th scope="col">Details</th> {% endcomment %}
+                        <th scope="col">Details</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -25,11 +25,11 @@
                         <td>{{ order.gene_infos.count }}</td>
                         <td>{{ order.status }}</td>
                         <td>{{ order.order_time }}</td>
-                        {% comment %} <td>
-                            <a href="#" data-bs-toggle="tooltip" data-bs-placement="top" title="Sorry, Under Construction" class="text-decoration-none">
+                        <td>
+                            <a href="{% url 'user_center:view_order_detail' order.id %}" data-bs-toggle="tooltip" data-bs-placement="top" title="See details" class="text-decoration-none">
                                 <i class="bi bi-ticket-detailed"></i> See Details
                             </a>
-                        </td> {% endcomment %}
+                        </td> 
                     </tr>
                     {% endfor %}
                 </tbody>
