@@ -348,7 +348,7 @@ def view_order_detail(request, order_id):
 @login_required
 def export_order_to_csv(request, order_id):
     # Retrieve the order with optimized query
-    order = OrderInfo.objects.select_related('gene_infos__vector', 'gene_infos__species').get(id=order_id)
+    order = OrderInfo.objects.get(id=order_id)
     # Function to get SeqAA
     def get_seq_aa(combined_seq):
         start_index = 0
