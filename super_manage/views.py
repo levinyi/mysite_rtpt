@@ -289,7 +289,7 @@ def export_order_to_csv(request, order_id):
     # response = HttpResponse(content_type='text/csv')
     # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
     # df.to_excel(path_or_buf=response, index=False)
-
+    
     # Prepare response with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order.user}-RootPath_Gene_Library_Order_Information.xlsx"'

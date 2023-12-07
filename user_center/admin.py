@@ -22,7 +22,7 @@ class OrderInfoResource(resources.ModelResource):
         fields = ('id', 'user', 'gene_infos', 'order_time', 'status')
 
 class OrderInfoAdmin(ImportExportModelAdmin):
-    list_display = ('id', 'user', 'order_time', 'status')
+    list_display = ('id', 'user', 'inquiry_id', 'order_time', 'status')
     list_filter = ('id', 'user', 'order_time', 'status')
     search_fields = ('id', 'user', 'order_time', 'status')
     resource_class = OrderInfoResource

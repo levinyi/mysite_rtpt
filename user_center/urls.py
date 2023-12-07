@@ -16,6 +16,8 @@ urlpatterns = [
     path('checkout/', views.checkout, name='checkout'),
     path('submit_notification/', views.submit_notification, name='submit_notification'),
     path('manage_order/', views.manage_order, name='manage_order'),
+    path('view_order_detail/<int:order_id>/', views.view_order_detail, name='view_order_detail'),
+    path('export_order_to_csv/<int:order_id>/', views.export_order_to_csv, name='export_order_to_csv'),
 
 
     path('manage_vector/', views.manage_vector, name='manage_vector'),
