@@ -350,7 +350,13 @@ def export_order_to_csv(request, order_id):
     # Convert datetime columns to timezone-unaware format
     # df['create_date'] = df['create_date'].dt.tz_localize(None)
     # Create a new column 'order_type' based on the condition
-    max_sequence_length = df['SeqAA'].str.len().max() + df['Seq5NC'].str.len().max() + df['Seq3NC'].str.len().max()
+    
+    if df.get('SeqAA') is not None:
+        max_sequence_length += df['SeqAA'].str.len().max()
+    if df.get('Seq5NC') is not None:
+        max_sequence_length += df['Seq5NC'].str.len().max()
+    if df.get('Seq3NC') is not None:
+        max_sequence_length += df['Seq3NC'].str.len().max()
 
     order_type = 2 if max_sequence_length > 650 else 1
     
@@ -361,7 +367,7 @@ def export_order_to_csv(request, order_id):
     
     # Prepare response with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{order.user}-RootPath_Gene_Library_Order_Information.xlsx"'
     df.to_excel(excel_writer=response, index=False, engine='openpyxl')
 
     return response

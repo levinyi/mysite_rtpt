@@ -9,6 +9,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 import pandas as pd
+from account.models import UserProfile
 
 from product.models import Vector
 from user_center.models import OrderInfo
@@ -294,3 +295,8 @@ def export_order_to_csv(request, order_id):
     df.to_excel(excel_writer=response, index=False, engine='openpyxl')
 
     return response
+
+
+def user_manage(request):
+    user_list = UserProfile.objects.all()
+    return render(request, 'super_manage/user_manage.html', {'user_list': user_list})
