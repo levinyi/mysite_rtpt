@@ -38,13 +38,8 @@ def get_table_context(table_name, status=None, start=0):
             "quantity": data.gene_infos.count(),
             "create": data.order_time.strftime('%d/%m/%Y %H:%M:%S'),
             "modify": "",
-<<<<<<< HEAD
-            "export": {},
-            "report": data.report_file.url if data.report_file and data.inquiry_id is not None else '',
-=======
             "export": 'export_order_to_csv/{}'.format(data.id),
             "report": 'download_report/{}'.format(data.id) if data.report_file else '',
->>>>>>> 7b8963aa6afe84d6647a1d95a7cafc2eda335eef
             "status": data.status,
             "url": data.url,
         }
@@ -278,12 +273,6 @@ def export_order_to_csv(request, order_id):
     # Convert datetime columns to timezone-unaware format
     # df['create_date'] = df['create_date'].dt.tz_localize(None)
     # Create a new column 'order_type' based on the condition
-<<<<<<< HEAD
-    max_sequence_length = df['SeqAA'].str.len().max() + df['Seq5NC'].str.len().max() + df['Seq3NC'].str.len().max()
-
-    order_type = 2 if max_sequence_length > 650 else 1
-    
-=======
     max_sequence_length = 0
     if df.get('SeqAA') is not None:
         max_sequence_length += df['SeqAA'].str.len().max()
@@ -294,23 +283,14 @@ def export_order_to_csv(request, order_id):
 
     order_type = 2 if max_sequence_length > 650 else 1
 
->>>>>>> 7b8963aa6afe84d6647a1d95a7cafc2eda335eef
     # Prepare response with CSV content
     # response = HttpResponse(content_type='text/csv')
     # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
     # df.to_excel(path_or_buf=response, index=False)
-<<<<<<< HEAD
     
     # Prepare response with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
-=======
-
-    # Prepare response with Excel content
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response[
-        'Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
->>>>>>> 7b8963aa6afe84d6647a1d95a7cafc2eda335eef
     df.to_excel(excel_writer=response, index=False, engine='openpyxl')
 
     return response
