@@ -1,7 +1,10 @@
 import json
+import os
 from math import ceil
+from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse, HttpResponse
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -9,7 +12,9 @@ import pandas as pd
 
 from product.models import Vector
 from user_center.models import OrderInfo
-from user_center.views import vector_download as uc_vector_download
+from user_center.views import \
+    vector_download as uc_vector_download, \
+    vector_delete as uc_vector_delete
 
 
 def get_table_context(table_name, status=None, start=0):
@@ -28,13 +33,18 @@ def get_table_context(table_name, status=None, start=0):
     def order_line(data):
         return {
             'id': data.id,
-            'inquiry_id': data.inquiry_id if data.inquiry_id is not None else 'null',
+            'inquiry_id': data.inquiry_id if data.inquiry_id else 'null',
             "custom": data.user.username,
             "quantity": data.gene_infos.count(),
             "create": data.order_time.strftime('%d/%m/%Y %H:%M:%S'),
             "modify": "",
+<<<<<<< HEAD
             "export": {},
             "report": data.report_file.url if data.report_file and data.inquiry_id is not None else '',
+=======
+            "export": 'export_order_to_csv/{}'.format(data.id),
+            "report": 'download_report/{}'.format(data.id) if data.report_file else '',
+>>>>>>> 7b8963aa6afe84d6647a1d95a7cafc2eda335eef
             "status": data.status,
             "url": data.url,
         }
@@ -78,10 +88,87 @@ def vector_download(request, vector_id, file_type):
 
 @login_required
 @require_POST
-def upload_report(request):
+def vector_upload(request):
+    vector_file = request.FILES.get('vector_file', default=None)
+    vector_id = request.POST.get('vector_id', default=None)
+    if vector_id is None or vector_file is None:
+        return JsonResponse(data={
+            'status': 'error',
+            'message': 'Invalid params'
+        })
+    vector = Vector.objects.get(id=vector_id)
+    vector.vector_file = vector_file
+    vector.save()
     return JsonResponse(data={
-        'status': 'success'
+        'status': 'success',
+        "newVal": 'vector_download/{}/map'.format(vector_id)
     })
+
+@require_GET
+@login_required
+def vector_delete(request):
+    vector_id = request.GET.get('vector_id', default=None)
+    vector = Vector.objects.get(id=vector_id)
+    if vector.vector_file:
+        file_path = vector.vector_file.path
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        vector.vector_file.delete()
+    return JsonResponse(data={
+        'status': 'success',
+    })
+
+
+@login_required
+@require_POST
+def upload_report(request):
+    file = request.FILES.get('file', default=None)
+    order_id = request.POST.get('id', default=None)
+    if file is None or order_id is None:
+        return JsonResponse(data={
+            'status': 'error',
+            'message': 'Empty params.'
+        })
+    order = OrderInfo.objects.get(id=order_id)
+    order.report_file = file
+    order.save()
+    return JsonResponse(data={
+        'status': 'success',
+        'newVal': 'download_report/{}'.format(order_id)
+    })
+
+
+@login_required
+@require_GET
+def delete_report(request):
+    order_id = request.GET.get('id', default=None)
+    order = OrderInfo.objects.get(id=order_id)
+    if order.report_file:
+        file_path = order.report_file.path
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        order.report_file.delete()
+    return JsonResponse(data={
+        'status': 'success',
+    })
+
+
+@login_required
+def download_report(request, order_id):
+    print('down report {}'.format(order_id))
+    order = OrderInfo.objects.get(id=order_id)
+    file = order.report_file
+    if file:
+        response = HttpResponse(file, content_type='application/octet-stream')
+        name = order.report_file.name.split('/')[-1]
+        # quote编码后下载的中文文件名可以正常显示
+        response.headers['Content-Disposition'] = "attachment; filename={}".format(quote(name))
+        return response
+    else:
+        return JsonResponse(data={
+            'status': 'error',
+            'message': "Can't find the file."
+        })
 
 
 @login_required
@@ -191,18 +278,39 @@ def export_order_to_csv(request, order_id):
     # Convert datetime columns to timezone-unaware format
     # df['create_date'] = df['create_date'].dt.tz_localize(None)
     # Create a new column 'order_type' based on the condition
+<<<<<<< HEAD
     max_sequence_length = df['SeqAA'].str.len().max() + df['Seq5NC'].str.len().max() + df['Seq3NC'].str.len().max()
 
     order_type = 2 if max_sequence_length > 650 else 1
     
+=======
+    max_sequence_length = 0
+    if df.get('SeqAA') is not None:
+        max_sequence_length += df['SeqAA'].str.len().max()
+    if df.get('Seq5NC') is not None:
+        max_sequence_length += df['Seq5NC'].str.len().max()
+    if df.get('Seq3NC') is not None:
+        max_sequence_length += df['Seq3NC'].str.len().max()
+
+    order_type = 2 if max_sequence_length > 650 else 1
+
+>>>>>>> 7b8963aa6afe84d6647a1d95a7cafc2eda335eef
     # Prepare response with CSV content
     # response = HttpResponse(content_type='text/csv')
     # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
     # df.to_excel(path_or_buf=response, index=False)
+<<<<<<< HEAD
     
     # Prepare response with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
+=======
+
+    # Prepare response with Excel content
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response[
+        'Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Information.xlsx"'
+>>>>>>> 7b8963aa6afe84d6647a1d95a7cafc2eda335eef
     df.to_excel(excel_writer=response, index=False, engine='openpyxl')
 
     return response

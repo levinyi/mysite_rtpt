@@ -3,6 +3,11 @@
 {% block title %}Order Manage{% endblock %}
 {% block extra_head %}
     <style>
+        .icon-btn {
+            width: 2rem;
+            display: inline-block;
+        }
+
         .row-button {
             padding: 0 4px 0 4px;
         }
@@ -47,36 +52,35 @@
             <td>18/3/2022</td>
             <td hidden>18/3/2022</td>
             <td>
-                <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">xlsx</a>
-                <button disabled type="button" class="btn btn-link row-button">xlsx</button>
+                <a href="" class="row-button"><i class="bi bi-cloud-download"></i></a>
+                <button disabled type="button" class="btn btn-link row-button"><i class="bi bi-cloud-download"></i></button>
             </td>
             <td>
                 <div class="file-down">
-                    <button type="button" style="color: crimson" class="btn btn-link row-button"
-                            onclick="clickDelReport(this)">delete
+                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
+                            onclick="clickDelReport(this)">
                     </button>
-                    <a href="" download="">pdf</a>
+                    <a href="" class="bi bi-download icon-btn"></a>
                 </div>
-                <button type="button" class="btn btn-link row-button upload" onclick="clickUpReport(this)">
-                    upload
+                <button type="button" class="btn btn-link row-button upload bi-upload icon-btn" onclick="this.querySelector('input').click();">
                     <input type="file" style="display: none;" onchange="fileChange(this)">
                 </button>
                 <div class="pre-upload">
                     <p style="margin: 0px;font-size: 13px;"></p>
-                    <button type="button" style="color: crimson" class="btn btn-link row-button"
-                            onclick="clickDelPreUpload(this)">delete
+                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
+                            onclick="clickDelPreUpload(this)">
                     </button>
-                    <button type="button" class="btn btn-link row-button upload" onclick="clickUpSubmit(this)">
+                    <button type="button" class="btn btn-link row-button upload " onclick="clickUpSubmit(this)">
                         submit
                     </button>
                 </div>
             </td>
             <td>
-                <button type="button" class="btn btn-link row-button" style="color: crimson"
-                        onclick="clickRevokeOrNext(this, 'revoke')">revoke
+                <button type="button" class="btn btn-link row-button bi-box-arrow-left text-danger icon-btn"
+                        onclick="clickRevokeOrNext(this, 'revoke')">
                 </button>
                 <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
-                <button type="button" class="btn btn-link row-button" onclick="clickRevokeOrNext(this,'next')">next
+                <button type="button" class="btn btn-link row-button bi-box-arrow-right icon-btn" onclick="clickRevokeOrNext(this,'next')">
                 </button>
             </td>
             <td class="input-td">
@@ -146,44 +150,9 @@
 {% endblock %}
 
 {% block javascript %}
-    <script>function clickDelPreUpload(e) {
-        let input = e.parentElement.parentElement.querySelector('input');
-        // 删除准备上传的文件
-        input.value = "";
-        setReport(e.parentElement.parentElement, "upload");
-    }
+    <script>
 
-    function clickUpSubmit(e){
-        // 提交准备上传的文件
-        let input = e.parentElement.parentElement.querySelector('input');
-        let row = get_row_content(e);
-        let formData = new FormData();
-        formData.append('id', row.id);
-        formData.append('file', input.files[0]);
-        $.ajax({
-            url: "{% url 'super_manage:upload_report' %}",
-            type: "POST",
-            data: formData,
-            async: false,
-            processData: false,
-            contentType: false,
-            success: function (res) {
-                console.log(res.newVal)
-                if (res.status == 'error') {
-                    alert(res.message)
-                } else {
-                    let newVal = res.newVal;
-                    setReport(e.parentElement.parentElement, "file-down",null ,newVal);
-                }
-            },
-            error: function (res) {
-                alert('Request error. ' + res.toString())
-            }
-        });
-    }
-
-
-    const TmpRow = document.querySelector("#tmp-table-row"),
+        const TmpRow = document.querySelector("#tmp-table-row"),
             TmpTd = TmpRow.content.querySelectorAll("td"),
             tableBody = document.querySelector("tbody");
         let RowMax = {{ max_row }};
@@ -196,6 +165,28 @@
             tableBody.innerHTML = "";
         }
 
+        function setRowReport(e, status, filename = null, filepath = null) {
+            const fileDown = e.querySelector('.file-down'),
+                upload = e.querySelector('.upload'),
+                preUpload = e.querySelector('.pre-upload');
+            if (status == "file-down") {
+                fileDown.hidden = false;
+                upload.hidden = true;
+                preUpload.hidden = true;
+                fileDown.querySelector('a').href = filepath;
+            } else if (status == "upload") {
+                fileDown.hidden = true;
+                upload.hidden = false;
+                preUpload.hidden = true;
+            } else if (status == "pre-upload") {
+                fileDown.hidden = true;
+                upload.hidden = true;
+                preUpload.hidden = false;
+                preUpload.querySelector('p').textContent = filename;
+            } else
+                console.log("Unknown report element status", status, filename, filepath);
+        }
+
         function setRowStatus(e, value) {
             e.querySelector("span").textContent = value;
 
@@ -203,10 +194,10 @@
             let bns = e.getElementsByTagName("button");
             if (value.toLowerCase() == "created") {
                 bns[0].disabled = true;
-                bns[0].style.removeProperty('color');
+                bns[0].classList.remove('text-danger')
             } else {
                 bns[0].disabled = false;
-                bns[0].style.color = 'crimson';
+                bns[0].classList.add('text-danger');
             }
             bns[1].disabled = value.toLowerCase() == "completed";
         }
@@ -223,14 +214,15 @@
             td[4].textContent = rowJson['modify'];
 
             let ep = td[5].getElementsByTagName("a"), un = td[5].getElementsByTagName("button");
-            if ('xlsx' in rowJson['export'])
-                ep[0].href = rowJson['export']['xlsx'];
-            td[6].querySelector("a").href = rowJson['report'];
+            ep[0].href = rowJson['export'];
+
+
             setRowStatus(td[7], rowJson['status']);
             td[8].querySelector("input").value = rowJson['url'];
             {#setInput(td[8].getElementsByTagName("p")[0], );#}
+
             {# 设置Export的显示 #}
-            if ('xlsx' in rowJson['export'] && rowJson['export']['xlsx'].length) {
+            if (rowJson['export'].length) {
                 un[0].hidden = true;
                 ep[0].hidden = false;
             } else {
@@ -240,38 +232,12 @@
 
             {# 设置Report的显示 #}
             if (rowJson['report'].length) {
-                setReport(td[6], "file-down",null ,rowJson['report']);
-            }
-            else{
-                setReport(td[6], "upload");
+                setRowReport(td[6], "file-down", null, rowJson['report']);
+            } else {
+                setRowReport(td[6], "upload");
             }
 
             return clone
-        }
-
-        function setReport(e, status, filename=null, filepath=null){
-            const fileDown = e.querySelector('.file-down'),
-                upload = e.querySelector('.upload'),
-                preUpload = e.querySelector('.pre-upload');
-            if(status == "file-down"){
-                fileDown.hidden = false;
-                upload.hidden = true;
-                preUpload.hidden = true;
-                fileDown.querySelector('a').href = filepath;
-            }
-            else if(status == "upload"){
-                fileDown.hidden = true;
-                upload.hidden = false;
-                preUpload.hidden = true;
-            }
-            else if(status == "pre-upload"){
-                fileDown.hidden = true;
-                upload.hidden = true;
-                preUpload.hidden = false;
-                preUpload.querySelector('p').textContent = filename;
-            }
-            else
-                console.log("Unknown report element status",status,filename,filepath);
         }
 
         // 获取行
@@ -378,7 +344,7 @@
                 return false;
             }
             target.parentElement
-            setReport(target.parentElement.parentElement, "pre-upload",target.files[0].name,filepath);
+            setRowReport(target.parentElement.parentElement, "pre-upload", target.files[0].name, filepath);
         }
 
         // 点击顶部Tab
@@ -412,7 +378,7 @@
                 type: "GET",
                 data: {
                     "status": status,
-                    "tableName":"order"
+                    "tableName": "order"
                 },
                 async: false,
                 success: function (res) {
@@ -432,6 +398,44 @@
                 }
             });
         }
+
+        function clickDelPreUpload(e) {
+            let input = e.parentElement.parentElement.querySelector('input');
+            // 删除准备上传的文件
+            input.value = "";
+            setRowReport(e.parentElement.parentElement, "upload");
+        }
+
+        function clickUpSubmit(e) {
+            // 提交准备上传的文件
+            let input = e.parentElement.parentElement.querySelector('input');
+            let row = get_row_content(e);
+            let formData = new FormData();
+            formData.append('id', row.id);
+            formData.append('file', input.files[0]);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+            $.ajax({
+                url: "{% url 'super_manage:upload_report' %}",
+                type: "POST",
+                data: formData,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (res) {
+                    console.log(res.newVal)
+                    if (res.status == 'error') {
+                        alert(res.message)
+                    } else {
+                        let newVal = res.newVal;
+                        setRowReport(e.parentElement.parentElement, "file-down", null, newVal);
+                    }
+                },
+                error: function (res) {
+                    alert('Request error. ' + res.toString())
+                }
+            });
+        }
+
 
         function changeUrl(e) {
             let row = get_row_content(e);
@@ -485,13 +489,25 @@
 
         // 点击report delete按钮
         function clickDelReport(e) {
+            let row = get_row_content(e);
             console.log('clickDelReport', e);
-        }
+            $.ajax({
+                url: "{% url 'super_manage:delete_report' %}",
+                type: "GET",
+                data: {
+                    "id": row.id
+                },
+                async: false,
+                success: function (res) {
+                    if (res.status == 'success') {
+                        setRowReport(e.parentElement.parentElement,"upload")
+                    }
 
-        // 点击report update按钮
-        function clickUpReport(e) {
-            console.log('clickUpReport', e);
-            e.querySelector('input').click()
+                },
+                error: function (res) {
+                    alert('Request error.')
+                }
+            });
         }
 
 

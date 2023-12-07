@@ -3,6 +3,11 @@
 {% block title %}Vector Manage{% endblock %}
 {% block extra_head %}
     <style>
+        .icon-btn {
+            width: 2rem;
+            display: inline-block;
+        }
+
         .danger-button {
             color: crimson
         }
@@ -66,14 +71,25 @@
                 </button>
             </td>
             <td>
-                <div>
-                    <button type="button" style="color: crimson" class="btn btn-link row-button"
-                            onclick="clickDelMap(this)">delete
+                <div class="file-down">
+                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
+                            onclick="clickDelMap(this)">
                     </button>
-                    <a href="">download</a>
+                    <a href="" class="bi bi-download icon-btn"></a>
                 </div>
-                <button type="button" class="btn btn-link row-button upload" onclick="clickUpMap(this)">upload
+                <button type="button" class="btn btn-link row-button upload bi-upload icon-btn"
+                        onclick="this.querySelector('input').click();">
+                    <input type="file" style="display: none;" onchange="fileChange(this)">
                 </button>
+                <div class="pre-upload">
+                    <p style="margin: 0px;font-size: 13px;"></p>
+                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
+                            onclick="clickDelPreUpload(this)">
+                    </button>
+                    <button type="button" class="btn btn-link row-button upload " onclick="clickUpSubmit(this)">
+                        submit
+                    </button>
+                </div>
             </td>
             <td hidden>
                 <a href="" onclick="alert('已添加入下载队列');return false;" class="row-button">pdf</a>
@@ -142,6 +158,28 @@
 
     <script>
 
+        function setRowMap(e, status, filename = null, filepath = null) {
+            const fileDown = e.querySelector('.file-down'),
+                upload = e.querySelector('.upload'),
+                preUpload = e.querySelector('.pre-upload');
+            if (status == "file-down") {
+                fileDown.hidden = false;
+                upload.hidden = true;
+                preUpload.hidden = true;
+                fileDown.querySelector('a').href = filepath;
+            } else if (status == "upload") {
+                fileDown.hidden = true;
+                upload.hidden = false;
+                preUpload.hidden = true;
+            } else if (status == "pre-upload") {
+                fileDown.hidden = true;
+                upload.hidden = true;
+                preUpload.hidden = false;
+                preUpload.querySelector('p').textContent = filename;
+            } else
+                console.log("Unknown report element status", status, filename, filepath);
+        }
+
         const TmpRow = document.querySelector("#tmp-table-row"),
             TmpTd = TmpRow.content.querySelectorAll("td"),
             tableBody = document.querySelector("tbody");
@@ -171,7 +209,9 @@
             td[2].querySelector('input').value = rowJson['Vector ID'];
             td[3].querySelector('input').value = rowJson['iD20'];
             td[4].querySelector('input').value = rowJson['iU20'];
-            td[6].querySelector("a").href = rowJson['Map'];
+            if (rowJson['Map'].length)
+                setRowMap(td[6], "file-down", null, rowJson['Map'])
+            else setRowMap(td[6], "upload");
 
             let f = td[7].getElementsByTagName("a"), un = td[7].getElementsByTagName("button");
             if ('pdf' in rowJson['File'])
@@ -205,9 +245,6 @@
                 f[2].hidden = true;
             }
 
-            // 设置Map的显示
-            td[6].querySelector("div").hidden = rowJson['Map'].length == 0;
-            td[6].querySelector(".upload").hidden = rowJson['Map'].length != 0;
             return clone
         }
 
@@ -229,6 +266,13 @@
             {#        rows = rows.concat(tmp);#}
             {#    }#}
             // });
+        }
+
+        // 行中元素获取整行数据
+        function get_row_content(e) {
+            let row = e.closest('tr');
+            let rowNum = parseInt(row.querySelector('th').textContent);
+            return Rows[rowNum - 1];
         }
 
         // 设置表，page：第几页，pageLen：每页长度
@@ -330,7 +374,96 @@
         }
 
         function clickDelMap(e) {
-            console.log("clickDelMap", e);
+            let row = get_row_content(e);
+            console.log('clickDelMap', e);
+            $.ajax({
+                url: "{% url 'super_manage:vector_delete' %}",
+                type: "GET",
+                data: {
+                    "vector_id": row.id
+                },
+                async: false,
+                success: function (res) {
+                    if (res.status == 'success') {
+                        setRowMap(e.parentElement.parentElement,"upload")
+                    }
+                },
+                error: function (res) {
+                    alert('Request error.')
+                }
+            });
+        }
+
+        function clickUpSubmit(e) {
+            // 提交准备上传的文件
+            let input = e.parentElement.parentElement.querySelector('input');
+            let row = get_row_content(e);
+            let formData = new FormData();
+            formData.append('vector_id', row.id);
+            formData.append('vector_file', input.files[0]);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+            $.ajax({
+                url: "{% url 'super_manage:vector_upload' %}",
+                type: "POST",
+                data: formData,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (res) {
+                    if (res.status == 'error') {
+                        alert(res.message)
+                    } else {
+                        let newVal = res.newVal;
+                        setRowMap(e.parentElement.parentElement, "file-down", null, newVal);
+                    }
+                },
+                error: function (res) {
+                    alert('Request error. ' + res)
+                },
+                finally: function (res) {
+                    console.log(res)
+                }
+            });
+        }
+
+
+        function fileChange(target) {
+            let fileSize = 0;
+            const filepath = target.value;
+            const filemaxsize = 1024 * 2;//2M
+            const isIE = navigator.userAgent.match(/MSIE/) != null;
+            if (isIE && !target.files) {
+                const fileSystem = new ActiveXObject("Scripting.FileSystemObject");
+                if (!fileSystem.FileExists(filePath)) {
+                    alert("File does not exist");
+                    return false;
+                }
+                const file = fileSystem.GetFile(filePath);
+                fileSize = file.Size;
+            } else {
+                fileSize = target.files[0].size;
+            }
+
+            const size = fileSize / 1024;
+            if (size > filemaxsize) {
+                alert("File cannot be larger than 2M");
+                target.value = "";
+                return false;
+            }
+            if (size <= 0) {
+                alert("File cannot be empty");
+                target.value = "";
+                return false;
+            }
+            target.parentElement
+            setRowMap(target.parentElement.parentElement, "pre-upload", target.files[0].name, filepath);
+        }
+
+        function clickDelPreUpload(e) {
+            let input = e.parentElement.parentElement.querySelector('input');
+            // 删除准备上传的文件
+            input.value = "";
+            setRowMap(e.parentElement.parentElement, "upload");
         }
 
         function clickCancel(e) {
@@ -360,7 +493,7 @@
                 data: JSON.stringify(data),
                 contentType: 'application/json',
                 dataType: 'json',
-                headers:{ "X-CSRFToken": '{{ csrf_token }}' },
+                headers: {"X-CSRFToken": '{{ csrf_token }}'},
                 success: function (res) {
                     if (res.status == 'error') {
                         alert(res.message)
