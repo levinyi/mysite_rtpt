@@ -253,18 +253,26 @@ def vector_manage(request):
 @login_required
 def export_order_to_csv(request, order_id):
     # Retrieve the order with optimized query
-    order = OrderInfo.objects.select_related('gene_infos__vector', 'gene_infos__species').get(id=order_id)
+    order = OrderInfo.objects.get(id=order_id)
     # Function to get SeqAA
     def get_seq_aa(combined_seq):
         start_index = 0
-        while start_index < 20 and not combined_seq[start_index].islower():
+        while start_index < min(20, len(combined_seq)) and not combined_seq[start_index].islower():
             start_index += 1
 
         end_index = -1
-        while end_index >= -20 and not combined_seq[end_index].islower():
+        while abs(end_index) <= min(20, len(combined_seq)) and not combined_seq[end_index].islower():
             end_index -= 1
 
-        return combined_seq[start_index:end_index]
+        # Check if any lowercase character was found in the first 20 characters
+        if start_index < min(20, len(combined_seq)):
+            # Check if any lowercase character was found in the last 20 characters
+            if abs(end_index) <= min(20, len(combined_seq)):
+                return combined_seq[start_index:end_index]
+        
+        # No lowercase characters found, return the original sequence
+        return combined_seq
+
 
     # Create a list of dictionaries containing gene information
     gene_info_list = [

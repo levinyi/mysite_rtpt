@@ -352,14 +352,22 @@ def export_order_to_csv(request, order_id):
     # Function to get SeqAA
     def get_seq_aa(combined_seq):
         start_index = 0
-        while start_index < 20 and not combined_seq[start_index].islower():
+        while start_index < min(20, len(combined_seq)) and not combined_seq[start_index].islower():
             start_index += 1
 
         end_index = -1
-        while end_index >= -20 and not combined_seq[end_index].islower():
+        while abs(end_index) <= min(20, len(combined_seq)) and not combined_seq[end_index].islower():
             end_index -= 1
 
-        return combined_seq[start_index:end_index]
+        # Check if any lowercase character was found in the first 20 characters
+        if start_index < min(20, len(combined_seq)):
+            # Check if any lowercase character was found in the last 20 characters
+            if abs(end_index) <= min(20, len(combined_seq)):
+                return combined_seq[start_index:end_index]
+        
+        # No lowercase characters found, return the original sequence
+        return combined_seq
+
 
     # Create a list of dictionaries containing gene information
     gene_info_list = [
