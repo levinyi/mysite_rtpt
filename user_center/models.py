@@ -30,7 +30,7 @@ class ShoppingCart(models.Model):
 class GeneInfo(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     gene_name = models.CharField(verbose_name="Gene name", max_length=200)
-    original_seq = models.TextField(verbose_name="SeqAA NT")
+    original_seq = models.TextField(verbose_name="original_seq SeqAA NT")
     vector = models.ForeignKey(Vector, on_delete=models.CASCADE)
     species = models.ForeignKey(Species, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=255, default='Need_To_Validate')
@@ -43,6 +43,9 @@ class GeneInfo(models.Model):
     gc_content = models.FloatField(null=True, blank=True)
     forbidden_check_list = models.CharField(max_length=255, null=True, blank=True)
     contained_forbidden_list = models.CharField(max_length=255, null=True, blank=True)
+
+    i5nc = models.TextField(verbose_name="i5nc", null=True, blank=True)
+    i3nc = models.TextField(verbose_name="i3nc", null=True, blank=True)
 
     def __str__(self):
         return self.gene_name

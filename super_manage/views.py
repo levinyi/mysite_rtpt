@@ -259,9 +259,9 @@ def export_order_to_csv(request, order_id):
     gene_info_list = [
         {
             'GeneName': gene_info.gene_name,
-            'Seq5NC': gene_info.vector.NC5,
-            'SeqAA': gene_info.saved_seq,
-            'Seq3NC': gene_info.vector.NC3,
+            'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
+            'SeqAA': gene_info.combined_seq[20:-20],
+            'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
             'ForbiddenSeqs': gene_info.forbid_seq,
             'VectorID': gene_info.vector.vector_id,
             'Species': gene_info.species.species_name if gene_info.species else None,
@@ -274,29 +274,30 @@ def export_order_to_csv(request, order_id):
     # Convert datetime columns to timezone-unaware format
     # df['create_date'] = df['create_date'].dt.tz_localize(None)
     # Create a new column 'order_type' based on the condition
-    max_sequence_length = 0
-    if df.get('SeqAA') is not None:
-        max_sequence_length += df['SeqAA'].str.len().max()
-    if df.get('Seq5NC') is not None:
-        max_sequence_length += df['Seq5NC'].str.len().max()
-    if df.get('Seq3NC') is not None:
-        max_sequence_length += df['Seq3NC'].str.len().max()
+    # 不用根据长度去订单判断类型了，都注释掉
+    # max_sequence_length = 0
+    # if df.get('SeqAA') is not None:
+    #     max_sequence_length += df['SeqAA'].str.len().max()
+    # if df.get('Seq5NC') is not None:
+    #     max_sequence_length += df['Seq5NC'].str.len().max()
+    # if df.get('Seq3NC') is not None:
+    #     max_sequence_length += df['Seq3NC'].str.len().max()
 
-    order_type = 2 if max_sequence_length > 650 else 1
+    # order_type = 2 if max_sequence_length > 650 else 1
 
     # Prepare response with CSV content
     # response = HttpResponse(content_type='text/csv')
-    # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
+    # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
     # df.to_excel(path_or_buf=response, index=False)
     
     # Prepare response with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order_type}-{order.user}-RootPath_Gene_Library_Order_Information.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order.user}-RootPath_Gene_Library_Order_Information.xlsx"'
     df.to_excel(excel_writer=response, index=False, engine='openpyxl')
 
     return response
 
 
 def user_manage(request):
-    user_list = UserProfile.objects.all()
+    user_list = UserProfile.objects.all().order_by('-id')
     return render(request, 'super_manage/user_manage.html', {'user_list': user_list})

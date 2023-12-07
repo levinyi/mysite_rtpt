@@ -101,16 +101,16 @@
         </div>
         <!-- Second Row -->
         <div class="row mb-5 mt-3">
-            <!-- First Column -->
+            <!-- First Column Original sequences -->
             <div class="col-md-5 col-12">
                 <p class="monospace-text">Original sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. This only provides a view for insertion site, which is not counted for charging"></i> :</p>
                 <!-- Add your sequences content here -->
                 <div class="card">
-                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate">{{ gene.combined_seq|safe}}</div>
-                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %}  class="card-body monospace-text first_col_full" id="sequence">{{ gene.combined_seq|safe}}</div>
+                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate"><span class="text-lowercase">{{gene.vector.iu20}}</span>{{ gene.original_seq|safe}}<span class="text-lowercase">{{gene.vector.id20}}</span></div>
+                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %}  class="card-body monospace-text first_col_full" id="sequence"><span class="text-lowercase">{{gene.vector.iu20}}</span>{{ gene.original_seq|safe}}<span class="text-lowercase">{{gene.vector.id20}}</span></div>
                 </div>
             </div>
-            <!-- Second Column -->
+            <!-- Second Column Edited sequences -->
             <div class="col-md-5 col-12 .second_col">
                 <p class="monospace-text">Edited sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. This only provides a view for insertion site, which is not counted for charging"></i> :</p>
                 <div class="card">

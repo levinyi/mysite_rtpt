@@ -2,45 +2,6 @@
 {% load static %}
 {% block title %}Order Manage{% endblock %}
 {% block extra_head %}
-    <style>
-        .icon-btn {
-            width: 2rem;
-            display: inline-block;
-        }
-
-        .row-button {
-            padding: 0 4px 0 4px;
-        }
-
-        .tab-table .nav-item {
-            width: 130px;
-            text-align: center;
-        }
-
-        .tab-table .nav-link {
-            color: black;
-        }
-
-        .input-td {
-            position: relative;
-            min-width: 120px;
-        }
-
-        .input-td input {
-            border: 0px;
-            outline: none;
-            position: absolute;
-            left: 0;
-            top: 0px;
-            height: 100%;
-            width: 100%;
-        }
-
-        .input-td input::placeholder { /* Mozilla Firefox 19+ */
-            color: #c5c5c5;
-
-        }
-    </style>
 {% endblock %}
 {% block manage_content %}
 <div class="container pt-4">
@@ -53,11 +14,11 @@
                 <th scope="col">User</th>
                 <th scope="col">email</th>
                 <th scope="col">company</th>
-                <th scope="col">department</th>
+                <th scope="col" hidden>department</th>
                 <th scope="col">phone</th>
                 <th scope="col">register_time</th>
-                <th scope="col">level</th>
-                <th scope="col">shipping_address</th>
+                <th scope="col" hidden>level</th>
+                <th scope="col" hidden>shipping_address</th>
             </tr>
             </thead>
             <tbody class="table-group-divider">
@@ -68,11 +29,11 @@
                         <td>{{ user.user }}</td>
                         <td>{{ user.email }}</td>
                         <td>{{ user.company }}</td>
-                        <td>{{ user.department }}</td>
+                        <td hidden>{{ user.department }}</td>
                         <td>{{ user.phone }}</td>
                         <td>{{ user.register_time }}</td>
-                        <td>{{ user.level }}</td>
-                        <td>{{ user.shipping_address }}</td>
+                        <td hidden>{{ user.level }}</td>
+                        <td hidden>{{ user.shipping_address }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
