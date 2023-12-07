@@ -347,15 +347,26 @@ def view_order_detail(request, order_id):
 
 @login_required
 def export_order_to_csv(request, order_id):
-    # Retrieve the order
-    order = OrderInfo.objects.get(id=order_id)
+    # Retrieve the order with optimized query
+    order = OrderInfo.objects.select_related('gene_infos__vector', 'gene_infos__species').get(id=order_id)
+    # Function to get SeqAA
+    def get_seq_aa(combined_seq):
+        start_index = 0
+        while start_index < 20 and not combined_seq[start_index].islower():
+            start_index += 1
+
+        end_index = -1
+        while end_index >= -20 and not combined_seq[end_index].islower():
+            end_index -= 1
+
+        return combined_seq[start_index:end_index]
 
     # Create a list of dictionaries containing gene information
     gene_info_list = [
         {
             'GeneName': gene_info.gene_name,
             'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
-            'SeqAA': gene_info.combined_seq[20:-20],
+            'SeqAA': get_seq_aa(gene_info.combined_seq),
             'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
             'ForbiddenSeqs': gene_info.forbid_seq,
             'VectorID': gene_info.vector.vector_id,
