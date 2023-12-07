@@ -61,7 +61,7 @@ class OrderInfo(models.Model):
     inquiry_id = models.CharField(max_length=100, null=True, blank=True)
     status = models.CharField(max_length=100, default='Pending')
 
-    url = models.URLField(blank=True)
+    url = models.URLField(verbose_name="report url", blank=True)
     report_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
 
     def __str__(self):
