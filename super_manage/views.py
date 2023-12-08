@@ -270,15 +270,34 @@ def vector_manage(request):
 
 @login_required
 def export_order_to_csv(request, order_id):
-    # Retrieve the order
+    # Retrieve the order with optimized query
     order = OrderInfo.objects.get(id=order_id)
+    # Function to get SeqAA
+    def get_seq_aa(combined_seq):
+        start_index = 0
+        while start_index < min(20, len(combined_seq)) and not combined_seq[start_index].islower():
+            start_index += 1
+
+        end_index = -1
+        while abs(end_index) <= min(20, len(combined_seq)) and not combined_seq[end_index].islower():
+            end_index -= 1
+
+        # Check if any lowercase character was found in the first 20 characters
+        if start_index < min(20, len(combined_seq)):
+            # Check if any lowercase character was found in the last 20 characters
+            if abs(end_index) <= min(20, len(combined_seq)):
+                return combined_seq[start_index:end_index]
+        
+        # No lowercase characters found, return the original sequence
+        return combined_seq
+
 
     # Create a list of dictionaries containing gene information
     gene_info_list = [
         {
             'GeneName': gene_info.gene_name,
             'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
-            'SeqAA': gene_info.combined_seq[20:-20],
+            'SeqAA': get_seq_aa(gene_info.combined_seq),
             'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
             'ForbiddenSeqs': gene_info.forbid_seq,
             'VectorID': gene_info.vector.vector_id,
@@ -292,8 +311,8 @@ def export_order_to_csv(request, order_id):
     # Convert datetime columns to timezone-unaware format
     # df['create_date'] = df['create_date'].dt.tz_localize(None)
     # Create a new column 'order_type' based on the condition
+    
     # 不用根据长度去订单判断类型了，都注释掉
-    # max_sequence_length = 0
     # if df.get('SeqAA') is not None:
     #     max_sequence_length += df['SeqAA'].str.len().max()
     # if df.get('Seq5NC') is not None:
@@ -302,7 +321,7 @@ def export_order_to_csv(request, order_id):
     #     max_sequence_length += df['Seq3NC'].str.len().max()
 
     # order_type = 2 if max_sequence_length > 650 else 1
-
+ 
     # Prepare response with CSV content
     # response = HttpResponse(content_type='text/csv')
     # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'

@@ -31,8 +31,8 @@ class GeneInfo(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     gene_name = models.CharField(verbose_name="Gene name", max_length=200)
     original_seq = models.TextField(verbose_name="original_seq SeqAA NT")
-    vector = models.ForeignKey(Vector, on_delete=models.CASCADE)
-    species = models.ForeignKey(Species, on_delete=models.CASCADE, null=True, blank=True)
+    vector = models.ForeignKey(Vector, on_delete=models.SET_NULL, null=True)
+    species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=255, default='Need_To_Validate')
     create_date = models.DateTimeField(auto_now_add=True)
 
@@ -61,7 +61,7 @@ class OrderInfo(models.Model):
     inquiry_id = models.CharField(max_length=100, null=True, blank=True)
     status = models.CharField(max_length=100, default='Pending')
 
-    url = models.URLField(blank=True)
+    url = models.URLField(verbose_name="report url", blank=True)
     report_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
 
     def __str__(self):

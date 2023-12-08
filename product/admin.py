@@ -11,7 +11,7 @@ class VectorResource(resources.ModelResource):
         fields = ('id', 'vector_id', 'vector_name', 'vector_map',  'NC5', 'NC3', 'iu20','id20')
 
 class VectorAdmin(ImportExportModelAdmin):
-    list_display = ('vector_name', 'create_date','id', 'user', 'vector_id', 'status', 'vector_file')
+    list_display = ('vector_name', 'create_date','id', 'user', 'vector_id', 'status', 'vector_file', 'vector_png')
     list_filter = ('vector_name', 'create_date','id', 'user', 'vector_id', 'status', 'vector_file')
     search_fields = ('vector_name', 'create_date','id', 'user', 'vector_id', 'status', 'vector_file')
     resource_class = VectorResource

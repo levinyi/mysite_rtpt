@@ -17,6 +17,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
 from .views import HomeView
+from django.conf.urls.static import static
+from django.conf import settings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,4 +29,4 @@ urlpatterns = [
     path('user_center/', include('user_center.urls', namespace=' ')),
     path('tools/', include('tools.urls', namespace='tools')),
     path('super_manage/',include('super_manage.urls', namespace='super_manage'))
-]
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

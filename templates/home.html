@@ -2,6 +2,12 @@
 {% load static %}
 {% block extra_head %}
 <style>
+    .img-fluid {
+        width: 100%;
+        max-width: 100%; /* Ensure the image does not exceed its intrinsic size */
+        height: auto;
+        display: block;
+    }
     /* 响应式字体大小 */
     .h0 {
         font-size: 4vw;
