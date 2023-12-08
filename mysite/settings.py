@@ -16,7 +16,6 @@ from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
@@ -29,7 +28,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = ['*']
 CORS_ORIGIN_ALLOW_ALL = True
-CSRF_TRUSTED_ORIGINS =['http://example.com']
+CSRF_TRUSTED_ORIGINS = ['http://example.com']
 
 # Application definition
 
@@ -45,6 +44,7 @@ INSTALLED_APPS = [
     'user_center',
     'widget_tweaks',
     'tools',
+    'notice',
     'import_export',  # pip install django-import-export
 ]
 
@@ -80,7 +80,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'mysite.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
@@ -95,7 +94,6 @@ DATABASES = {
         'OPTIONS': {'unix_socket': '/var/run/mysqld/mysqld.sock'},
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -114,7 +112,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
@@ -145,3 +142,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 LOGIN_URL = '/account/login/'
 LOGIN_REDIRECT_URL = '/'
 
+# settings.py
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp-mail.outlook.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'noreply@rootpathgx.com'
+# EMAIL_HOST_PASSWORD = 'RPservice_2023'
+# DEFAULT_FROM_EMAIL = 'noreply@rootpathgx.com'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.163.com'
+EMAIL_PORT = 25
+# EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'zsl503503@163.com'
+EMAIL_HOST_PASSWORD = 'SPUXTRVSZCONGGNB'
+DEFAULT_FROM_EMAIL = 'zsl503503@163.com'
+#
+## 目前仅测试，需要填写正确的域名，用于邮件的链接
+BASE_URL = 'http://127.0.0.1:8000'

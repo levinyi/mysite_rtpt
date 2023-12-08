@@ -19,7 +19,14 @@ from user_center.views import \
 
 
 def get_table_context(table_name, status=None, start=0):
+    """
+    这里修改给前端Table的数据
+    table_name:表名
+    status：状态，即表上面Tab的
+    start:开始的页面，目前功能不完善
+    """
     def vector_line(data):
+        print(data.vector_map)
         return {
             'id': data.id,
             'Custom': data.user.username if data.user is not None else '',
@@ -28,7 +35,9 @@ def get_table_context(table_name, status=None, start=0):
             "Map seq": data.vector_map,
             "Vector ID": data.vector_id,
             "iD20": data.id20,
-            "iU20": data.iu20
+            "iU20": data.iu20,
+            "status": data.status,
+            "vector_name":data.vector_name
         }
 
     def order_line(data):
@@ -53,6 +62,8 @@ def get_table_context(table_name, status=None, start=0):
         process_fun = order_line
     elif table_name == 'vector':
         obj = Vector.objects
+        if status is not None:
+            obj = obj.filter(status=status)
         order_by = 'create_date'
         process_fun = vector_line
     else:
@@ -215,28 +226,35 @@ def submit_vector_data(request):
 def change_status(request):
     row_id = request.GET.get('id')
     opr = request.GET.get('opr')
-    status = OrderInfo.objects.get(id=row_id).status
-    if row_id is None or opr is None:
+    table = request.GET.get('table')
+
+    if row_id is None or opr is None or table is None or table not in ['order', 'vector']:
         return JsonResponse(data={'status': 'error', 'message': 'Invalid value'})
-    status_list = ['Created', 'Synthesizing', 'Shipped', 'Completed']
-    status = status[0].upper() + status[1:].lower()
-    if status == 'Pending':
-        status = 'Created'
+
+    if table == 'order':
+        obj = OrderInfo.objects
+        status_list = ['Created', 'Synthesizing', 'Shipped', 'Completed']
+    elif table == 'vector':
+        obj = Vector.objects
+        status_list = ['Submitted', 'ReadyToUse']
+    item = obj.get(id=row_id)
+    status = item.status
+
     if status not in status_list:
         return JsonResponse(data={'status': 'error', 'message': 'Backstage error'})
     index = status_list.index(status)
     if opr == 'revoke':
         if index == 0:
             return JsonResponse(data={'status': 'failed', 'message': "Can't revoke the {} status".format(status)})
-        OrderInfo.objects.filter(id=row_id).update(status=status_list[index - 1])
+        obj.filter(id=row_id).update(status=status_list[index - 1])
     elif opr == 'next':
         if index == len(status_list) - 1:
             return JsonResponse(data={'status': 'failed', 'message': "Can't next the {} status".format(status)})
-        OrderInfo.objects.filter(id=row_id).update(status=status_list[index + 1])
+        obj.filter(id=row_id).update(status=status_list[index + 1])
     return JsonResponse(data={
         'status': 'success',
         'message': 'Change success',
-        'newVal': OrderInfo.objects.get(id=row_id).status
+        'newVal': obj.get(id=row_id).status
     })
 
 

@@ -4,7 +4,7 @@
 {% block extra_head %}
     <style>
         .icon-btn {
-            width: 2rem;
+            width: 1.5rem;
             display: inline-block;
         }
 
@@ -47,9 +47,11 @@
 {% endblock %}
 {% block manage_content %}
     <template id="tmp-table-row">
+        {#  行模板，每个td代表从左往右的每一列，td内的是默认文本，正常都会被替换掉  #}
         <tr>
             <th scope="row">1</th>
             <td>PSG</td>
+            <td>Vector Name</td>
             <td class="input-td">
                 <input onchange="changeInput(this)" type="text" class="align-middle" placeholder="Please input..."/>
             </td>
@@ -68,6 +70,14 @@
                 </button>
                 <button disabled onclick="submitRowInput(this)" type="button" class="btn btn-link row-button opr-bnt">
                     submit
+                </button>
+            </td>
+            <td>
+                <button type="button" class="btn btn-link row-button bi-box-arrow-left text-danger icon-btn"
+                        onclick="clickRevokeOrNext(this, 'revoke')">
+                </button>
+                <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
+                <button type="button" class="btn btn-link row-button bi-box-arrow-right icon-btn" onclick="clickRevokeOrNext(this,'next')">
                 </button>
             </td>
             <td>
@@ -110,9 +120,20 @@
     <div class="tab-table" style="margin-top: 50px;">
 
         <ul style="margin-bottom: 15px;" class="nav nav-tabs">
-            <li class="nav-item">
-                <a class="nav-link active" aria-current="page" href="#">All</a>
-            </li>
+            <ul style="margin-bottom: 15px;" class="nav nav-tabs" id="select-tab">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#" onclick="clickTab(this,0)">All</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="clickTab(this,1)">ReadyToUse</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="clickTab(this,2)">forbidden</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="clickTab(this,3)">Submitted</a>
+                </li>
+            </ul>
         </ul>
 
         <table class="table table-hover table-bordered align-middle text-center">
@@ -120,13 +141,14 @@
             <tr>
                 <th scope="col">#</th>
                 <th scope="col">Custom</th>
+                <th scope="col">Vector Name</th>
                 <th scope="col">Map seq</th>
-
                 <th scope="col">Vector ID</th>
                 <th scope="col">iD20</th>
                 <th scope="col">iU20</th>
                 <th scope="col">Operated</th>
-                <th scope="col">Map</th>
+                <th scope="col" style="min-width:11rem;">status</th>
+                <th scope="col" style="min-width:5rem;">Map</th>
                 <th scope="col" hidden>File</th>
             </tr>
             </thead>
@@ -199,28 +221,55 @@
             tableBody.innerHTML = "";
         }
 
+        function setRowStatus(e, value) {
+            e.querySelector("span").textContent = value;
+
+            {# 设置Status的显示 #}
+            let bns = e.getElementsByTagName("button");
+            if (value.toLowerCase() == "submitted") {
+                bns[0].disabled = true;
+                bns[1].disabled = false;
+                bns[0].classList.remove('text-danger');
+            }
+            else if (value.toLowerCase() == "readytouse"){
+                bns[0].disabled = false;
+                bns[1].disabled = true;
+                bns[0].classList.add('text-danger');
+            }
+            else if ( value.toLowerCase() == 'forbidden') {
+                bns[0].disabled = true;
+                bns[1].disabled = true;
+                bns[0].classList.remove('text-danger');
+                e.querySelector("span").classList.add('text-danger');
+            }
+        }
+
         // 往表中添加一行
         function getTableRow(rowNum, rowJson) {
             let clone = document.importNode(TmpRow.content, true);
             let td = clone.querySelectorAll("td");
             clone.querySelectorAll("th")[0].textContent = rowNum;
             td[0].textContent = rowJson['Custom'];
-            td[1].querySelector('input').value = rowJson['Map seq'];
-            td[2].querySelector('input').value = rowJson['Vector ID'];
-            td[3].querySelector('input').value = rowJson['iD20'];
-            td[4].querySelector('input').value = rowJson['iU20'];
+            td[1].textContent = rowJson['vector_name'];
+            td[2].querySelector('input').value = rowJson['Map seq'];
+            td[3].querySelector('input').value = rowJson['Vector ID'];
+            td[4].querySelector('input').value = rowJson['iD20'];
+            td[5].querySelector('input').value = rowJson['iU20'];
+            setRowStatus(td[7],rowJson['status']);
             if (rowJson['Map'].length)
-                setRowMap(td[6], "file-down", null, rowJson['Map'])
-            else setRowMap(td[6], "upload");
+                setRowMap(td[8], "file-down", null, rowJson['Map'])
+            else setRowMap(td[8], "upload");
 
-            let f = td[7].getElementsByTagName("a"), un = td[7].getElementsByTagName("button");
+            // 设置File的显示，目前是隐藏状态，不起作用
+            let f = td[9].getElementsByTagName("a"), un = td[9].getElementsByTagName("button");
             if ('pdf' in rowJson['File'])
                 f[0].href = rowJson['File']['pdf'];
             if ('xlsx' in rowJson['File'])
                 f[1].href = rowJson['File']['xlsx'];
             if ('txt' in rowJson['File'])
                 f[2].href = rowJson['File']['txt'];
-            // 设置File的显示
+
+
             if ('pdf' in rowJson['File'] && rowJson['File']['pdf'].length) {
                 un[0].hidden = true;
                 f[0].hidden = false;
@@ -334,16 +383,13 @@
                     status = 'all';
                     break;
                 case 1:
-                    status = 'Created';
+                    status = 'ReadyToUse';
                     break;
                 case 2:
-                    status = 'Synthesizing';
+                    status = 'forbidden';
                     break;
                 case 3:
-                    status = 'Shipped';
-                    break;
-                case 4:
-                    status = 'Completed';
+                    status = 'Submitted';
                     break;
             }
             $.ajax({
@@ -373,6 +419,35 @@
 
         }
 
+                // 点击Revoke按钮
+        function clickRevokeOrNext(e, type) {
+            let row = get_row_content(e);
+            $.ajax({
+                url: "{% url 'super_manage:change_status' %}",
+                type: "GET",
+                data: {
+                    "id": row.id,
+                    'opr': type,
+                    'table':'vector'
+                },
+                async: false,
+                success: function (res) {
+                    console.log(res.newVal)
+                    if (res.status == 'error') {
+                        alert(res.message)
+                    } else if (res.status == 'failed') {
+                        alert(res.message + ' Try to refresh this page.')
+                    } else {
+                        let newVal = res.newVal;
+                        setRowStatus(e.parentElement, newVal);
+                    }
+                },
+                error: function (res) {
+                    alert('Request error.')
+                }
+            });
+        }
+
         function clickDelMap(e) {
             let row = get_row_content(e);
             console.log('clickDelMap', e);
@@ -385,7 +460,7 @@
                 async: false,
                 success: function (res) {
                     if (res.status == 'success') {
-                        setRowMap(e.parentElement.parentElement,"upload")
+                        setRowMap(e.parentElement.parentElement, "upload")
                     }
                 },
                 error: function (res) {

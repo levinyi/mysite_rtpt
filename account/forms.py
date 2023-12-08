@@ -14,6 +14,15 @@ class LoginForm(forms.ModelForm):
             'password': forms.PasswordInput(attrs={'placeholder': 'Password'}),
         }
 
+class ForgotPwForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['username', 'email']
+        widgets = {
+            'username': forms.TextInput(attrs={'placeholder': 'Username'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'Email'})
+        }
+
 class RegistrationForm(forms.ModelForm):
     password = forms.CharField(label='Password', widget=forms.PasswordInput)
     password2 = forms.CharField(label="Confirm Password", widget=forms.PasswordInput)
@@ -32,19 +41,9 @@ class RegistrationForm(forms.ModelForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['first_name', 'last_name', 'email', 'company', 
-                  'department', 'phone', 'photo', 'shipping_address']
+        fields = ['company', 'department', 'phone', 'photo', 'shipping_address']
 
     def __init__(self, *args, **kwargs):
         super(UserProfileForm, self).__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
-
-    def clean_email(self):
-        email = self.cleaned_data['email']
-        if self.instance.id:  # 如果 instance 存在，说明是修改，而不是创建新对象
-            if UserProfile.objects.filter(email=email).exclude(id=self.instance.id).exists():
-                raise forms.ValidationError("This email address has been used.")
-        elif UserProfile.objects.filter(email=email).exists():
-            raise forms.ValidationError("This email address has been used.")
-        return email
