@@ -14,7 +14,7 @@
             <div class="card" style="width:18rem;">
                 <div class="d-flex justify-content-center align-items-center position-relative" style="height:200px;">
                     <!-- Badge Code Starts Here -->
-                    <span class="position-absolute" 
+                    {% comment %} <span class="position-absolute" 
                           style="bottom: 35%; right: calc(50% - 55px); 
                                  transform: translateY(50%); z-index: 1; 
                                  background-color: rgba(196,153,236, 0.9);
@@ -27,7 +27,7 @@
                                  font-size: larger;
                                  align-items: center;">
                         {{ order_number_in_shipment }}
-                    </span>
+                    </span> {% endcomment %}
                     <!-- Badge Code Ends Here -->
                     <img class="card-img-top mx-auto d-block" src="{% static 'user_center/img/icon1.jpg' %}" alt="Card image cap" style="width:130px">
                     {% comment %} <i class="bi bi-cart3"></i> {% endcomment %}

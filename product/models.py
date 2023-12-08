@@ -56,21 +56,22 @@ def user_directory_path(instance, filename):
 
 class Vector(models.Model):
     user = models.ForeignKey(User, verbose_name="User", on_delete=models.SET_NULL, null=True, blank=True)
-    vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
-
-    vector_map = models.TextField(verbose_name="Vector_Seq")
     vector_id = models.CharField(verbose_name="Vector_ID", max_length=20, null=True, blank=True)
+    vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
+    vector_map = models.TextField(verbose_name="Vector_Seq")
     NC5 = models.TextField(verbose_name="v5NC")
     NC3 = models.TextField(verbose_name="v3NC")
     iu20 = models.TextField(verbose_name="iu20", null=True, blank=True)
     id20 = models.TextField(verbose_name="id20", null=True, blank=True)
+    vector_file = models.FileField(verbose_name="用户上传的vector文件", upload_to=user_directory_path, null=True, blank=True)
+    vector_png = models.ImageField(verbose_name="改造后的Vector_png", upload_to=user_directory_path, null=True, blank=True)
 
     create_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=255, default='Received')
 
+    # 这两个好像没有用到，可以删掉了
     combined_seq = models.TextField(null=True, blank=True)
     saved_seq = models.TextField(null=True, blank=True)
-    vector_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
 
     def is_company_vector(self):
         return self.user is None

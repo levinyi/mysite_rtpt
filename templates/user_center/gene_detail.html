@@ -122,10 +122,6 @@
 
             <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="col-md-2 col-12 edit-buttons">
                 <p>Choose Species:</p>
-
-                    <!-- 上面的select 部分修改成下面的select部分 -->
-                    <!-- dushiyi修改的部分：species的值是从数据库中获取，如果没有获取到，就显示的是Choose a species，
-                    此时，用户选择一个物种。通过javascript函数保存到数据库中。 js在底部写了。-->
                 <div class="mt-3 species-select-container" style="max-width:182px;">
                         <select class="form-select species-select" id="species_select_{{ gene.id }}"  name="species_select">
                             <option value="" {% if not gene.species or not gene.species.species_name %}selected{% endif %}>Choose a species</option>
@@ -137,30 +133,26 @@
                         <!-- 将gene.id传递到后端 -->
                         <input type="hidden" class="gene-id" value="{{ gene.id }}">
                 </div>
-                    <!-- 修改结束 -->
-
                 <div class="mt-3">
                     <label for="frameshiftSelector">Choose frameshift:</label>
-                    <select id="frameshiftSelector">
+                    <select id="frameshiftSelector" class="form-select" style="max-width:182px;">
                         <option value="0" selected>0</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                     </select>
                     <button class="btn btn-warning toggle-btn mt-3" data-displayed="false">Toggle Codon Boxes</button>
+                </div>
+                <div>
                     <button class="btn btn-primary mt-3 analysis-btn" data-gene-name="{{ gene.gene_name }}">Re-analyze</button>
-
-                    
                     <button {% if gene.status != "validated" %}  style="display:none" {% endif %} class="btn btn-success mt-3 canSave" data-url="{% url 'user_center:validation_save' gene.id %}">Save</button>
                     <button {% if gene.status == "validated" %}  style="display:none" {% endif %} class="btn btn-secondary mt-3 noSave" disabled>Save</button>
                 </div>
-                
             </div>
             <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="col-md-2 col-12 saved-button">
                 <div class="mt-3">
                     <button class="btn btn-primary mt-4 editButton" style="width:100px;" data-url="{% url 'user_center:gene_edit' gene.id %}">Edit</button>
                 </div>
             </div>
-
         </div>
         {% endfor %}
     </div>

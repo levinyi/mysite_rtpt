@@ -149,7 +149,20 @@
             rowHeaders: true,
             colWidths: [300, 600],  // 设置每列的宽度
             columns: [
-                { data: 'GeneName' },
+                { 
+                    data: 'GeneName',
+                    validator: function (value, callback) {
+                        // 正则表达式匹配数字，字母，下划线，短横线，且长度不超过15，不能有空格
+                        var regex = /^[a-zA-Z0-9_-]{1,15}$/;
+
+                        // 检查是否符合规则
+                        if (!regex.test(value)) {
+                            callback(false, 'Only letters, numbers, underscores, and hyphens are allowed, and the length cannot exceed 15.');
+                        } else {
+                            callback(true);
+                        }
+                    }
+                },
                 { data: 'Sequence' },
             ],
             height: 'auto',
@@ -172,26 +185,33 @@
             rowHeaders: true,
             colWidths: [100, 300, 100, 200, 200,200],  // 设置每列的宽度
             columns: [
-                { data: 'GeneName' },
+                { 
+                    data: 'GeneName',
+                    validator: function (value, callback) {
+                        // 正则表达式匹配数字，字母，下划线，短横线，且长度不超过15，不能有空格
+                        var regex = /^[a-zA-Z0-9_-]{1,15}$/;
+
+                        // 检查是否符合规则
+                        if (!regex.test(value)) {
+                            callback(false, 'Only letters, numbers, underscores, and hyphens are allowed, and the length cannot exceed 15.');
+                        } else {
+                            callback(true);
+                        }
+                    }
+                },
                 { data: 'Sequence' },
                 { type: 'dropdown', source: speciesList, data: 'Species' },
                 { data: 'ForbiddenSequence' },
                 { data: '5NC' },
                 { data: '3NC' },
             ],
+            // invalidCellClassName: 'bg-warning',
             height: 'auto',
             width: 'auto',
             licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
         });
         // "+" 按钮的点击事件
         document.getElementById('addRowBtn2').addEventListener('click', function () {
-            // 获取当前表格数据
-            // var data = hot2.getData();
-            // console.log(data);
-            // 添加一个空数组作为新行
-            // data.push([]);
-            // 刷新表格以显示新数据
-            // hot2.loadData(data);
             hot2.alter('insert_row_below');
         });
     }

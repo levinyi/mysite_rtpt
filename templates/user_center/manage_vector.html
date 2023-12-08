@@ -74,6 +74,7 @@
             <table class="table table-striped table-hover" style="text-align:center">
                 <thead>
                     <tr>
+                        <th scope="col">#</th>
                         <th scope="col">Vector Name</th>
                         <th scope="col">Vector ID</th>
                         <th scope="col" data-bs-toggle="tooltip" data-bs-placement="top" title="20 bp upstream of insertion site">iU20</th>
@@ -84,6 +85,7 @@
                 <tbody>
                     {% for vector in company_vectors %}
                     <tr>
+                        <td>{{ forloop.counter }}</td>
                         <td>{{ vector.vector_name }}</td>
                         <td>{{ vector.vector_id }}</td>
                         <td>
@@ -131,6 +133,7 @@
             <table class="table table-striped table-hover" style="text-align:center">
                 <thead>
                     <tr>
+                        <th scope="col">#</th>
                         <th scope="col">Vector Name</th>
                         <th scope="col">Vector ID</th>
                         <th scope="col">Status</th>
@@ -143,6 +146,7 @@
                 <tbody>
                     {% for vector in user_vectors %}
                     <tr>
+                        <td>{{ forloop.counter }}</td>
                         <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</td>
                         <td>{{ vector.vector_id }}</td>
                         <td>{{ vector.status }}</td>
