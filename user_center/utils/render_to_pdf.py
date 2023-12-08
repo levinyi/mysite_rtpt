@@ -48,17 +48,20 @@ def render_to_pdf(data, header_func=header):
     Story.append(Paragraph(data.get('vector_name', ''), styles['Title']))
     Story.append(Spacer(1, 12))
 
-    # NC5
-    Story.append(Paragraph(f"NC5: {data.get('NC5', '')}", styles['Normal']))
+    # iU20
+    Story.append(Paragraph(f"iU20: {data.get('iu20', '')}", styles['Normal']))
     Story.append(Spacer(1, 12))
 
-    # NC3
-    Story.append(Paragraph(f"NC3: {data.get('NC3', '')}", styles['Normal']))
+    # iD20
+    Story.append(Paragraph(f"iD20: {data.get('id20', '')}", styles['Normal']))
     Story.append(Spacer(1, 12))
 
     # vector_map，长文本自动换行
-    vector_map_text = data.get('vector_map', '')
-    vector_map_paragraph = Paragraph(vector_map_text, styles['Normal'])
+    NC3 = data.get('NC3', '')
+    NC5 = data.get('NC5', '')
+    vector_seq = data.get('vector_map', '')
+    vector_combined_seq = NC3 + vector_seq + NC5
+    vector_map_paragraph = Paragraph(vector_combined_seq, styles['Normal'])
     Story.append(vector_map_paragraph)
 
     doc.build(Story, onFirstPage=header_func, onLaterPages=header_func)

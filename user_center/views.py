@@ -2,6 +2,8 @@ import json, re, os
 import pandas as pd
 from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from product.models import GeneSynEnzymeCutSite, Species, Vector
 from user_center.utils.pagination import Pagination
 from .models import Cart, GeneInfo, OrderInfo
@@ -634,6 +636,7 @@ def process_sequence(seq, forbid_seq):
 # checked
 @login_required
 def vector_upload(request):
+    '''当用户在manage_vector页面点击上传按钮时，调用此函数，上传自己的vector文件'''
     if request.method == 'POST':
         vector_file = request.FILES.get('vector_file')
         vector_name = request.POST.get('vector_name')
@@ -680,18 +683,24 @@ def vector_download(request, vector_id, file_type, is_admin=False):
         vector_object = Vector.objects.get(id=vector_id)
     # 从vector_object中提取数据
     vector_name = vector_object.vector_name
+    vector_id = vector_object.vector_id
     NC5 = vector_object.NC5
     NC3 = vector_object.NC3
+    iu20 = vector_object.iu20
+    id20 = vector_object.id20
     vector_map = vector_object.vector_map
-    vector_file = vector_object.vector_file
-
+    vector_file = vector_object.vector_file # 这是用户上传的文件，不是png的文件
+    vector_png = vector_object.vector_png
     data = {
+        'vector_id': vector_id,
         'vector_name': vector_name,
         'NC5': NC5,
         'NC3': NC3,
+        'iu20': iu20,
+        'id20': id20,
         'vector_map': vector_map,
     }
-
+    # pdf not used
     if file_type == 'pdf':
         # 生成PDF文件
         pdf_buffer = render_to_pdf(data)
@@ -699,26 +708,34 @@ def vector_download(request, vector_id, file_type, is_admin=False):
         response['Content-Disposition'] = f'attachment; filename="{vector_name}.pdf"'
         return response
     elif file_type == 'txt':
+        # 使用 quote 可以确保浏览器正确解析文件名。特别是文件名包含空格或其他特殊字符时
         response = HttpResponse(content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="{vector_name}.txt"'
+        custom_filename = f'RootPath_{vector_id}_{vector_name}.txt'
+        response['Content-Disposition'] = f'attachment; filename="{quote(custom_filename)}"'
         response.write(f"Vector Name: {vector_name}\n")
-        response.write(f"NC5: {NC5}\n")
-        response.write(f"NC3: {NC3}\n")
-        response.write(f"Vector Map: {vector_map}\n")
+        response.write(f"iD20: {iu20}\n")
+        response.write(f"iD20: {id20}\n")
+        response.write(f"Vector Map: {NC3}{vector_map}{NC5}\n")
         return response
     elif file_type == 'dna':
         response = HttpResponse(content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="{vector_name}.dna"'
-        response.write(f"{NC5}{vector_map}{NC3}")
+        custom_filename = f'RootPath_{vector_id}_{vector_name}.dna'
+        response['Content-Disposition'] = f'attachment; filename="{quote(custom_filename)}"'
+        response.write(f"{NC3}{vector_map}{NC5}")
         return response
     elif file_type == 'map':
-        # 把vector_map文件直接返回
-        if vector_file:
-            response = HttpResponse(vector_file, content_type='application/octet-stream')
-            name = vector_file.name.split('/')[-1]
-            # quote编码后下载的中文文件名可以正常显示
-            response.headers['Content-Disposition'] = "attachment; filename={}".format(quote(name))
-            return response
+        # 返回vector_png文件
+        if vector_png:
+            response = HttpResponse(vector_png, content_type='application/octet-stream')
+            name = vector_png.name   # user/vector_file/pCVa001M1Kan_pET-28.png
+            file_path = default_storage.path(name)  # /path/to/media/user/vector_file/pCVa001M1Kan_pET-28.png
+            basename = os.path.basename(file_path)  # pCVa001M1Kan_pET-28.png
+            with default_storage.open(file_path, 'rb') as file:
+                response = HttpResponse(file.read(), content_type='image/png')
+                custom_filename = f'RootPath_{basename}'
+                response['Content-Disposition'] = f'attachment; filename="{quote(custom_filename)}"'
+
+                return response
         else:
             return HttpResponse("No vector map found")
     else:

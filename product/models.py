@@ -50,7 +50,7 @@ class ExpressionScale(models.Model):
 def user_directory_path(instance, filename):
     # 文件将被上传到 MEDIA_ROOT/user_<id>/vector_file/<filename>
     if not instance.user:
-        return 'user/vector_file/{1}'.format(filename)
+        return f'user/vector_file/{filename}'
     else:
         return 'user_{0}/vector_file/{1}'.format(instance.user.id, filename)
 
