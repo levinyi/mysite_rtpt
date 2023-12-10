@@ -17,8 +17,9 @@ urlpatterns = [
     path('password-reset-complete/', auth_views.PasswordResetCompleteView.as_view(template_name='account/password_reset_complete.html'), name='password_reset_complete'),
 
     path('verify/<uidb64>/<token>/', views.verify, name='verify'),
-    path('resend_login_verify/<str:username>/', views.resend_login_verify, name='resend_login_verify'),
-    path('login_verify_failed/', views.login_verify_failed, name='login_verify_failed'),
+    path('resend_login_verify/<str:username>/<str:verify_type>', views.resend_login_verify, name='resend_login_verify'),
+    path('email_not_verify/', views.email_not_verify, name='email_not_verify'),
+    path('phone_not_verify/', views.phone_not_verify, name='phone_not_verify'),
     path('forgot_passwd/', views.forgot_passwd, name='forgot_passwd'),
 
     path('my-information/', views.myself, name='my_information'),

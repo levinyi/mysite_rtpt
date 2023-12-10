@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404, render
+
+from user_center.models import ShoppingCart
 from .models import Product, ExpressionHost, PurificationMethod, Addon, ExpressionScale, Vector
 
 from django.http import JsonResponse

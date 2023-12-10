@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}password reset{% endblock %}
+{% block title %}Email not verify{% endblock %}
 {% block content %}
 <div class="row text-center vertical-middle-sm">
     <h1>Email not verify</h1>
     <p>Dear {{ username }}: We have been email you.You may go ahead and click a verify link.</p>
     <p>If you didn't find, click
-        <a href="{% url 'account:resend_login_verify' username %}"> here</a>
+        <a href="{% url 'account:resend_login_verify' username 'email' %}"> here</a>
         to resend your email {{ email }}
     </p>
 </div>

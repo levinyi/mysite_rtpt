@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
 # Create your models here.
 # class Account(models.Model):
 #     user = models.OneToOneField(User, on_delete=models.CASCADE, unique=True)
@@ -16,10 +17,10 @@ from django.contrib.auth.models import User
 #     shipping_address = models.CharField(max_length=500)
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, unique=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     company = models.CharField(max_length=254)
     department = models.CharField(max_length=200, blank=True)
-    phone = models.CharField(max_length=200, null=True)
+    phone = models.CharField(max_length=200, null=True, unique=True)
     photo = models.ImageField(blank=True)
     level = models.SmallIntegerField(default=1, blank=True)
     shipping_address = models.CharField(max_length=500)

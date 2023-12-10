@@ -16,6 +16,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
+
+import data_process.views
 from .views import HomeView
 from django.conf.urls.static import static
 from django.conf import settings
@@ -28,5 +30,7 @@ urlpatterns = [
     path('product/', include('product.urls', namespace='product')),
     path('user_center/', include('user_center.urls', namespace=' ')),
     path('tools/', include('tools.urls', namespace='tools')),
-    path('super_manage/',include('super_manage.urls', namespace='super_manage'))
+    path('super_manage/', include('super_manage.urls', namespace='super_manage')),
+    path('data_process/request_order', data_process.views.request_order, name='request_order')
+    # path('data_process/request_order', data_process.views.request_order, namespace='request_order')
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

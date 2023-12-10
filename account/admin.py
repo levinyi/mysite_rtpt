@@ -18,9 +18,9 @@ class UserProfilereSource(resources.ModelResource):
         fields = ('user','first_name', 'last_name','email','company','department', 'phone', 'register_time', 'shipping_address')
 
 class UserProfileAdmin(ImportExportModelAdmin):
-    list_display = ('id','user','company','department', 'phone', 'shipping_address')
-    list_filter = ('id','user','company','department', 'phone')
-    search_fields = ('id','user','company','department', 'phone')
+    list_display = ('user','company','department', 'phone', 'shipping_address')
+    list_filter = ('user','company','department', 'phone')
+    search_fields = ('user','company','department', 'phone')
     resource_class = UserProfilereSource
 
 # admin.site.register(Account)

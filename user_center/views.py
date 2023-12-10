@@ -18,8 +18,8 @@ from urllib.parse import quote
 @login_required(login_url='/account/login/')
 def dashboard(request):
     # 如果没有shopping cart，创建一个
-    production_order = OrderInfo.objects.filter(user=request.user, status='CREATED')
-    shipping_order = OrderInfo.objects.filter(user=request.user, status='SHIPPING')
+    production_order = OrderInfo.objects.filter(user=request.user, status='Created')
+    shipping_order = OrderInfo.objects.filter(user=request.user, status='Shipping')
     shopping_cart = Cart.genes.through.objects.filter(cart__user=request.user)
     return render(request, 'user_center/dashboard.html', {
             'order_number_in_production': len(production_order),
@@ -339,6 +339,7 @@ def checkout(request):
 
     # 重定向到订单详情页面
     return JsonResponse({'status': 'success', 'message': 'Order created successfully', 'redirect_url': f'/user_center/manage_order/'})
+
 
 # checked
 @login_required

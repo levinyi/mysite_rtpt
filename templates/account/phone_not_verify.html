@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Email not verify{% endblock %}
+{% block content %}
+    <div class="row text-center vertical-middle-sm">
+        <h1>Phone not verify</h1>
+        <p>
+            Dear {{ form.username.value }}: We need to verify your phone number: {{ form.phone.value }}.
+            <button style="width: 300px;">
+                <a onclick="alert('Send?');" href="{% url 'account:resend_login_verify' form.username.value 'phone' %}">Send
+                verify code</a>
+            </button>
+        </p>
+        <form class="form-horizontal" action="." method="post">
+            {% csrf_token %}
+            <div style="display: none">
+                {{ form.phone }}
+                {{ form.username }}
+            </div>
+            <div>
+                {{ form.code.label }}: <span>{{ form.code }}</span>
+            </div>
+            <input type="submit" value="Confirm" class="btn btn-primary btn-lg"/>
+        </form>
+        <div {% if hidden_failed %} hidden {% endif %}>Verify Failed, please try again.</div>
+    </div>
+{% endblock %}

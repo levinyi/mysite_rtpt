@@ -3,6 +3,8 @@ from django import forms
 from django.contrib.auth.models import User
 
 from .models import UserProfile
+
+
 # from .models import UserProfile, UserInfo
 
 class LoginForm(forms.ModelForm):
@@ -14,6 +16,7 @@ class LoginForm(forms.ModelForm):
             'password': forms.PasswordInput(attrs={'placeholder': 'Password'}),
         }
 
+
 class ForgotPwForm(forms.ModelForm):
     class Meta:
         model = User
@@ -22,6 +25,7 @@ class ForgotPwForm(forms.ModelForm):
             'username': forms.TextInput(attrs={'placeholder': 'Username'}),
             'email': forms.EmailInput(attrs={'placeholder': 'Email'})
         }
+
 
 class RegistrationForm(forms.ModelForm):
     password = forms.CharField(label='Password', widget=forms.PasswordInput)
@@ -36,7 +40,7 @@ class RegistrationForm(forms.ModelForm):
         if cd['password'] != cd['password2']:
             raise forms.ValidationError("passwords don not match.")
         return cd['password2']
-        
+
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
@@ -47,3 +51,9 @@ class UserProfileForm(forms.ModelForm):
         super(UserProfileForm, self).__init__(*args, **kwargs)
         for field in self.fields.values():
             field.required = False
+
+
+class PhoneCodeForm(forms.Form):
+    phone = forms.CharField(max_length=11)
+    code = forms.CharField(max_length=6)
+    username = forms.CharField(max_length=255)
