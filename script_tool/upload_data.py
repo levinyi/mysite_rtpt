@@ -6,6 +6,7 @@ import time
 def upload_data(data):
     # 上传数据到云服务器
     # 返回成功与否的状态
+    pass
 
 def update_upload_done(uploaded_data):
     # 更新 upload_done.json
