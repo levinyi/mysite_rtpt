@@ -281,16 +281,16 @@ def register(request):
         userprofile_form = UserProfileForm(request.POST)
         if user_form.is_valid() and userprofile_form.is_valid():
             new_user = user_form.save(commit=False)
-            print(new_user.email)
             new_user.set_password(user_form.cleaned_data['password'])
             new_user.save()
-            new_profile = userprofile_form.save(commit=False)
-            new_profile.user = new_user
-            new_profile.save()    
+            new_profile = UserProfile.objects.create(user=new_user)
+            new_profile.company = userprofile_form.data.get('company')
+            new_profile.phone = userprofile_form.data.get('phone')
+            new_profile.save()
             send_email_with_link(new_user, purpose='signup', subject='Register rootpath confirm')
             return HttpResponseRedirect(reverse('account:register_confirm'))
         else:
-            print(user_form.errors, userprofile_form.errors)
+
             return HttpResponse('sorry, your username or password is not right')
     else:
         user_form = RegistrationForm()
