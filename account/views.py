@@ -279,17 +279,18 @@ def register(request):
     if request.method == 'POST':
         user_form = RegistrationForm(request.POST)
         userprofile_form = UserProfileForm(request.POST)
-        if user_form.is_valid():
+        if user_form.is_valid() and userprofile_form.is_valid():
             new_user = user_form.save(commit=False)
             print(new_user.email)
             new_user.set_password(user_form.cleaned_data['password'])
             new_user.save()
             new_profile = userprofile_form.save(commit=False)
             new_profile.user = new_user
-            new_profile.save()
+            new_profile.save()    
             send_email_with_link(new_user, purpose='signup', subject='Register rootpath confirm')
             return HttpResponseRedirect(reverse('account:register_confirm'))
         else:
+            print(user_form.errors, userprofile_form.errors)
             return HttpResponse('sorry, your username or password is not right')
     else:
         user_form = RegistrationForm()
@@ -307,3 +308,15 @@ def settings(request):
 
 def contact_us(request):
     return render(request, 'account/contact_us.html')
+
+def is_secondary_admin(user):
+    """
+    判断用户是否是二级管理员。
+
+    参数:
+    user -- Django的User对象。
+
+    返回:
+    True或False，表示用户是否是二级管理员。
+    """
+    return user.is_authenticated and user.groups.filter(name='SecondaryAdminGroup').exists()

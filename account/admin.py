@@ -3,7 +3,6 @@ from .models import UserProfile
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 
-
 # Register your models here.
 
 class AccountAdmin(admin.ModelAdmin):
