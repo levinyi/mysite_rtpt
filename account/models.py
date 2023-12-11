@@ -25,6 +25,7 @@ class UserProfile(models.Model):
     level = models.SmallIntegerField(default=1, blank=True)
     shipping_address = models.CharField(max_length=500)
     is_verify = models.BooleanField(default=False)
+    register_time = models.DateField(auto_now_add=True)
 
     def confirm_verify(self):
         self.is_verify = True

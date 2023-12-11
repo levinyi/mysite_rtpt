@@ -336,5 +336,5 @@ def export_order_to_csv(request, order_id):
 
 
 def user_manage(request):
-    user_list = UserProfile.objects.all().order_by('-id')
+    user_list = UserProfile.objects.all().order_by('-register_time')
     return render(request, 'super_manage/user_manage.html', {'user_list': user_list})
