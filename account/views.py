@@ -279,7 +279,7 @@ def register(request):
     if request.method == 'POST':
         user_form = RegistrationForm(request.POST)
         userprofile_form = UserProfileForm(request.POST)
-        if user_form.is_valid():
+        if user_form.is_valid() and userprofile_form.is_valid():
             new_user = user_form.save(commit=False)
             new_user.set_password(user_form.cleaned_data['password'])
             new_user.save()
@@ -308,3 +308,15 @@ def settings(request):
 
 def contact_us(request):
     return render(request, 'account/contact_us.html')
+
+def is_secondary_admin(user):
+    """
+    判断用户是否是二级管理员。
+
+    参数:
+    user -- Django的User对象。
+
+    返回:
+    True或False，表示用户是否是二级管理员。
+    """
+    return user.is_authenticated and user.groups.filter(name='SecondaryAdminGroup').exists()

@@ -18,9 +18,13 @@ from django.contrib.auth.models import User
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    first_name = models.CharField(max_length=200, blank=True)
+    last_name = models.CharField(max_length=200, blank=True)
+    email = models.EmailField(max_length=254)
     company = models.CharField(max_length=254)
     department = models.CharField(max_length=200, blank=True)
     phone = models.CharField(max_length=200, null=True, unique=True)
+    register_time = models.DateField(auto_now_add=True)
     photo = models.ImageField(blank=True)
     level = models.SmallIntegerField(default=1, blank=True)
     shipping_address = models.CharField(max_length=500)

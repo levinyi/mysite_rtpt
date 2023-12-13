@@ -2,39 +2,37 @@
 {% load static %}
 
 {% block content %}
-<div class="container">
-    <div class="container">
-        <div class="row">
-            <div class="col-6 col-md-auto">
-                <div class="d-flex flex-column flex-shrink-0 p-3 bg-body-tertiary mt-3 leftslider">
-                    <hr>
-                    <ul class="nav nav-pills flex-column mb-auto">
-                        <li>
-                            <a href="{% url 'super_manage:user_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/user_manage/' %}active{% endif %}">
-                                <i class="bi bi-people-fill me-2"></i>
-                                <span class="link-text">User Manage</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'super_manage:order_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/order_manage/' %}active{% endif %}">
-                                <i class="bi bi-speedometer2 me-2"></i>
-                                <span class="link-text">Order Manage</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'super_manage:vector_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/vector_manage/' %}active{% endif %}">
-                                <i class="bi bi-journal-text me-2"></i>
-                                <span class="link-text">Vector Manage</span>
-                            </a>
-                        </li>
-                    </ul>
-                    <hr>
-                </div>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-3 col-md-auto">
+            <div class="d-flex flex-column flex-shrink-0 p-3 bg-body-tertiary mt-3 leftslider">
+                <hr>
+                <ul class="nav nav-pills flex-column mb-auto">
+                    <li>
+                        <a href="{% url 'super_manage:user_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/user_manage/' %}active{% endif %}">
+                            <i class="bi bi-people-fill me-2"></i>
+                            <span class="link-text">User Manage</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'super_manage:order_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/order_manage/' %}active{% endif %}">
+                            <i class="bi bi-speedometer2 me-2"></i>
+                            <span class="link-text">Order Manage</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'super_manage:vector_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/vector_manage/' %}active{% endif %}">
+                            <i class="bi bi-journal-text me-2"></i>
+                            <span class="link-text">Vector Manage</span>
+                        </a>
+                    </li>
+                </ul>
+                <hr>
             </div>
-            <div class="col">
-                {% block manage_content %}
-                {% endblock %}
-            </div>
+        </div>
+        <div class="col">
+            {% block manage_content %}
+            {% endblock %}
         </div>
     </div>
 </div>

@@ -26,7 +26,7 @@ def get_table_context(table_name, status=None, start=0):
     start:开始的页面，目前功能不完善
     """
     def vector_line(data):
-        print(data.vector_map)
+        # print(data.vector_map)
         return {
             'id': data.id,
             'Custom': data.user.username if data.user is not None else '',
@@ -162,7 +162,7 @@ def delete_report(request):
 
 @login_required
 def download_report(request, order_id):
-    print('down report {}'.format(order_id))
+    # print('down report {}'.format(order_id))
     order = OrderInfo.objects.get(id=order_id)
     file = order.report_file
     if file:
@@ -334,7 +334,10 @@ def export_order_to_csv(request, order_id):
 
     return response
 
-
+from account.views import is_secondary_admin
 def user_manage(request):
-    user_list = UserProfile.objects.all().order_by('-id')
-    return render(request, 'super_manage/user_manage.html', {'user_list': user_list})
+    if not is_secondary_admin(request.user):
+        return render(request, 'super_manage/no_permission.html')
+    else:    
+        user_list = UserProfile.objects.all().order_by('-register_time')
+        return render(request, 'super_manage/user_manage.html', {'user_list': user_list})
