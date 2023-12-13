@@ -262,10 +262,11 @@ def myself_edit(request):
         else UserProfile.objects.create(user=request.user)
 
     user_form = UserProfileForm(request.POST or None, instance=userprofile)
-
     if request.method == "POST":
         if user_form.is_valid():
-            user_form.save()
+            up = user_form.save()
+            # Email同时写入user表
+            User.objects.filter(id=up.user.id).update(email=user_form.data.get('email'))
             return redirect('/account/my-information/')
         else:
             return render(request, "account/myself.html", {"user": request.user, "userprofile": userprofile})
@@ -279,7 +280,8 @@ def register(request):
     if request.method == 'POST':
         user_form = RegistrationForm(request.POST)
         userprofile_form = UserProfileForm(request.POST)
-        if user_form.is_valid() and userprofile_form.is_valid():
+        # if user_form.is_valid() and userprofile_form.is_valid(): 若添加userprofile_form.is_valid会导致无法验证通过
+        if user_form.is_valid():
             new_user = user_form.save(commit=False)
             new_user.set_password(user_form.cleaned_data['password'])
             new_user.save()

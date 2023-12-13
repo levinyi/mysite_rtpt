@@ -45,7 +45,7 @@ class RegistrationForm(forms.ModelForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['company', 'department', 'phone', 'photo', 'shipping_address']
+        fields = ['email', 'first_name', 'last_name', 'company', 'department', 'phone', 'photo', 'shipping_address']
 
     def __init__(self, *args, **kwargs):
         super(UserProfileForm, self).__init__(*args, **kwargs)
