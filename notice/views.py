@@ -16,8 +16,24 @@ from typing import List
 from alibabacloud_dysmsapi20170525.client import Client as Dysmsapi20170525Client
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_dysmsapi20170525 import models as dysmsapi_20170525_models
-from alibabacloud_tea_util import models as util_models
 from alibabacloud_tea_util.client import Client as UtilClient
+
+
+def send_email(user, purpose):
+    if type(user) == int:
+        user = User.objects.get(id=user)
+    subject = ''
+    message = ''
+    if purpose == 'notice_synthesized':
+        subject = 'Notice synthesized'
+        message = 'Your genes has been synthesized.'
+
+    send_mail(
+        subject,
+        message,
+        None,
+        recipient_list=[user.email],  # 收件人邮箱
+    )
 
 
 def send_email_with_link(user, purpose, subject, message=""):
@@ -43,8 +59,8 @@ def send_email_with_link(user, purpose, subject, message=""):
         subject,
         message
         + f" Click the link to verify your {purpose}: {settings.BASE_URL}{notice.get_verification_url()}",
-        "zsl503503@163.com",  # 发件人邮箱
-        [user.email],  # 收件人邮箱
+        None,
+        recipient_list=[user.email],  # 收件人邮箱
     )
     return True
 
@@ -71,7 +87,7 @@ def create_sms_client(
     return Dysmsapi20170525Client(config)
 
 
-def send_sms_with_code(user:User, purpose) -> bool:
+def send_sms_with_code(user: User, purpose) -> bool:
     # 请确保代码运行环境设置了环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET。
     # 工程代码泄露可能会导致 AccessKey 泄露，并威胁账号下所有资源的安全性。以下代码示例使用环境变量获取 AccessKey 的方式进行调用，
     # 仅供参考，建议使用更安全的 STS 方式，更多鉴权访问方式请参见：https://help.aliyun.com/document_detail/378659.html
@@ -118,4 +134,3 @@ def send_sms_with_code(user:User, purpose) -> bool:
         print(error.data.get("Recommend"))
         UtilClient.assert_as_string(error.message)
         return False
-

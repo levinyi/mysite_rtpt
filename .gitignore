@@ -13,3 +13,5 @@ media/
 migrations/
 *.bak
 *.sql
+script_tool/process/
+script_tool/temp/
