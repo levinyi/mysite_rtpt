@@ -12,8 +12,14 @@ LATEST_FILE = None
 
 
 def generate_file(folder, user_id, gene_data):
-    # 处理一个 order 的数据
-    # 返回临时文件路径和输出文件路径
+    """生成输入文件，返回输入文件路径和输出文件路径
+
+    :param folder (path): 输入和输出文件的文件夹路径
+    :param user_id (int): user id
+    :param gene_data (dict): 要处理的基因数据
+
+    :return: tuple: (输入文件路径, 输出文件路径)
+    """
     logger.info(f"Generate file for user: {user_id}")
     fm = "R%y%m%d{:" + f'0{len(str(MAX_REQ - 1))}d' + "}"
     req_str = time.strftime(fm.format(REQ), time.localtime())
@@ -40,7 +46,16 @@ def generate_file(folder, user_id, gene_data):
 
 
 def process_genes_in_file(folder, file_path):
-    # 处理文件中的所有基因数据
+    """处理最新下载的json文件中的所有基因数据, 返回输入输出文件路径列表。
+    将会生成输入文件在file_path中，然后调用 MATLAB 程序，
+    执行完后将会在file_path中生成输出文件
+
+    :param folder (path): Matlab输入输出文件夹路径；
+    :param file_path (path): 最新下载的json文件路径
+
+    :return: list[tuple(path,path)]: 输入输出文件路径列表
+    """
+    # 
     # 实现你的处理逻辑，调用 MATLAB 程序等
     global REQ
     logger.info(f"Process file: {file_path} REQ: {REQ}")
@@ -68,8 +83,7 @@ def process_genes_in_file(folder, file_path):
 
 
 def update_process_done(done_path, io_files):
-    # 更新 done.json
-
+    """更新 done.json 文件"""
     processed_data = {}
     if os.path.exists(done_path):
         with open(done_path, 'r') as file:
@@ -94,7 +108,7 @@ def update_process_done(done_path, io_files):
 
 
 def update_error_process(error_path, err_files):
-    # 更新 error_process.json
+    """更新 error_process.json 文件"""
     if not err_files or len(err_files) == 0:
         return
     logger.info(f"Find error files: {err_files}")
@@ -151,5 +165,5 @@ while not DEBUG:
         time.sleep(PROCESS_WAIT)
 
 if DEBUG:
-    logger.info("Run debug mode. 该模式下Logger不会输入文件中")
+    logger.info("Running on debug mode. 该模式下Logger不会输入文件中，并且只会执行一次")
     run()

@@ -8,8 +8,11 @@ logger = get_logger(os.path.join(path_cfg['base_path'], path_cfg['upload_log_pat
 
 
 def upload_data(data):
-    # 上传数据到云服务器
-    # 返回成功与否的状态
+    """上传数据到云服务器
+
+    :param data: 待上传数据
+    :return: 成功与否的状态
+    """
     headers = {'Content-Type': 'application/json;charset=utf-8',
                'token': upload_cfg['token']}
     logger.debug(f"{upload_cfg['upload_url']}, {headers}, {data}")
@@ -86,5 +89,5 @@ while not DEBUG:
         time.sleep(UPLOAD_WAIT)  # 出错时也休眠
 
 if DEBUG:
-    logger.info("Run debug mode. 该模式下Logger不会输入文件中")
+    logger.info("Running on debug mode. 该模式下Logger不会输入文件中该模式下Logger不会输入文件中，并且只会执行一次")
     run()
