@@ -142,23 +142,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 LOGIN_URL = '/account/login/'
 LOGIN_REDIRECT_URL = '/'
 
-# settings.py
+# 邮件配置
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp-mail.outlook.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
+SERVER_EMAIL = config('SERVER_EMAIL')
 
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp-mail.outlook.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'noreply@rootpathgx.com'
-# EMAIL_HOST_PASSWORD = 'RPservice_2023'
-# DEFAULT_FROM_EMAIL = 'noreply@rootpathgx.com'
-
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.163.com'
-EMAIL_PORT = 25
-# EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'zsl503503@163.com'
-EMAIL_HOST_PASSWORD = 'SPUXTRVSZCONGGNB'
-DEFAULT_FROM_EMAIL = 'zsl503503@163.com'
+# EMAIL_HOST = 'smtp.163.com'
+# EMAIL_PORT = 25
+# # EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'zsl503503@163.com'
+# EMAIL_HOST_PASSWORD = 'SPUXTRVSZCONGGNB'
+# DEFAULT_FROM_EMAIL = 'zsl503503@163.com'
 #
 ## 目前仅测试，需要填写正确的域名，用于邮件的链接
-BASE_URL = 'http://127.0.0.1:8000'
+BASE_URL = 'https://www.rootpath.com.cn'
