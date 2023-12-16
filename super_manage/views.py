@@ -5,17 +5,35 @@ from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
-from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
-import pandas as pd
 from account.models import UserProfile
-
 from product.models import Vector
 from user_center.models import OrderInfo
 from user_center.views import \
     vector_download as uc_vector_download, \
     vector_delete as uc_vector_delete
+
+from account.views import is_secondary_admin
+from django.http import HttpResponseForbidden
+
+def custom_user_passes_test(test_func):
+    """
+    自定义装饰器，用于检查用户是否通过测试，不通过时返回 HttpResponseForbidden。
+    """
+    def decorator(view_func):
+        def wrapped_view(request, *args, **kwargs):
+            if test_func(request.user):
+                # 用户通过测试，执行正常的视图逻辑
+                return view_func(request, *args, **kwargs)
+            else:
+                # 用户未通过测试，返回 HttpResponseForbidden
+                return HttpResponseForbidden("No permission")
+        return wrapped_view
+    return decorator
+
+# 使用自定义装饰器
+is_secondary_admin_required = custom_user_passes_test(is_secondary_admin)
 
 
 def get_table_context(table_name, status=None, start=0):
@@ -88,12 +106,14 @@ def get_table_context(table_name, status=None, start=0):
 
 
 @login_required
+@is_secondary_admin_required
 @require_GET
 def vector_download(request, vector_id, file_type):
     return uc_vector_download(request, vector_id, file_type, True)
 
 
 @login_required
+@is_secondary_admin_required
 @require_POST
 def vector_upload(request):
     vector_file = request.FILES.get('vector_file', default=None)
@@ -111,7 +131,8 @@ def vector_upload(request):
         "newVal": 'vector_download/{}/map'.format(vector_id)
     })
 
-@require_GET
+@login_required
+@is_secondary_admin_required
 @login_required
 def vector_delete(request):
     vector_id = request.GET.get('vector_id', default=None)
@@ -127,6 +148,7 @@ def vector_delete(request):
 
 
 @login_required
+@is_secondary_admin_required
 @require_POST
 def upload_report(request):
     file = request.FILES.get('file', default=None)
@@ -146,6 +168,7 @@ def upload_report(request):
 
 
 @login_required
+@is_secondary_admin_required
 @require_GET
 def delete_report(request):
     order_id = request.GET.get('id', default=None)
@@ -161,6 +184,7 @@ def delete_report(request):
 
 
 @login_required
+@is_secondary_admin_required
 def download_report(request, order_id):
     # print('down report {}'.format(order_id))
     order = OrderInfo.objects.get(id=order_id)
@@ -179,6 +203,7 @@ def download_report(request, order_id):
 
 
 @login_required
+@is_secondary_admin_required
 @require_GET
 def get_rows(request):
     status = request.GET.get('status')
@@ -192,6 +217,7 @@ def get_rows(request):
 
 
 @login_required
+@is_secondary_admin_required
 @require_GET
 def change_url(request):
     row_id = request.GET.get('id')
@@ -204,6 +230,7 @@ def change_url(request):
 
 
 @login_required
+@is_secondary_admin_required
 @require_POST
 def submit_vector_data(request):
     post_data = request.body
@@ -222,6 +249,7 @@ def submit_vector_data(request):
 
 
 @login_required
+@is_secondary_admin_required
 @require_GET
 def change_status(request):
     row_id = request.GET.get('id')
@@ -259,85 +287,18 @@ def change_status(request):
 
 
 @login_required
+@is_secondary_admin_required
 def order_manage(request):
     return render(request, 'super_manage/order_manage.html', get_table_context("order"))
 
 
 @login_required
+@is_secondary_admin_required
 def vector_manage(request):
     return render(request, 'super_manage/vector_manage.html', get_table_context("vector"))
 
-
 @login_required
-def export_order_to_csv(request, order_id):
-    # Retrieve the order with optimized query
-    order = OrderInfo.objects.get(id=order_id)
-    # Function to get SeqAA
-    def get_seq_aa(combined_seq):
-        start_index = 0
-        while start_index < min(20, len(combined_seq)) and not combined_seq[start_index].islower():
-            start_index += 1
-
-        end_index = -1
-        while abs(end_index) <= min(20, len(combined_seq)) and not combined_seq[end_index].islower():
-            end_index -= 1
-
-        # Check if any lowercase character was found in the first 20 characters
-        if start_index < min(20, len(combined_seq)):
-            # Check if any lowercase character was found in the last 20 characters
-            if abs(end_index) <= min(20, len(combined_seq)):
-                return combined_seq[start_index:end_index]
-        
-        # No lowercase characters found, return the original sequence
-        return combined_seq
-
-
-    # Create a list of dictionaries containing gene information
-    gene_info_list = [
-        {
-            'GeneName': gene_info.gene_name,
-            'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
-            'SeqAA': get_seq_aa(gene_info.combined_seq),
-            'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
-            'ForbiddenSeqs': gene_info.forbid_seq,
-            'VectorID': gene_info.vector.vector_id,
-            'Species': gene_info.species.species_name if gene_info.species else None,
-        }
-        for gene_info in order.gene_infos.all()
-    ]
-
-    # Create a DataFrame from the list
-    df = pd.DataFrame(gene_info_list)
-    # Convert datetime columns to timezone-unaware format
-    # df['create_date'] = df['create_date'].dt.tz_localize(None)
-    # Create a new column 'order_type' based on the condition
-    
-    # 不用根据长度去订单判断类型了，都注释掉
-    # if df.get('SeqAA') is not None:
-    #     max_sequence_length += df['SeqAA'].str.len().max()
-    # if df.get('Seq5NC') is not None:
-    #     max_sequence_length += df['Seq5NC'].str.len().max()
-    # if df.get('Seq3NC') is not None:
-    #     max_sequence_length += df['Seq3NC'].str.len().max()
-
-    # order_type = 2 if max_sequence_length > 650 else 1
- 
-    # Prepare response with CSV content
-    # response = HttpResponse(content_type='text/csv')
-    # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
-    # df.to_excel(path_or_buf=response, index=False)
-    
-    # Prepare response with Excel content
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order.user}-RootPath_Gene_Library_Order_Information.xlsx"'
-    df.to_excel(excel_writer=response, index=False, engine='openpyxl')
-
-    return response
-
-from account.views import is_secondary_admin
-def user_manage(request):
-    if not is_secondary_admin(request.user):
-        return render(request, 'super_manage/no_permission.html')
-    else:    
-        user_list = UserProfile.objects.all().order_by('-register_time')
-        return render(request, 'super_manage/user_manage.html', {'user_list': user_list})
+@is_secondary_admin_required
+def user_manage(request): 
+    user_list = UserProfile.objects.all().order_by('-register_time')
+    return render(request, 'super_manage/user_manage.html', {'user_list': user_list})

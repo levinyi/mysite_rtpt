@@ -40,8 +40,8 @@ def generate_file(folder, user_id, gene_data):
     df_reordered['REQID'] = req_str
 
     # 这里文件夹是什么来着
-    input_folder = os.path.join(folder, req_str, "input")
-    output_folder = os.path.join(folder, req_str, "output")
+    input_folder = os.path.join(folder, req_str, "Database_REQ")
+    output_folder = os.path.join(folder, req_str, "Database_PRJ")
     os.makedirs(input_folder, exist_ok=True)
     os.makedirs(output_folder, exist_ok=True)
 
@@ -80,13 +80,18 @@ def process_genes_in_file(folder, file_path):
 
         # 调用 MATLAB 程序
         # process = subprocess.Popen(["matlab", "-nodisplay", "-nosplash", "-nodesktop", "-r", f"run('{temp_file}', '{output_file}')"])
-        # process_list.append(process)
-        # err_files.append((user_id, temp_file, output_file))
+
+        # 将文件写入的是固定的folder，所以不需要传入参数
+        process = subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script1_REQtoSACfI_5p2_3p1.m'); exit;"], shell=True)
+        process = subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script2_SACfI_to_SACfO.m'); exit;"], shell=True)
+        process = subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script3_SACfOtoDone_5p2_3p1.m'); exit;"], shell=True)
+        process_list.append(process)
+        err_files.append((user_id, temp_file, output_file))
         REQ = (REQ + 1) % MAX_REQ
 
     # 等待所有 MATLAB 程序运行结束
-    # for process in process_list:
-    #     process.wait()
+    for process in process_list:
+        process.wait()
 
     return io_files, err_files
 

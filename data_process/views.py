@@ -7,8 +7,9 @@ from django.views.decorators.http import require_GET, require_POST
 
 from notice.views import send_email
 from user_center.models import GeneInfo
+from decouple import config
 
-TOKEN = '65f4c2c7143d4a1a90050f193859dc4b'
+TOKEN = config('TOKEN')
 
 
 def check(token):
@@ -26,7 +27,7 @@ def request_genes(request):
     if request.GET.get('token', default=None) is None or not check(request.GET['token']):
         raise Http404('Page Not Found!')
 
-    genes = GeneInfo.objects.filter(status='Synthesizing')
+    genes = GeneInfo.objects.filter(status='optimizing')
     result_data = {}
 
     for gene in genes.all():
@@ -39,15 +40,15 @@ def request_genes(request):
 
         result_data[gene.user.id].append({
             'GeneName': v.vector_name,
-            'Seq5NC': gene.i5nc,
+            'Seq5NC': v.NC5 + gene.i5nc,
             'SeqAA': gene.original_seq,
-            'Seq3NC': gene.i3nc,
+            'Seq3NC': v.NC3 + gene.i3nc,
             'VectorID': v.vector_id,
             'Species': gene.species.species_name if gene.species else None,
             'ForbiddenSeqs': gene.forbid_seq,
             'length': length
         })
-    print(result_data)
+    # print(result_data)
     return JsonResponse(result_data, json_dumps_params={'ensure_ascii': False})
 
 
@@ -63,7 +64,7 @@ def upload_genes(request):
         datas = value['datas']
         for v in datas:
             obj.filter(vector__vector_id=v['VectorID']) \
-                .update(status='Synthesized', saved_seq=v['FullSeqREAL'])
+                .update(status='optimized', saved_seq=v['FullSeqREAL'])
         # 发送消息的内容，统一在Notice view中设置
         send_email(user_id, purpose='notice_synthesized')
     # raise Http404('Page Not Found!')

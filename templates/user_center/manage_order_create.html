@@ -67,7 +67,7 @@
                 <p>If your vector is not listed below, you can create your own vector <a class="text-decoration-none" href="{% url 'user_center:manage_vector' %}">here</a> first.</p>
             </div>
             <span class="text-success">Commonly used vectors at RootPath </span> and <span class="text-info">your own vectors</span> are listed below.
-            <select class="form-select mt-2" size="5" aria-label="Multiple select example" id="vector_id">
+            <select class="form-select mt-2" size="10" aria-label="Multiple select example" id="vector_id">
                 <option value="" selected >Choose a vector</option>
                 {% for vector in company_vectors %}
                 <option value="{{ vector.id }}" class="text-success">{{ vector.vector_name }}</option>

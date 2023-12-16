@@ -293,7 +293,7 @@ def gene_delete(request):
 
 @login_required
 def view_cart(request):
-    cart = Cart.objects.get(user=request.user)
+    cart, created = Cart.objects.get_or_create(user=request.user)
     shopping_cart = cart.genes.all()
     # page_object = Pagination(request, shopping_cart)
     # context = {
@@ -355,19 +355,21 @@ def export_order_to_csv(request, order_id):
     # Function to get SeqAA
     def get_seq_aa(combined_seq):
         start_index = 0
-        while start_index < min(20, len(combined_seq)) and not combined_seq[start_index].islower():
+        while start_index < min(20, len(combined_seq)) and combined_seq[start_index].islower():
             start_index += 1
 
         end_index = -1
-        while abs(end_index) <= min(20, len(combined_seq)) and not combined_seq[end_index].islower():
+        while abs(end_index) <= min(20, len(combined_seq)) and combined_seq[end_index].islower():
             end_index -= 1
 
+        print(f"start_index: {start_index}, end_index: {end_index}")
+
         # Check if any lowercase character was found in the first 20 characters
-        if start_index < min(20, len(combined_seq)):
+        if start_index <= min(20, len(combined_seq)):
             # Check if any lowercase character was found in the last 20 characters
-            if abs(end_index) <= min(20, len(combined_seq)):
-                return combined_seq[start_index:end_index]
-        
+            if abs(end_index) >= min(20, len(combined_seq)):
+                return combined_seq[start_index:end_index + 1]
+
         # No lowercase characters found, return the original sequence
         return combined_seq
 
@@ -375,13 +377,17 @@ def export_order_to_csv(request, order_id):
     # Create a list of dictionaries containing gene information
     gene_info_list = [
         {
+            'InquiryID': order.inquiry_id,
             'GeneName': gene_info.gene_name,
             'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
             'SeqAA': get_seq_aa(gene_info.combined_seq),
             'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
             'ForbiddenSeqs': gene_info.forbid_seq,
+            'VectorName': gene_info.vector.vector_name,
             'VectorID': gene_info.vector.vector_id,
             'Species': gene_info.species.species_name if gene_info.species else None,
+            'i5nc': gene_info.i5nc,
+            'i3nc': gene_info.i3nc,
         }
         for gene_info in order.gene_infos.all()
     ]

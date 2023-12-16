@@ -73,6 +73,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'mysite.context_processors.user_context',  # 自定义context_processor, 用于在模板中获取当前登录用户
             ],
         },
     },
@@ -151,14 +152,4 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 SERVER_EMAIL = config('SERVER_EMAIL')
-
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.163.com'
-# EMAIL_PORT = 25
-# # EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'zsl503503@163.com'
-# EMAIL_HOST_PASSWORD = 'SPUXTRVSZCONGGNB'
-# DEFAULT_FROM_EMAIL = 'zsl503503@163.com'
-#
-## 目前仅测试，需要填写正确的域名，用于邮件的链接
-BASE_URL = 'https://www.rootpath.com.cn'
+BASE_URL = config('BASE_URL')

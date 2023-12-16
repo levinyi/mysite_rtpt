@@ -288,6 +288,7 @@ def register(request):
             new_profile = UserProfile.objects.create(user=new_user)
             new_profile.company = userprofile_form.data.get('company')
             new_profile.phone = userprofile_form.data.get('phone')
+            new_profile.email = user_form.data.get('email')
             new_profile.save()
             send_email_with_link(new_user, purpose='signup', subject='Register rootpath confirm')
             return HttpResponseRedirect(reverse('account:register_confirm'))

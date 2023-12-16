@@ -13,11 +13,11 @@
             <table class="table table-striped table-hover" style="text-align:center">
                 <thead>
                     <tr>
-                        <th scope="col">ID</th>
+                        <th scope="col">#</th>
                         <th scope="col">Gene Name</th>
-                        <th scope="col">Vector ID</th>
+                        <th scope="col">Vector Name</th>
+                        <th scope="col">Sequence</th>
                         <th scope="col">Species</th>
-                        <th scope="col">Seq</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -25,9 +25,9 @@
                     <tr>
                         <td>{{ forloop.counter }}</td>
                         <td>{{ gene_info.gene_name }}</td>
-                        <td>{{ gene_info.vector.vector_id }}</td>
+                        <td>{{ gene_info.vector.vector_name }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ gene_info.combined_seq }}</td>
                         <td>{{ gene_info.species.species_name }}</td>
-                        <td class="text-truncate" style="max-width: 150px;">{{ gene_info.saved_seq }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
