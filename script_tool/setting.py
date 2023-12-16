@@ -37,12 +37,12 @@ def get_logger(path):
     """
     if DEBUG:
         logging.basicConfig(level=logging_cfg['log_level'], format=logging_cfg['log_format'],
-                            datefmt=logging_cfg['datefmt'])
+                            datefmt=logging_cfg['datefmt'],encoding='utf-8')
     else:
         logging.basicConfig(level=logging_cfg['log_level'], format=logging_cfg['log_format'],
-                            datefmt=logging_cfg['datefmt'], handlers=[
-                RotatingFileHandler(path, maxBytes=LOG_MAX_BYTES,
-                                    backupCount=int(logging_cfg['log_file_backup']))
-            ])
+                            datefmt=logging_cfg['datefmt'], encoding='utf-8',
+                            handlers=[RotatingFileHandler(
+                                path, maxBytes=LOG_MAX_BYTES, backupCount=int(logging_cfg['log_file_backup']))
+                            ])
     logger = logging.getLogger()
     return logger

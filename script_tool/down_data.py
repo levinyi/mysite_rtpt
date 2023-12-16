@@ -6,6 +6,7 @@ import json
 from setting import *
 
 logger = get_logger(os.path.join(path_cfg['base_path'], path_cfg['down_log_path']))
+logger.info(down_cfg)
 
 def poll_cloud_api():
     """轮询云服务API，获取未处理数据
@@ -17,6 +18,8 @@ def poll_cloud_api():
     params = {'token': down_cfg.get('token')}
     res = requests.get(down_cfg.get('down_url'), params=params)
     logger.info(f"Get data from cloud api. Status code: {res.status_code}")
+    if res.status_code == 404:
+        return None
     return res.json()
 
 
@@ -96,7 +99,8 @@ def run():
     folder_path = os.path.join(path_cfg['base_path'], date_str)
     pre_data_folder = os.path.join(folder_path, path_cfg['pre_data_path'])
     if not os.path.exists(pre_data_folder):
-        os.mkdir(pre_data_folder)
+        logger.info(f'Make pre data folder {pre_data_folder}')
+        os.makedirs(pre_data_folder)
 
     pre_data_path = os.path.join(pre_data_folder, f"{time_str}.json")
     long_wait_path = os.path.join(folder_path, path_cfg['long_wait_path'])
@@ -105,6 +109,8 @@ def run():
         save_data_to_file(pre_data_path, data)
         if USE_CHECK:
             find_long_wait_data(pre_data_folder, long_wait_path, data)
+    else:
+        logger.info("No data downloaded.")
 
 logger.info("Running down_data.py")
 while not DEBUG:

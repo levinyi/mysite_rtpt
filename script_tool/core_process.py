@@ -6,6 +6,8 @@ import pandas as pd
 from setting import *
 
 logger = get_logger(os.path.join(path_cfg['base_path'], path_cfg['process_log_path']))
+logger.info(process_cfg)
+
 REQ = int(process_cfg["start_req"])  # 启动时初始REQ值，默认为0
 MAX_REQ = int(process_cfg["max_req"])  # 最大REQ值，默认为100，即REQ范围是（0,99）
 LATEST_FILE = None
@@ -36,12 +38,19 @@ def generate_file(folder, user_id, gene_data):
     df_reordered['Plate'] = 'NS'
     df_reordered['WellPos'] = 'NS'
     df_reordered['REQID'] = req_str
-    temp_file = os.path.join(folder, name)
+
+    # 这里文件夹是什么来着
+    input_folder = os.path.join(folder, req_str, "input")
+    output_folder = os.path.join(folder, req_str, "output")
+    os.makedirs(input_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
+
+    temp_file = os.path.join(input_folder, name)
     df_reordered.to_csv(temp_file, index=False, sep='\t')
     if DEBUG:
-        output_file = os.path.join(folder, '0_PRJIN_MWF5p2_[R2312120]_20231212_225210_IDcorrected.txt')
+        output_file = os.path.join(output_folder, '0_PRJIN_MWF5p2_[R2312120]_20231212_225210_IDcorrected.txt')
     else:
-        output_file = os.path.join(folder, f"0_PRJIN_{len_str}_[{req_str}]_{time_str}_IDcorrected.txt")
+        output_file = os.path.join(output_folder, f"0_PRJIN_{len_str}_[{req_str}]_{time_str}_IDcorrected.txt")
     return temp_file, output_file
 
 
@@ -134,10 +143,14 @@ def run():
     if not os.path.exists(pre_data_folder):
         return False
     if not os.path.exists(io_files_folder):
+        logger.info(f'Make io files folder {io_files_folder}')
         os.makedirs(io_files_folder)
 
     done_path = os.path.join(folder_path, path_cfg['done_path'])
     error_path = os.path.join(folder_path, path_cfg['error_path'])
+
+    if len(os.listdir(pre_data_folder)):
+        return 0
     latest_file = sorted(os.listdir(pre_data_folder))[-1]
 
     if LATEST_FILE is not None and LATEST_FILE == latest_file:
@@ -158,6 +171,7 @@ while not DEBUG:
         if run():
             continue
         else:
+            logger.info("No files need to be processed")
             logger.info(f"Sleep {PROCESS_WAIT} seconds")
             time.sleep(PROCESS_WAIT)
     except Exception as e:

@@ -5,7 +5,7 @@ import time
 from setting import *
 
 logger = get_logger(os.path.join(path_cfg['base_path'], path_cfg['upload_log_path']))
-
+logger.info(upload_cfg)
 
 def upload_data(data):
     """上传数据到云服务器
