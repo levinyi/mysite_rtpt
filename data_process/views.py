@@ -39,7 +39,7 @@ def request_genes(request):
             get_str_len(gene.i3nc) + get_str_len(v.NC3)
 
         result_data[gene.user.id].append({
-            'GeneName': v.vector_name,
+            'GeneName': gene.gene_name,
             'Seq5NC': v.NC5 + gene.i5nc,
             'SeqAA': gene.original_seq,
             'Seq3NC': v.NC3 + gene.i3nc,

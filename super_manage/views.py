@@ -16,6 +16,8 @@ from user_center.views import \
 
 from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
+from user_center.utils.pagination import Pagination
+
 
 def custom_user_passes_test(test_func):
     """
@@ -133,7 +135,6 @@ def vector_upload(request):
 
 @login_required
 @is_secondary_admin_required
-@login_required
 def vector_delete(request):
     vector_id = request.GET.get('vector_id', default=None)
     vector = Vector.objects.get(id=vector_id)
@@ -301,4 +302,9 @@ def vector_manage(request):
 @is_secondary_admin_required
 def user_manage(request): 
     user_list = UserProfile.objects.all().order_by('-register_time')
-    return render(request, 'super_manage/user_manage.html', {'user_list': user_list})
+    page_object = Pagination(request, user_list, page_size=15)
+    context = {
+        'user_list': page_object.page_queryset,  # 分完页的数据
+        'page_string':page_object.html(),  # 页码
+    }
+    return render(request, 'super_manage/user_manage.html', context)

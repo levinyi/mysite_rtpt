@@ -13,6 +13,23 @@ MAX_REQ = int(process_cfg["max_req"])  # 最大REQ值，默认为100，即REQ范
 LATEST_FILE = None
 
 
+def create_symlink(source_path, target_path, overwrite=False):
+    try:
+        # 创建符号链接
+        os.symlink(source_path, target_path)
+        print(f"符号链接已成功创建: {target_path} -> {source_path}")
+    except FileExistsError:
+        if overwrite:
+            # 如果文件已存在并且指定了覆盖选项，则先删除目标文件，然后重新创建符号链接
+            os.remove(target_path)
+            os.symlink(source_path, target_path)
+            print(f"已覆盖并成功创建符号链接: {target_path} -> {source_path}")
+        else:
+            print(f"创建符号链接失败: 目标文件已存在 ({target_path})")
+    except OSError as e:
+        print(f"创建符号链接失败: {e}")
+
+
 def generate_file(folder, user_id, gene_data):
     """生成输入文件，返回输入文件路径和输出文件路径
 
@@ -44,6 +61,10 @@ def generate_file(folder, user_id, gene_data):
     output_folder = os.path.join(folder, req_str, "Database_PRJ")
     os.makedirs(input_folder, exist_ok=True)
     os.makedirs(output_folder, exist_ok=True)
+    
+    # 创建链接, 用于 MATLAB 程序读取
+    create_symlink('/cygene4/pipeline/Dev_20231130_ForShiyi/*.txt', os.path.join(folder, req_str), overwrite=True)
+    create_symlink('/cygene4/pipeline/Dev_20231130_ForShiyi/*.m',   os.path.join(folder, req_str), overwrite=True)
 
     temp_file = os.path.join(input_folder, name)
     df_reordered.to_csv(temp_file, index=False, sep='\t')
@@ -79,19 +100,16 @@ def process_genes_in_file(folder, file_path):
         io_files.append((user_id, temp_file, output_file))
 
         # 调用 MATLAB 程序
-        # process = subprocess.Popen(["matlab", "-nodisplay", "-nosplash", "-nodesktop", "-r", f"run('{temp_file}', '{output_file}')"])
-
-        # 将文件写入的是固定的folder，所以不需要传入参数
-        process = subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script1_REQtoSACfI_5p2_3p1.m'); exit;"], shell=True)
-        process = subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script2_SACfI_to_SACfO.m'); exit;"], shell=True)
-        process = subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script3_SACfOtoDone_5p2_3p1.m'); exit;"], shell=True)
-        process_list.append(process)
+        subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script1_REQtoSACfI_5p2_3p1.m'); exit;"], shell=True)
+        subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script2_SACfI_to_SACfO.m'); exit;"], shell=True)
+        subprocess.run(['matlab', '-nodisplay', '-nosplash', '-nodesktop', '-r', "run('Script3_SACfOtoDone_5p2_3p1.m'); exit;"], shell=True)
+        # process_list.append(process)
         err_files.append((user_id, temp_file, output_file))
         REQ = (REQ + 1) % MAX_REQ
 
-    # 等待所有 MATLAB 程序运行结束
-    for process in process_list:
-        process.wait()
+    # # 等待所有 MATLAB 程序运行结束
+    # for process in process_list:
+    #     process.wait()
 
     return io_files, err_files
 
