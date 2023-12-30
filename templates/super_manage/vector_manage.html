@@ -180,6 +180,19 @@
 
     <script>
 
+        const TmpRow = document.querySelector("#tmp-table-row"),
+            TmpTd = TmpRow.content.querySelectorAll("td"),
+            tableBody = document.querySelector("tbody");
+        let RowMax = {{ max_row }};
+        let SelectedTab = 0;
+        let PageMax = {{ max_page }};
+        let Rows = JSON.parse("{{ rows }}".replace(/\&quot;/g, '\"'));
+
+        // 清除表
+        function clearTable() {
+            tableBody.innerHTML = "";
+        }
+
         function setRowMap(e, status, filename = null, filepath = null) {
             const fileDown = e.querySelector('.file-down'),
                 upload = e.querySelector('.upload'),
@@ -202,23 +215,10 @@
                 console.log("Unknown report element status", status, filename, filepath);
         }
 
-        const TmpRow = document.querySelector("#tmp-table-row"),
-            TmpTd = TmpRow.content.querySelectorAll("td"),
-            tableBody = document.querySelector("tbody");
-        let RowMax = {{ max_row }};
-        let SelectedTab = 0;
-        let PageMax = {{ max_page }};
-        let Rows = JSON.parse("{{ rows }}".replace(/\&quot;/g, '\"'));
-
         function changeInput(e) {
             e.parentElement.parentElement.querySelectorAll('.opr-bnt').forEach(btnElem => {
                 btnElem.disabled = false;
             })
-        }
-
-        // 清除表
-        function clearTable() {
-            tableBody.innerHTML = "";
         }
 
         function setRowStatus(e, value) {
@@ -357,6 +357,8 @@
                 c.querySelector('a').textContent = i.toString();
                 fragment.appendChild(c);
             }
+            for (let i = 1; i < items.length - 1; i++)
+                items[i].remove()
             last.parentElement.insertBefore(fragment, last);
             if (start == 1)
                 items[0].hidden = true;

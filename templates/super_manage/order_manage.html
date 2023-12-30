@@ -98,16 +98,19 @@
                 <a class="nav-link active" href="#" onclick="clickTab(this,0)">All</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,1)">Created</a>
+                <a class="nav-link" href="#" onclick="clickTab(this,1)">Cancelled</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,2)">Synthesizing</a>
+                <a class="nav-link" href="#" onclick="clickTab(this,2)">Created</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,3)">Shipped</a>
+                <a class="nav-link" href="#" onclick="clickTab(this,3)">Synthesizing</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,4)">Completed</a>
+                <a class="nav-link" href="#" onclick="clickTab(this,4)">Shipped</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="clickTab(this,5)">Completed</a>
             </li>
         </ul>
 
@@ -192,7 +195,7 @@
 
             {# 设置Status的显示 #}
             let bns = e.getElementsByTagName("button");
-            if (value.toLowerCase() == "created") {
+            if (value.toLowerCase() == "cancelled") {
                 bns[0].disabled = true;
                 bns[0].classList.remove('text-danger')
             } else {
@@ -361,15 +364,18 @@
                     status = 'all';
                     break;
                 case 1:
-                    status = 'Created';
+                    status = 'Cancelled';
                     break;
                 case 2:
-                    status = 'Synthesizing';
+                    status = 'Created';
                     break;
                 case 3:
-                    status = 'Shipped';
+                    status = 'Synthesizing';
                     break;
                 case 4:
+                    status = 'Shipped';
+                    break;
+                case 5:
                     status = 'Completed';
                     break;
             }
