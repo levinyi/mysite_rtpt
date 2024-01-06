@@ -3,13 +3,10 @@
 {% block title %}Order Manage{% endblock %}
 {% block extra_head %}
     <style>
-        .icon-btn {
-            width: 2rem;
-            display: inline-block;
-        }
-
-        .row-button {
-            padding: 0 4px 0 4px;
+        {#  label.0 style  #}
+        {#    用于顶部状态标签    #}
+        .tab-table .nav-link {
+            color: black;
         }
 
         .tab-table .nav-item {
@@ -17,8 +14,14 @@
             text-align: center;
         }
 
-        .tab-table .nav-link {
-            color: black;
+        {#    用于表    #}
+        .icon-btn {
+            width: 2rem;
+            display: inline-block;
+        }
+
+        .row-button {
+            padding: 0 4px 0 4px;
         }
 
         .input-td {
@@ -38,13 +41,15 @@
 
         .input-td input::placeholder { /* Mozilla Firefox 19+ */
             color: #c5c5c5;
-
         }
+
     </style>
 {% endblock %}
 {% block manage_content %}
     <template id="tmp-table-row">
+        {#  label.1 行模板  #}
         <tr>
+            {#  这里的内容不重要，可作为默认内容，在js中将会动态修改为需要的文本  #}
             <th scope="row">1</th>
             <td>PO001</td>
             <td>PSG</td>
@@ -53,7 +58,8 @@
             <td hidden>18/3/2022</td>
             <td>
                 <a href="" class="row-button"><i class="bi bi-cloud-download"></i></a>
-                <button disabled type="button" class="btn btn-link row-button"><i class="bi bi-cloud-download"></i></button>
+                <button disabled type="button" class="btn btn-link row-button"><i class="bi bi-cloud-download"></i>
+                </button>
             </td>
             <td>
                 <div class="file-down">
@@ -62,7 +68,8 @@
                     </button>
                     <a href="" class="bi bi-download icon-btn"></a>
                 </div>
-                <button type="button" class="btn btn-link row-button upload bi-upload icon-btn" onclick="this.querySelector('input').click();">
+                <button type="button" class="btn btn-link row-button upload bi-upload icon-btn"
+                        onclick="this.querySelector('input').click();">
                     <input type="file" style="display: none;" onchange="fileChange(this)">
                 </button>
                 <div class="pre-upload">
@@ -80,7 +87,8 @@
                         onclick="clickRevokeOrNext(this, 'revoke')">
                 </button>
                 <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
-                <button type="button" class="btn btn-link row-button bi-box-arrow-right icon-btn" onclick="clickRevokeOrNext(this,'next')">
+                <button type="button" class="btn btn-link row-button bi-box-arrow-right icon-btn"
+                        onclick="clickRevokeOrNext(this,'next')">
                 </button>
             </td>
             <td class="input-td">
@@ -94,6 +102,7 @@
 
     <div class="tab-table" style="margin-top: 20px;">
         <ul style="margin-bottom: 15px;" class="nav nav-tabs" id="select-tab">
+            {#      label.2 顶部点击筛选标签      #}
             <li class="nav-item">
                 <a class="nav-link active" href="#" onclick="clickTab(this,0)">All</a>
             </li>
@@ -117,6 +126,7 @@
         <table class="table table-hover table-bordered align-middle text-center">
             <thead>
             <tr>
+                {#      label.3 表头文本      #}
                 <th scope="col">#</th>
                 <th scope="col">ID</th>
                 <th scope="col">Custom</th>
@@ -168,6 +178,7 @@
             tableBody.innerHTML = "";
         }
 
+        // label.5
         function setRowReport(e, status, filename = null, filepath = null) {
             const fileDown = e.querySelector('.file-down'),
                 upload = e.querySelector('.upload'),
@@ -190,22 +201,26 @@
                 console.log("Unknown report element status", status, filename, filepath);
         }
 
+        // label.6
         function setRowStatus(e, value) {
             e.querySelector("span").textContent = value;
 
             {# 设置Status的显示 #}
             let bns = e.getElementsByTagName("button");
             if (value.toLowerCase() == "cancelled") {
+            // 末状态，不可向右滑
                 bns[0].disabled = true;
                 bns[0].classList.remove('text-danger')
             } else {
                 bns[0].disabled = false;
                 bns[0].classList.add('text-danger');
             }
+            // 初状态，不可向左滑
             bns[1].disabled = value.toLowerCase() == "completed";
         }
 
-        // 往表中添加一行
+        // 获取表中一行的html元素
+        // label.4 设置行内容
         function getTableRow(rowNum, rowJson) {
             let clone = document.importNode(TmpRow.content, true);
             let td = clone.querySelectorAll("td");
@@ -317,38 +332,6 @@
             return Rows[rowNum - 1];
         }
 
-        function fileChange(target) {
-            let fileSize = 0;
-            const filepath = target.value;
-            const filemaxsize = 1024 * 2;//2M
-            console.log(target.files[0].name)
-            const isIE = navigator.userAgent.match(/MSIE/) != null;
-            if (isIE && !target.files) {
-                const fileSystem = new ActiveXObject("Scripting.FileSystemObject");
-                if (!fileSystem.FileExists(filePath)) {
-                    alert("File does not exist");
-                    return false;
-                }
-                const file = fileSystem.GetFile(filePath);
-                fileSize = file.Size;
-            } else {
-                fileSize = target.files[0].size;
-            }
-
-            const size = fileSize / 1024;
-            if (size > filemaxsize) {
-                alert("File cannot be larger than 2M");
-                target.value = "";
-                return false;
-            }
-            if (size <= 0) {
-                alert("File cannot be empty");
-                target.value = "";
-                return false;
-            }
-            target.parentElement
-            setRowReport(target.parentElement.parentElement, "pre-upload", target.files[0].name, filepath);
-        }
 
         // 点击顶部Tab
         function clickTab(e, id) {
@@ -405,6 +388,8 @@
             });
         }
 
+        /*** label.7 Begin:Report文件上传下载函数 ***/
+
         function clickDelPreUpload(e) {
             let input = e.parentElement.parentElement.querySelector('input');
             // 删除准备上传的文件
@@ -442,7 +427,65 @@
             });
         }
 
+        // 点击report delete按钮
+        function clickDelReport(e) {
+            let row = get_row_content(e);
+            console.log('clickDelReport', e);
+            $.ajax({
+                url: "{% url 'super_manage:delete_report' %}",
+                type: "GET",
+                data: {
+                    "id": row.id
+                },
+                async: false,
+                success: function (res) {
+                    if (res.status == 'success') {
+                        setRowReport(e.parentElement.parentElement, "upload")
+                    }
 
+                },
+                error: function (res) {
+                    alert('Request error.')
+                }
+            });
+        }
+
+        function fileChange(target) {
+            let fileSize = 0;
+            const filepath = target.value;
+            const filemaxsize = 1024 * 2;//2M
+            console.log(target.files[0].name)
+            const isIE = navigator.userAgent.match(/MSIE/) != null;
+            if (isIE && !target.files) {
+                const fileSystem = new ActiveXObject("Scripting.FileSystemObject");
+                if (!fileSystem.FileExists(filePath)) {
+                    alert("File does not exist");
+                    return false;
+                }
+                const file = fileSystem.GetFile(filePath);
+                fileSize = file.Size;
+            } else {
+                fileSize = target.files[0].size;
+            }
+
+            const size = fileSize / 1024;
+            if (size > filemaxsize) {
+                alert("File cannot be larger than 2M");
+                target.value = "";
+                return false;
+            }
+            if (size <= 0) {
+                alert("File cannot be empty");
+                target.value = "";
+                return false;
+            }
+            target.parentElement
+            setRowReport(target.parentElement.parentElement, "pre-upload", target.files[0].name, filepath);
+        }
+
+        /*** label.7 End:Report文件上传下载函数 ***/
+
+        // label.8
         function changeUrl(e) {
             let row = get_row_content(e);
             $.ajax({
@@ -474,7 +517,7 @@
                 data: {
                     "id": row.id,
                     'opr': type,
-                    'table':'order'
+                    'table': 'order'
                 },
                 async: false,
                 success: function (res) {
@@ -487,29 +530,6 @@
                         let newVal = res.newVal;
                         setRowStatus(e.parentElement, newVal);
                     }
-                },
-                error: function (res) {
-                    alert('Request error.')
-                }
-            });
-        }
-
-        // 点击report delete按钮
-        function clickDelReport(e) {
-            let row = get_row_content(e);
-            console.log('clickDelReport', e);
-            $.ajax({
-                url: "{% url 'super_manage:delete_report' %}",
-                type: "GET",
-                data: {
-                    "id": row.id
-                },
-                async: false,
-                success: function (res) {
-                    if (res.status == 'success') {
-                        setRowReport(e.parentElement.parentElement,"upload")
-                    }
-
                 },
                 error: function (res) {
                     alert('Request error.')
