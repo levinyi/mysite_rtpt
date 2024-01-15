@@ -44,7 +44,7 @@
                     <td>{{ gene.status }}</td>
                     <td>
                         {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="comming soon" href="#" class="text-decoration-none">
+                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See detail" href="{% url 'user_center:protein_edit' gene.id %}" class="text-decoration-none">
                             <i class="bi bi-eye me-2"></i>
                         </a>
                         {% else %}

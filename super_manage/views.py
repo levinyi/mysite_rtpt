@@ -262,7 +262,7 @@ def change_status(request):
 
     if table == 'order':
         obj = OrderInfo.objects
-        status_list = ['Created', 'Synthesizing', 'Shipped', 'Completed']
+        status_list = ['Cancelled', 'Created', 'Synthesizing', 'Shipped', 'Completed']
     elif table == 'vector':
         obj = Vector.objects
         status_list = ['Submitted', 'ReadyToUse']

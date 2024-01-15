@@ -27,6 +27,10 @@
         cursor: pointer;
         transform: translateY(-50%) scale(1.1); /* 轻微放大 */
     }
+    li {
+        word-wrap: break-word;
+        white-space: normal;
+    }
 </style>
 {% endblock %}
 {% block content %}
@@ -36,14 +40,14 @@
         <h2>Evaluation Results</h2>
         {% for gene in gene_list %}
             <!-- First Column -->
-            <div class="col-6">
+            <div class="col-7">
                 <!-- first row -->
                 <div class="row mt-5">
                     <div class="col">
                         <li> Gene Name: {{ gene.gene_name }}</li>
                     </div>
                     <div class="col">
-                        <li>Forbidden check list <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="The underlined sequences are avoided by default to assist subsequent cloning process"></i> : {{ gene.forbidden_check_list }}. </li>
+                        <li>Forbidden check list <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="The underlined sequences are avoided by default to assist subsequent cloning process"></i> : {{ gene.forbidden_check_list }}.</li>
                         <li> And found : {{ gene.contained_forbidden_list }}</li>
                     </div>
                 </div>
@@ -61,7 +65,7 @@
                 </div>
             </div>
             <!-- Second Column -->
-            <div class="col-6 mt-3">
+            <div class="col-5 mt-3">
                 <div class="row mt-3">
                     {% if gene.status == 'optimized' %}
                         <h3>Congrats!</h3>
@@ -100,6 +104,10 @@
                         </div>
                     {% endif %}
                 </div>
+            </div>
+            <!-- add a line -->
+            <div class="row mt-5">
+                <hr>
             </div>
         {% endfor %}
     </div>

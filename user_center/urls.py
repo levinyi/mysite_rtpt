@@ -19,7 +19,6 @@ urlpatterns = [
     path('view_order_detail/<int:order_id>/', views.view_order_detail, name='view_order_detail'),
     path('export_order_to_csv/<int:order_id>/', views.export_order_to_csv, name='export_order_to_csv'),
 
-
     path('manage_vector/', views.manage_vector, name='manage_vector'),
     path('vector_upload/', views.vector_upload, name='vector_upload'),
     path('vector_delete/', views.vector_delete, name='vector_delete'),
