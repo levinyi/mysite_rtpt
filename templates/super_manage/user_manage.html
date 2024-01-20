@@ -10,7 +10,7 @@
             <thead>
             <tr>
                 <th scope="col">#</th>
-                <th scope="col">Custom_ID</th>
+                {% comment %} <th scope="col">Custom_ID</th> {% endcomment %}
                 <th scope="col">User</th>
                 <th scope="col">email</th>
                 <th scope="col">company</th>
@@ -25,7 +25,7 @@
                 {% for user in user_list %}
                     <tr>
                         <th scope="row">{{ forloop.counter }}</th>
-                        <td>{{ user.custom_id }}</td>
+                        {% comment %} <td>{{ user.custom_id }}</td> {% endcomment %}
                         <td>{{ user.user }}</td>
                         <td>{{ user.email }}</td>
                         <td>{{ user.company }}</td>

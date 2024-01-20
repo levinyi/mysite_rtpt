@@ -7,6 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.csrf import csrf_exempt
+import pandas as pd
 from account.models import UserProfile
 from product.models import Vector
 from user_center.models import OrderInfo
@@ -295,8 +297,143 @@ def order_manage(request):
 
 @login_required
 @is_secondary_admin_required
-def vector_manage(request):
+def vector_manage_zxl(request):
     return render(request, 'super_manage/vector_manage.html', get_table_context("vector"))
+
+@login_required
+@is_secondary_admin_required
+def vector_manage(request):
+    '''list vector'''
+    company_vector_list = Vector.objects.filter(user=None).order_by('-create_date')
+    company_page_object = Pagination(request, company_vector_list, page_size=10)
+
+    custom_vector_list = Vector.objects.filter(user__isnull=False).order_by('-create_date')
+    custom_page_object = Pagination(request, custom_vector_list, page_size=10)
+
+    context = {
+        'company_vector_list': company_page_object.page_queryset,  # 分完页的数据
+        'company_page_string': company_page_object.html(),  # 页码
+        'custom_vector_list': custom_page_object.page_queryset,  # 分完页的数据
+        'custom_page_string': custom_page_object.html(),  # 页码
+    }
+    return render(request, 'super_manage/vector_manage_dsy.html', context)
+
+
+@login_required
+@is_secondary_admin_required
+def vector_delete(request):
+    if request.method == 'POST':
+        vector_id = request.POST.get('gene_id')
+        vector = Vector.objects.get(id=vector_id)
+        print(f"{request.user} delete this {vector_id} {vector.vector_id} {vector.vector_name}")
+    
+        if vector.vector_file:
+            file_path = vector.vector_file.path
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        if vector.vector_gb:
+            file_path = vector.vector_gb.path
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        if vector.vector_png:
+            file_path = vector.vector_png.path
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        vector.delete()
+        return JsonResponse({'status': 'success', 'message': 'Vector deleted Successfully'})
+    else:
+        return JsonResponse({'status': 'failed', 'message': 'Not A Post Request.'})
+
+
+@login_required
+@is_secondary_admin_required
+@csrf_exempt
+def vector_upload_file(request):
+    '''for customer's vector file, vector_png and vector_gb files.'''
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('file')
+        vector_id = request.POST.get('vectorId')
+        print(vector_id)
+        file_type = request.POST.get('fileType')
+
+        if uploaded_file is None or vector_id is None or file_type is None:
+            return JsonResponse({'status': 'failed', 'message': 'Invalid params.'})
+
+        try:
+            vector = Vector.objects.get(id=vector_id)
+            if file_type == 'vector_file':
+                if vector.vector_file:
+                    file_path = vector.vector_file.path
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                vector.vector_file = uploaded_file
+            elif file_type == 'vector_png':
+                if vector.vector_png:
+                    file_path = vector.vector_png.path
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                vector.vector_png = uploaded_file
+            elif file_type == 'vector_gb':
+                # 如果存在旧的genebank文件，先删除
+                if vector.vector_gb:
+                    file_path = vector.vector_gb.path
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                vector.vector_gb = uploaded_file
+            else:
+                return JsonResponse({'status': 'failed', 'message': 'Invalid params.'})
+            vector.save()
+        except Exception as e:
+            return JsonResponse({'status': 'failed', 'message': str(e)})
+        
+        return JsonResponse({'status': 'success', 'message': 'File uploaded Successfully'})
+
+
+def vector_edit_item(request):
+    if request.method == 'POST':
+        vector_id = request.POST.get('vector_id')
+        new_status = request.POST.get('new_status')
+        print(f"vector_id: {vector_id}, new_status: {new_status}")
+        try:
+            vector = Vector.objects.get(id=vector_id)
+            print(f"vector: {vector}")
+            vector.status = new_status
+            vector.save()
+            return JsonResponse({'status': 'success'})
+        except Vector.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Vector not found'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+
+@login_required
+@is_secondary_admin_required
+def vector_add_item(request):
+    '''can edit any item in vector model, eg. 'status','''
+    if request.method == 'POST':
+        csv_file = request.FILES.get('csvFile')
+        if not csv_file.name.endswith('.csv'):
+            return HttpResponse("File is not CSV type", status=400)
+
+        # 使用 Pandas 读取 CSV 文件
+        try:
+            df = pd.read_csv(csv_file)
+
+            # 对于 DataFrame 中的每一行，创建一个模型实例并保存
+            for _, row in df.iterrows():
+                model_instance = Vector(**row.to_dict())
+                model_instance.save()
+
+            return HttpResponse("CSV file has been imported", status=200)
+
+        except Exception as e:
+            # 处理异常
+            return HttpResponse(str(e), status=500)
+
+    # 如果不是 POST 请求，返回错误
+    return HttpResponse("Invalid request", status=400)
+
 
 @login_required
 @is_secondary_admin_required

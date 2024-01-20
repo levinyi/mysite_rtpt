@@ -19,6 +19,10 @@ urlpatterns = [
     path('vector_manage/vector_delete/', views.vector_delete, name='vector_delete'),
     path('vector_manage/vector_upload/', views.vector_upload, name='vector_upload'),
 
+    path('vector_upload_file/', views.vector_upload_file, name='vector_upload_file'),
+    path('vector_add_item/', views.vector_add_item, name='vector_add_item'),
+    path('vector_edit_item/', views.vector_edit_item, name='vector_edit_item'),
+
     path('get_rows', views.get_rows, name='get_rows'),
 
     # user management

@@ -668,15 +668,18 @@ def vector_delete(request):
         vector = Vector.objects.get(user=request.user, id=vector_id)
 
         # 删除与之关联的文件
-        file_path = vector.vector_file.path
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        if vector.vector_file:
+            file_path = vector.vector_file.path
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
         vector.delete()
         return JsonResponse({'status': 'success', 'message': 'Gene deleted successfully'})
     else:
         return render(request, 'user_center/manage_vector.html')
 
+
+@login_required
 def vector_download(request, vector_id, file_type, is_admin=False):
     # user只能下载自己的vector和公司的vector，不能下载别人的vector，所以需要验证
     if not is_admin:
@@ -695,26 +698,27 @@ def vector_download(request, vector_id, file_type, is_admin=False):
     NC3 = vector_object.NC3
     iu20 = vector_object.iu20
     id20 = vector_object.id20
-    vector_map = vector_object.vector_map
-    vector_file = vector_object.vector_file # 这是用户上传的文件，不是png的文件
-    vector_png = vector_object.vector_png
-    data = {
-        'vector_id': vector_id,
-        'vector_name': vector_name,
-        'NC5': NC5,
-        'NC3': NC3,
-        'iu20': iu20,
-        'id20': id20,
-        'vector_map': vector_map,
-    }
+    vector_map = vector_object.vector_map  # 
+    vector_file = vector_object.vector_file # 这是用户上传的原始文件，通常是一个没有处理的序列文件，可以是多种格式。不是png的文件, 
     # pdf not used
     if file_type == 'pdf':
+        '''Not used'''
         # 生成PDF文件
+        data = {
+            'vector_id': vector_id,
+            'vector_name': vector_name,
+            'NC5': NC5,
+            'NC3': NC3,
+            'iu20': iu20,
+            'id20': id20,
+            'vector_map': vector_map,
+        }
         pdf_buffer = render_to_pdf(data)
         response = HttpResponse(pdf_buffer, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{vector_name}.pdf"'
         return response
     elif file_type == 'txt':
+        '''Not used'''
         # 使用 quote 可以确保浏览器正确解析文件名。特别是文件名包含空格或其他特殊字符时
         response = HttpResponse(content_type='text/plain')
         custom_filename = f'RootPath_{vector_id}_{vector_name}.txt'
@@ -723,8 +727,10 @@ def vector_download(request, vector_id, file_type, is_admin=False):
         response.write(f"iD20: {iu20}\n")
         response.write(f"iD20: {id20}\n")
         response.write(f"Vector Map: {NC3}{vector_map}{NC5}\n")
+    
         return response
     elif file_type == 'dna':
+        '''Not used'''
         response = HttpResponse(content_type='text/plain')
         custom_filename = f'RootPath_{vector_id}_{vector_name}.dna'
         response['Content-Disposition'] = f'attachment; filename="{quote(custom_filename)}"'
@@ -732,6 +738,7 @@ def vector_download(request, vector_id, file_type, is_admin=False):
         return response
     elif file_type == 'map':
         # 返回vector_png文件
+        vector_png = vector_object.vector_png  # 这是改造后的Vector_png
         if vector_png:
             response = HttpResponse(vector_png, content_type='application/octet-stream')
             name = vector_png.name   # user/vector_file/pCVa001M1Kan_pET-28.png
@@ -745,6 +752,36 @@ def vector_download(request, vector_id, file_type, is_admin=False):
                 return response
         else:
             return HttpResponse("No vector map found")
+    elif file_type == 'gb':
+        # 返回vector_genebank文件
+        vector_gb = vector_object.vector_gb
+        if vector_gb:
+            response = HttpResponse(vector_gb, content_type='application/octet-stream')
+            name = vector_gb.name
+            file_path = default_storage.path(name)
+            basename = os.path.basename(file_path)
+            with default_storage.open(file_path, 'rb') as file:
+                response = HttpResponse(file.read(), content_type='application/octet-stream')
+                custom_filename = f'RootPath_{basename}'
+                response['Content-Disposition'] = f'attachment; filename="{quote(custom_filename)}"'
+                return response
+        else:
+            return HttpResponse("No vector GeneBank file found", status=404)
+    elif file_type == 'file':
+        # 返回vector_file文件
+        vector_file = vector_object.vector_file
+        if vector_file:
+            response = HttpResponse(vector_file, content_type='application/octet-stream')
+            name = vector_file.name
+            file_path = default_storage.path(name)
+            basename = os.path.basename(file_path)
+            with default_storage.open(file_path, 'rb') as file:
+                response = HttpResponse(file.read(), content_type='application/octet-stream')
+                custom_filename = f'RootPath_{basename}'
+                response['Content-Disposition'] = f'attachment; filename="{quote(custom_filename)}"'
+                return response
+        else:
+            return HttpResponse("No vector file found", status=404)
     else:
-        return HttpResponse("File type not supported")
+        return HttpResponse("File type not supported", status=400)
 
