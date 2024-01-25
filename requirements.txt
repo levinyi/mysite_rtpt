@@ -11,3 +11,4 @@ django-cors-headers
 reportlab
 django-import-export
 alibabacloud-dysmsapi20170525
+biopython

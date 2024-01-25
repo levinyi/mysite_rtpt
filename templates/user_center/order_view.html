@@ -15,6 +15,7 @@
                         <th scope="col">Status</th>
                         <th scope="col">Creation Time</th>
                         <th scope="col">Details</th>
+                        <th scope="col">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -30,7 +31,19 @@
                                 data-bs-placement="top" title="See details" class="text-decoration-none">
                                 <i class="bi bi-ticket-detailed"></i> See Details
                             </a>
-                        </td> 
+                        </td>
+                        {% if order.status == 'Cancelled' %}
+                        <td>
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete this order" href="javascript:"
+                                onclick="del_order(this, {{ order.id }})">
+                                <i class="bi bi-trash text-danger"></i>
+                            </a>
+                        </td>
+                        {% else %}
+                        <td>
+                            <i data-bs-toggle="tooltip" data-bs-replacement="top" title="Only cancelled orders can be deleted by users. If you wish to cancel this order, please contact the administrator." class="bi bi-trash text-secondary"></i>
+                        </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -48,5 +61,42 @@
     $(function () {
         $('[data-bs-toggle="tooltip"]').tooltip()
     })
+</script>
+<script>
+    function del_order(the, order_id) {
+        layer.open({
+            type: 1,
+            skin: 'layui-layer-rim',
+            area: ['420px', '240px'],
+            title: 'Delete',
+            content: '<div style="padding: 20px 80px;">Are you sure to delete this item?</div>',
+            btn: ['Yes', 'No'],
+            btnAlign: 'c',
+            yes: function (index, layero) {
+                $.ajax({
+                    url: "{% url 'user_center:order_delete' %}",
+                    type: "POST",
+                    data: {
+                        'csrfmiddlewaretoken': '{{ csrf_token }}',
+                        'order_id': order_id,
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        if (data.status === 'success') {
+                            layer.msg('Delete successfully!', { icon: 1 });
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg(data.message, { icon: 2 });
+                        }
+                    },
+                    error: function (xhr, errmsg, err) {
+                        layer.msg('Delete failed!', { icon: 2 });
+                    }
+                });
+            },
+        })
+    }
 </script>
 {% endblock %}

@@ -126,10 +126,11 @@
     let hot1Initialized = false;
     let hot2Initialized = false;
 
+    let validationFailed = false; // 用于检查是否有单元格未通过验证
+
     // Tab切换事件监听
     $('#myTab button').on('shown.bs.tab', function (e) {
         const target = $(e.target).data("bs-target");
-
         if (target === '#nt_sequence' && !hot1Initialized) {
             initHot1();
             console.log('init hot1');
@@ -141,33 +142,68 @@
         }
     });
 
+    // 生成基因名验证器
+    function createGeneNameValidator() {
+        let lastError = '';
+        return function(value, callback) {
+            var regex = /^[a-zA-Z0-9_-]{1,15}$/;
+            if (!regex.test(value)) {
+                lastError = 'Gene Name "' + value + '" is invalid. It must be 1-15 characters long and can only contain letters, numbers, underscores, and hyphens.';
+                callback(false);
+            } else {
+                lastError = '';
+                callback(true);
+            }
+            return lastError;
+        };
+    }
+    // 生成序列验证器
+    function createSequenceValidator() {
+        let lastError = '';
+        return function(value, callback) {
+            var regex = /^[a-zA-Z0-9\*\n\r]*$/;
+            if (!regex.test(value)) {
+                lastError = 'Sequence "' + value + '" is invalid. It should not contain spaces, multiple lines, line breaks, or illegal characters.';
+                callback(false);
+            } else {
+                lastError = '';
+                callback(true);
+            }
+            return lastError;
+        };
+    }
+
+    // 初始化第一个Tab的Handsontable, 在初始化函数中使用这些验证器
     function initHot1() {
         const container1 = document.querySelector('#excelTable');
+        const geneNameValidator = createGeneNameValidator();
+        const sequenceValidator = createSequenceValidator();
+
         hot1 = new Handsontable(container1, {
             // 配置
             colHeaders: ['Gene Name', 'Sequence'],
             rowHeaders: true,
             colWidths: [300, 600],  // 设置每列的宽度
             columns: [
-                { 
-                    data: 'GeneName',
-                    validator: function (value, callback) {
-                        // 正则表达式匹配数字，字母，下划线，短横线，且长度不超过15，不能有空格
-                        var regex = /^[a-zA-Z0-9_-]{1,15}$/;
-
-                        // 检查是否符合规则
-                        if (!regex.test(value)) {
-                            callback(false, 'Only letters, numbers, underscores, and hyphens are allowed, and the length cannot exceed 15.');
-                        } else {
-                            callback(true);
-                        }
-                    }
-                },
-                { data: 'Sequence' },
+                { data: 'GeneName', validator: geneNameValidator },
+                { data: 'Sequence', validator: sequenceValidator },
             ],
             height: 'auto',
             width: 'auto',
             licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+        });
+
+        hot1.addHook('afterValidate', function (isValid, value, row, prop, source) {
+            if (!isValid) {
+                validationFailed = true;
+                let errorMessage = '';
+                if (prop === 'GeneName') {
+                    errorMessage = geneNameValidator(value, () => {});
+                } else if (prop === 'Sequence') {
+                    errorMessage = sequenceValidator(value, () => {});
+                }
+                alert('Validation error at row ' + (row + 1) + ': ' + errorMessage);
+            }
         });
         // "+" 按钮的点击事件
         document.getElementById('addRowBtn').addEventListener('click', function () {
@@ -179,27 +215,16 @@
         var speciesList = {{ species_names_json | safe }};
 
         const container2 = document.querySelector('#excelTable2');
+        const geneNameValidator = createGeneNameValidator();
+        const sequenceValidator = createSequenceValidator();
         hot2 = new Handsontable(container2, {
             // 配置
             colHeaders: ['Gene Name*', 'AA Sequence*', 'Species*', 'Forbidden Sequence <i class="bi bi-question-circle"></i>', "5' Non-coding Sequence", "3' Non-coding Sequence"],
             rowHeaders: true,
             colWidths: [100, 300, 100, 200, 200,200],  // 设置每列的宽度
             columns: [
-                { 
-                    data: 'GeneName',
-                    validator: function (value, callback) {
-                        // 正则表达式匹配数字，字母，下划线，短横线，且长度不超过15，不能有空格
-                        var regex = /^[a-zA-Z0-9_-]{1,15}$/;
-
-                        // 检查是否符合规则
-                        if (!regex.test(value)) {
-                            callback(false, 'Only letters, numbers, underscores, and hyphens are allowed, and the length cannot exceed 15.');
-                        } else {
-                            callback(true);
-                        }
-                    }
-                },
-                { data: 'Sequence' },
+                { data: 'GeneName', validator: geneNameValidator },
+                { data: 'Sequence', validator: sequenceValidator },
                 { type: 'dropdown', source: speciesList, data: 'Species' },
                 { data: 'ForbiddenSequence' },
                 { data: '5NC' },
@@ -209,6 +234,19 @@
             height: 'auto',
             width: 'auto',
             licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+        });
+
+        hot2.addHook('afterValidate', function (isValid, value, row, prop, source) {
+            if (!isValid) {
+                validationFailed = true;
+                let errorMessage = '';
+                if (prop === 'GeneName') {
+                    errorMessage = geneNameValidator(value, () => {});
+                } else if (prop === 'Sequence') {
+                    errorMessage = sequenceValidator(value, () => {});
+                }
+                alert('Validation error at row ' + (row + 1) + ': ' + errorMessage);
+            }
         });
         // "+" 按钮的点击事件
         document.getElementById('addRowBtn2').addEventListener('click', function () {
@@ -231,6 +269,12 @@
         // 检查是否选择了vector
         if (!vectorId) {
             alert('Please select a vector.');
+            return;
+        }
+        // 检查是否有单元格未通过验证
+        if (validationFailed) {
+            alert('Please correct the errors(cells with red background) in the table.');
+            validationFailed = false;
             return;
         }
 
@@ -278,6 +322,7 @@
             alert('An Error occurred while sending the data:', error);
         });
     }
+
     function postDataFromAaSequence() {
         const hotData = hot2.getData();
         const vectorSelect = document.querySelector('#vector_id');
@@ -285,6 +330,12 @@
         // 检查是否选择了vector
         if (!vectorId) {
             alert('Please select a vector.');
+            return;
+        }
+        // 检查是否有单元格未通过验证
+        if (validationFailed) {
+            alert('Please correct the errors(cells with red background) in the table.');
+            validationFailed = false;
             return;
         }
 

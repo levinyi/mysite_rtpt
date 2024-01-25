@@ -274,6 +274,16 @@ def myself_edit(request):
         return render(request, "account/myself.html", {"user": request.user, "userprofile": userprofile})
 
 
+def avatar_edit(request):
+    if request.method == 'POST':
+        userid = request.POST.get('userid')
+        imagePath = request.POST.get('imagePath')
+        print(f"userid:{userid}, imagePath:{imagePath}")
+        UserProfile.objects.filter(user_id=userid).update(photo=imagePath)
+        return HttpResponse('success')
+    else:
+        return HttpResponse('error')
+
 def register(request):
     if request.user.is_authenticated:
         return HttpResponseRedirect(reverse('/user_center/dashboard/'))

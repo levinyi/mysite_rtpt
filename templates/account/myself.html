@@ -1,10 +1,20 @@
 {% extends "user_center/base.html" %}
 {% block title %}Profile Settings {% endblock %}
-
+{% block extra_head %}
+<style>
+.avatar-icon {
+    width: 50px; /* Adjust the size as needed */
+    height: 50px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+</style>
+{% endblock %}
 {% block content %}
-<div class="card-header bg-transparent border-bottom">
+<div class="card-header bg-transparent border-bottom mt-3 mb-2">
     <h3 class="card-header-title mb-0">Edit Profile</h3>
-    <h5 class="card-header-title mb-0">Register at {{ user.register_time }}.</h5>
+    <h5 class="card-header-title mb-2 text-end">Register at {{ userprofile.register_time }}.</h5>
 </div>
 <div class="card-body">
     <!-- Form -->
@@ -12,19 +22,30 @@
         {% csrf_token %}
         <!-- Profile picture -->
         <div class="col-12 justify-content-center align-items-center">
-            <label class="form-label">Profile picture</label>
+            <label class="form-label">Choose an avatar</label>
             <div class="d-flex align-items-center">
-                <label class="position-relative me-4" for="uploadfile-1" title="Replace this pic">
-                    <!-- Avatar place holder -->
-                    <span class="avatar avatar-xl">
-                        <img id="uploadfile-1-preview" class="avatar-img rounded-circle border border-white border-3 shadow" src="{{ user.photo }}" alt="">
-                    </span>
-                    <!-- Remove btn -->
-                    <button type="button" class="uploadremove"><i class="bi bi-x text-white"></i></button>
-                </label>
-                <!-- Upload button -->
-                <label class="btn btn-primary-soft mb-0" for="uploadfile-1">Change</label>
-                <input id="uploadfile-1" class="form-control d-none" type="file">
+                <!-- Avatar place holder -->
+                <span id="selected-avatar" class="avatar avatar-xl">
+                    <img class="avatar-img rounded-circle border border-white border-3 shadow" src="{{ user.photo }}" alt="">
+                </span>
+                <!-- Image selection -->
+                <div id="image-options" class="d-flex justify-content-center align-items-center">
+                    <img class="avatar-icon" src="/static/user_avatar/1.png" onclick="selectImage('/static/user_avatar/1.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/2.png" onclick="selectImage('/static/user_avatar/2.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/3.png" onclick="selectImage('/static/user_avatar/3.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/4.png" onclick="selectImage('/static/user_avatar/4.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/5.png" onclick="selectImage('/static/user_avatar/5.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/6.png" onclick="selectImage('/static/user_avatar/6.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/7.png" onclick="selectImage('/static/user_avatar/7.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/8.png" onclick="selectImage('/static/user_avatar/8.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/9.png" onclick="selectImage('/static/user_avatar/9.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/10.png" onclick="selectImage('/static/user_avatar/10.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/11.png" onclick="selectImage('/static/user_avatar/11.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/12.png" onclick="selectImage('/static/user_avatar/12.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/13.png" onclick="selectImage('/static/user_avatar/13.png')">
+                    <img class="avatar-icon" src="/static/user_avatar/14.png" onclick="selectImage('/static/user_avatar/14.png')">
+                    <!-- Add more images as needed -->
+                </div>
             </div>
         </div>
 
@@ -39,7 +60,7 @@
 
         <!-- Username -->
         <div class="col-md-6">
-            <label class="form-label">Username</label>
+            <label class="form-label">User name</label>
             <div class="input-group">
                 <span class="input-group-text">RootPath.com</span>
                 <input type="text" class="form-control" value="{{ user.username }}" disabled>
@@ -89,4 +110,24 @@
         </div>
     </form>
 </div>
+{% endblock %}
+{% block javascript %}
+<script>
+    function selectImage(imagePath) {
+        // 点击时，将图片路径上传给服务器，保存到数据库
+        $.ajax({
+            url: "{% url 'account:avatar_edit' %}",
+            type: "POST",
+            data: {
+                "csrfmiddlewaretoken": "{{ csrf_token }}",
+                "imagePath": imagePath,
+                "userid": "{{ user.id }}",
+            },
+            success: function (data) {
+                // 上传成功后, 刷新页面
+                location.reload();
+            }
+        });
+    }
+</script>
 {% endblock %}

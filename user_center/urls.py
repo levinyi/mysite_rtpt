@@ -6,19 +6,24 @@ app_name = 'user_center'
 urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('order_create/', views.order_create, name='order_create'),
+
     path('gene_detail/', views.gene_detail, name='gene_detail'),
     path('save_species/', views.save_species, name='save_species'),
     path('gene_edit/<int:gene_id>/', views.gene_edit, name='gene_edit'),
     path('protein_edit/<int:gene_id>/', views.protein_edit, name='protein_edit'),
     path('gene_delete/', views.gene_delete, name='gene_delete'),
     path('gene_validation/', views.gene_validation, name='gene_validation'),
+    # shopping cart
     path('view_cart/', views.view_cart, name='view_cart'),
+    path('cart_genbank_download/<int:gene_id>/', views.cart_genbank_download, name='cart_genbank_download'),
     path('checkout/', views.checkout, name='checkout'),
     path('submit_notification/', views.submit_notification, name='submit_notification'),
+    # order
     path('manage_order/', views.manage_order, name='manage_order'),
     path('view_order_detail/<int:order_id>/', views.view_order_detail, name='view_order_detail'),
     path('export_order_to_csv/<int:order_id>/', views.export_order_to_csv, name='export_order_to_csv'),
-
+    path('order_delete/', views.order_delete, name='order_delete'),
+    # vector
     path('manage_vector/', views.manage_vector, name='manage_vector'),
     path('vector_upload/', views.vector_upload, name='vector_upload'),
     path('vector_delete/', views.vector_delete, name='vector_delete'),

@@ -158,11 +158,8 @@
     </div>
     <div class="row">
         <div class="col text-center mb-5">
-            <!-- 如果全部status为saved，则显示order now按钮 -->
-            {% comment %} {% if gene_list|check_status:"saved" %} {% endcomment %}
             <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add more Genes</a>
             <a href="{% url 'user_center:view_cart' %}" class="btn btn-primary"><i class="bi bi-cart3"></i> Go to Shopping Cart</a>
-            {% comment %} {% endif %} {% endcomment %}
         </div>
     </div>
 </div>
@@ -264,42 +261,42 @@
     }
 
 
-        // 添加事件监听器
+    // 添加事件监听器
     function addCodonBoxEventListeners(codonBox, selector) {
-            codonBox.addEventListener("click", function(e, event) {
-                const codon = codonBox.childNodes[0].textContent;
-                const list = getCodonDetail(selector.value, codon);
-                const item_begin = `<li><a class="dropdown-item small-dropdown-item" onclick="clickNewCodon(this,event)">`;
-                const item_end = `</a></li>`;
-                var ul = codonBox.querySelector("ul");
-                if(list === null)
-                    return;
-                ul.innerHTML = ""
-                if(list.length > 0) {
-                    for (let i = 0; i < list.length; i++) {
-                        // 追加列表元素
-                        ul.innerHTML += (item_begin + list[i]["Triplet"] + item_end)
-                    }
+        codonBox.addEventListener("click", function(e, event) {
+            const codon = codonBox.childNodes[0].textContent;
+            const list = getCodonDetail(selector.value, codon);
+            const item_begin = `<li><a class="dropdown-item small-dropdown-item" onclick="clickNewCodon(this,event)">`;
+            const item_end = `</a></li>`;
+            var ul = codonBox.querySelector("ul");
+            if(list === null)
+                return;
+            ul.innerHTML = ""
+            if(list.length > 0) {
+                for (let i = 0; i < list.length; i++) {
+                    // 追加列表元素
+                    ul.innerHTML += (item_begin + list[i]["Triplet"] + item_end)
                 }
-            });
-            codonBox.addEventListener("mouseenter", function(e, event) {
-                const codon = e.srcElement.innerText.toUpperCase();
-                const list = getCodonDetail(selector.value, codon);
-                if (list === null) {
-                    codonBox.setAttribute('title', "Unknown");
-                }
-                else{
-                    // var text = 'Triplet(' + list[0]["Amino acid"] + ')   Frequency  Fraction \n'
-                    var text = '\t ' + list[0]["Amino acid"] + ' \t Frequency  Fraction \n'
-                    list.forEach(function(item) {
-                        var fre = item["Frequency"].toFixed(2).padEnd(9, ' ');
-                        var fra = item["Fraction"].toFixed(2).padEnd(9, ' ');
-                        // 尽量对齐，不足加空格
-                        text += ('  ' + item["Triplet"] + " :").padEnd(13, ' ') + "  " + fre + "\t" + fra + '\n';
-                    });
-                    codonBox.setAttribute('title', text);
-                }
-            });
+            }
+        });
+        codonBox.addEventListener("mouseenter", function(e, event) {
+            const codon = e.srcElement.innerText.toUpperCase();
+            const list = getCodonDetail(selector.value, codon);
+            if (list === null) {
+                codonBox.setAttribute('title', "Unknown");
+            }
+            else{
+                // var text = 'Triplet(' + list[0]["Amino acid"] + ')   Frequency  Fraction \n'
+                var text = '\t ' + list[0]["Amino acid"] + ' \t Frequency  Fraction \n'
+                list.forEach(function(item) {
+                    var fre = item["Frequency"].toFixed(2).padEnd(9, ' ');
+                    var fra = item["Fraction"].toFixed(2).padEnd(9, ' ');
+                    // 尽量对齐，不足加空格
+                    text += ('  ' + item["Triplet"] + " :").padEnd(13, ' ') + "  " + fre + "\t" + fra + '\n';
+                });
+                codonBox.setAttribute('title', text);
+            }
+        });
     }
 
     // 点击species_select按钮时，保存物种名称到数据库中, 这部分功能是完整的。

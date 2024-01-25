@@ -1,10 +1,12 @@
 import json, re, os
+import tempfile
 import pandas as pd
 from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from product.models import GeneSynEnzymeCutSite, Species, Vector
+from tools.scripts.ParsingGenBank import addFeaturesToGeneBank
 from user_center.utils.pagination import Pagination
 from .models import Cart, GeneInfo, OrderInfo
 from .utils.render_to_pdf import render_to_pdf
@@ -46,8 +48,6 @@ def order_create(request):
         except Vector.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Invalid vector ID'})
 
-        # nc5 = vector.NC5
-        # nc3 = vector.NC3
         iu20 = vector.iu20
         id20 = vector.id20
 
@@ -61,10 +61,9 @@ def order_create(request):
 
             gene_name = row[0]
             original_seq = row[1]
+            original_seq = original_seq.replace("\n","").replace("\r","").replace(" ","") # 去掉换行符和空格
             species = None
             forbid_seq = None
-            # aa_nc5 = ''
-            # aa_nc3 = ''
             combined_seq = original_seq
             saved_seq = original_seq
             gc_content = None
@@ -91,8 +90,6 @@ def order_create(request):
                 response_message = 'AA sequence submitted for codon optimization. Please wait 10-20 minutes to check the result.'
             else:
                 # print("Processing NT sequence")
-                # original_seq = f'<span class="text-lowercase">{nc5}</span>{original_seq}<span class="text-lowercase">{nc3}</span>'
-                # combined_seq = nc5 + row[1] + nc3
                 combined_seq = f'{iu20.lower()}{original_seq}{id20.lower()}'
                 tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(combined_seq, forbid_seq)
                 # print("seq_status: ", seq_status, "forbidden_check_list: ", forbidden_check_list, "contained_forbidden_list: ", contained_forbidden_list)
@@ -111,7 +108,6 @@ def order_create(request):
                     'species': species,
                     'status': status,
                     'forbid_seq': forbid_seq,
-                    # 'combined_seq': original_seq,
                     'combined_seq': combined_seq,
                     'i5nc': i5nc,
                     'i3nc': i3nc,
@@ -212,7 +208,7 @@ def gene_validation(request):
             return JsonResponse({'status': 'error', 'message': 'No changes made.'})
 
         tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(edited_seq, gene_object.forbid_seq)
-        # print(seq_status)
+        print(f"tagged_seq: {tagged_seq}, seq_status: {seq_status}, forbidden_check_list: {forbidden_check_list}, contained_forbidden_list: {contained_forbidden_list}, gc_content: {gc_content}")
         if seq_status in ['Protein', 'Invalid Protein']:
             return JsonResponse({'status': 'error', 'message': 'Squence is not allowed. Your sequence may has '+ seq_status + ' sequence.'})
         gene_object.status = seq_status
@@ -305,6 +301,27 @@ def view_cart(request):
     }
     return render(request, 'user_center/cart_view.html', context)
 
+@login_required
+def cart_genbank_download(request, gene_id):
+    '''下载购物车中的基因的genbank文件'''
+    gene = GeneInfo.objects.get(user=request.user, id=gene_id)
+    sequence = re.sub(r'<[^>]*>', '', gene.saved_seq)
+    # 删除序列前后的小写字母
+    sequence = re.sub(r'^[a-z]+|[a-z]+$', '', sequence)
+
+    vector = gene.vector
+    if vector.vector_gb:
+        vector_genbank_file_path = vector.vector_gb.path  # Get the file path
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
+            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)
+
+            temp_file.seek(0)
+            response = HttpResponse(temp_file.read(), content_type='application/genbank')
+            response['Content-Disposition'] = f'attachment; filename="RootPath-Online-Submition-{vector.vector_name}-{gene.gene_name}.gb"'
+            return response
+    else:
+        print("no vector_gb")
+        return HttpResponse("No vector genbank file found")
 
 @login_required
 @require_POST
@@ -421,10 +438,27 @@ def export_order_to_csv(request, order_id):
     return response
 
 
-# checked
+@login_required
 def manage_order(request):
     order_list = OrderInfo.objects.filter(user=request.user)
     return render(request, 'user_center/order_view.html', {'order_list': order_list})
+
+
+@login_required
+def order_delete(request):
+    '''删除订单
+        只有status为Cancelled的订单才能被删除!
+    '''
+    if request.method == 'POST':
+        order_id = request.POST.get('order_id')
+        order = OrderInfo.objects.get(id=order_id)
+        if order.status == 'Cancelled':
+            order.delete()
+            return JsonResponse({'status': 'success', 'message': 'Order deleted successfully'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Only cancelled order can be deleted'})
+    else:
+        return render(request, 'user_center/order_view.html')
 
 @login_required
 def manage_vector(request):
