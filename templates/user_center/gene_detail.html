@@ -45,6 +45,8 @@
         background-color: #e0e0e0;
         cursor: pointer;
     }
+    .danger { background-color: red; }
+    .warning { background-color: yellow; }
 </style>
 {% endblock %}
 {% block content %}
@@ -86,8 +88,15 @@
 <div class="container-fluid" style="padding-left:50px;">
     <div class="row mt-3">
         <h2>Editing Gene Sequences</h2>
+        <div id="gene-info-list"></div>
         {% for gene in gene_list %}
         <!-- First Row -->
+        <!-- test -->
+        <div class="card-body text-truncate first_col_trun" id="original-sequence">
+        </div>
+        <div class="card-body monospace-text first_col_full" id="modified-sequence">
+        </div>
+
         <div class="row mt-5">
             <div class="col-4">
                 <p> Gene Name: {{ gene.gene_name }}</p>
@@ -103,19 +112,33 @@
         <div class="row mb-5 mt-3">
             <!-- First Column Original sequences -->
             <div class="col-md-5 col-12">
-                <p class="monospace-text">Original sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. This only provides a view for insertion site, which is not counted for charging"></i> :</p>
-                <!-- Add your sequences content here -->
+                <p class="monospace-text">Original sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" 
+                    title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. 
+                    This only provides a view for insertion site, which is not counted for charging"></i> :</p>
+                <!-- sequences content here -->
                 <div class="card">
-                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate"><span class="text-lowercase">{{gene.vector.iu20}}</span>{{ gene.original_seq|safe}}<span class="text-lowercase">{{gene.vector.id20}}</span></div>
-                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %}  class="card-body monospace-text first_col_full" id="sequence"><span class="text-lowercase">{{gene.vector.iu20}}</span>{{ gene.original_seq|safe}}<span class="text-lowercase">{{gene.vector.id20}}</span></div>
+                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate">
+                        <!-- <span class="text-lowercase">{{gene.vector.iu20}}</span> -->
+                        {{ gene.original_seq|safe}}
+                        <!-- <span class="text-lowercase">{{gene.vector.id20}}</span> -->
+                    </div>
+                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %}  class="card-body monospace-text first_col_full" id="sequence">
+                        <!-- <span class="text-lowercase">{{gene.vector.iu20}}</span> -->
+                        {{ gene.original_seq|safe}}
+                        <!-- <span class="text-lowercase">{{gene.vector.id20}}</span> -->
+                    </div>
                 </div>
             </div>
             <!-- Second Column Edited sequences -->
             <div class="col-md-5 col-12 .second_col">
-                <p class="monospace-text">Edited sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. This only provides a view for insertion site, which is not counted for charging"></i> :</p>
+                <p class="monospace-text">Edited sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" 
+                    title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. 
+                    This only provides a view for insertion site, which is not counted for charging"></i> :</p>
                 <div class="card">
-                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate second_col_trun" contenteditable="false" id="edited-sequence-trun">{{ gene.saved_seq|safe }}</div>
-                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="card-body monospace-text second_col_full" contenteditable="true" id="edited-sequence">{{ gene.saved_seq|safe }}</div>
+                    <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate second_col_trun" contenteditable="false" id="edited-sequence-trun">
+                        {{ gene.saved_seq|safe }}</div>
+                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="card-body monospace-text second_col_full" contenteditable="true" id="edited-sequence">
+                        {{ gene.saved_seq|safe }}</div>
                 </div>
             </div>
             <!-- Third Column -->
@@ -127,7 +150,10 @@
                             <option value="" {% if not gene.species or not gene.species.species_name %}selected{% endif %}>Choose a species</option>
                             {% for species in species_names %}
                                 <!-- 检查当前gene的species是否等于循环中的species -->
-                                <option value="{{ species }}" {% if gene.species and species == gene.species.species_name %}selected{% endif %}>{{ species }}</option>
+                                <!-- Add numbers by using the forloop.counter -->
+                                <option value="{{ species }}" {% if gene.species and species == gene.species.species_name %}selected{% endif %}>
+                                    {{ forloop.counter }}. {{ species }}
+                                </option>
                             {% endfor %}
                         </select>
                         <!-- 将gene.id传递到后端 -->
@@ -143,7 +169,7 @@
                     <button class="btn btn-warning toggle-btn mt-3" data-displayed="false">Toggle Codon Boxes</button>
                 </div>
                 <div>
-                    <button class="btn btn-primary mt-3 analysis-btn" data-gene-name="{{ gene.gene_name }}">Re-analyze</button>
+                    <button class="btn btn-primary mt-3 analysis-btn" data-gene-id="{{ gene.id }}">Re-analyze</button>
                     <button {% if gene.status != "validated" %}  style="display:none" {% endif %} class="btn btn-success mt-3 canSave" data-url="{% url 'user_center:validation_save' gene.id %}">Save</button>
                     <button {% if gene.status == "validated" %}  style="display:none" {% endif %} class="btn btn-secondary mt-3 noSave" disabled>Save</button>
                 </div>
@@ -250,22 +276,30 @@
     }
 
     function getCodonDetail(specie_name, codon) {
-        if(species[specie_name].hasOwnProperty(codon)) {
-            const acid = species[specie_name][codon]["Amino acid"];
-            if(aminoAcid[specie_name].hasOwnProperty(acid)) {
-                list = aminoAcid[specie_name][acid];
-                return list;
+        // Check if species object is defined and has the specie_name property
+        if (species.hasOwnProperty(specie_name)) {
+            // console.log("species: ", species);
+            // Check if the codon exists for the given species
+            const specieData = species[specie_name];
+            // console.log("specieData: ", specieData);
+            if (specieData.hasOwnProperty(codon)) {
+                const acid = specieData[codon]["Amino acid"];
+                // Check if amino acid data exists
+                if (aminoAcid.hasOwnProperty(specie_name) && aminoAcid[specie_name].hasOwnProperty(acid)) {
+                    return aminoAcid[specie_name][acid];
+                }
             }
         }
-        return null;
+        return null; // Return null if no matching data is found
     }
-
 
     // 添加事件监听器
     function addCodonBoxEventListeners(codonBox, selector) {
         codonBox.addEventListener("click", function(e, event) {
             const codon = codonBox.childNodes[0].textContent;
+            // console.log("mouse select species and codon: ", selector.value, codon);
             const list = getCodonDetail(selector.value, codon);
+            // console.log("get codon detail list: ", list)
             const item_begin = `<li><a class="dropdown-item small-dropdown-item" onclick="clickNewCodon(this,event)">`;
             const item_end = `</a></li>`;
             var ul = codonBox.querySelector("ul");
@@ -306,9 +340,6 @@
             const geneContainer = this.closest('.species-select-container');
             const geneId = geneContainer.querySelector('.gene-id').value;
 
-            console.log(species);
-            console.log(geneId);
-
             // 这里发送您的AJAX请求...
             $.ajax({
                 url: '/user_center/save_species/',
@@ -337,23 +368,8 @@
 
     // 点击Toggle Codon Boxes按钮时，显示或隐藏codon框
     document.addEventListener("DOMContentLoaded", function() {
-        // 默认从species_data.json中获取全部物种名称
-        function get_specie_names() {
-            var specie_names = Object.keys(species);
-            return specie_names;
-        }
-        
-        const specie_names = get_specie_names();
-        const specieSelector = $('.form-select');  // dushiyi故意修改的部分
-        // 遍历specie_names，添加到specieSelector中
-        specie_names.forEach(function(specie_name) {
-            specieSelector.append(`<option value="${specie_name}">${specie_name}</option>`);
-        });
-
         const toggleButtons = document.querySelectorAll(".toggle-btn");
-        const selectors = document.querySelectorAll(".form-select");
-        // 为每个selector添加事件监听器
-
+        const selectors = document.querySelectorAll("species-select");  // 获取所有的物种选择器
 
         // 为每个Toggle Codon Boxes按钮添加事件监听器
         toggleButtons.forEach(function(toggleButton) {
@@ -367,7 +383,7 @@
             });
 
             toggleButton.addEventListener("click", function() {
-                console.log("click", toggleButton.dataset.displayed);
+                // console.log("click", toggleButton.dataset.displayed);
                 if (toggleButton.dataset.displayed === "true") {
                     // 隐藏codon框
                     editedSequenceDiv.innerHTML = getTagTextByHTML(editedSequenceDiv);
@@ -391,7 +407,7 @@
         analysisButtons.forEach(function(analysisButton) {
             analysisButton.addEventListener("click", function() {
                 const editedSequenceDiv = analysisButton.closest('.col-md-2').previousElementSibling.querySelector("#edited-sequence");
-                const geneName = analysisButton.getAttribute("data-gene-name");
+                const geneID = analysisButton.getAttribute("data-gene-id");
                 const toggleButton = analysisButton.closest('.col-md-2').querySelector(".toggle-btn");
                 const frameshiftSelector = analysisButton.closest('.col-md-2').querySelector("#frameshiftSelector");
                 const canSaveButton = analysisButton.closest('.col-md-2').querySelector(".canSave");
@@ -402,9 +418,8 @@
                 // 构建要发送的数据
                 const data = {
                     sequence: sequenceContent,
-                    gene: geneName,
+                    gene_id: geneID,
                 };
-                // console.log("data: ", data);
                 // 创建一个新的XMLHttpRequest对象
                 const xhr = new XMLHttpRequest();
 
@@ -417,7 +432,6 @@
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState == 4 && xhr.status == 200) {
                         const response = JSON.parse(xhr.responseText);
-                        console.log(response);
                         // 你可以在这里加入处理响应数据的代码
                         if(response.status === 'success') {
                             // 弹窗提示
@@ -487,7 +501,7 @@ $(document).ready(function() {
                     second_col_full.style.display = "none";
                     second_col_trun.style.display = "";
                 } else {
-                    console.log(response);
+                    // console.log(response);
                     alert(response.message); // 或其他方式显示错误消息
                 }
             },
@@ -534,11 +548,47 @@ $(document).ready(function() {
     });
 });
 </script>
+
 <script>
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl)
-    })
+    // 获取模板中的数据
+    const originalSeq = "{{ gene.original_seq|escapejs }}";
+    const originalHighlightsRaw = `{{ gene.original_highlights|default_if_none:"[]"|escapejs }}`;
+    const modifiedSeq = "{{ gene.combined_seq|escapejs }}";
+    const modifiedHighlightsRaw = `{{ gene.modified_highlights|default_if_none:"[]"|escapejs }}`;
+
+    console.log('Original Highlights Raw:', originalHighlightsRaw);
+    console.log('Modified Highlights Raw:', modifiedHighlightsRaw);
+
+    try {
+        const originalHighlights = JSON.parse(originalHighlightsRaw);
+        const modifiedHighlights = JSON.parse(modifiedHighlightsRaw);
+
+        function highlightSequence(seq, highlights) {
+            let highlightedSeq = '';
+            for (let i = 0; i < seq.length; i++) {
+                let highlightClass = '';
+                for (const highlight of highlights) {
+                    if (i >= highlight.start && i < highlight.end) {
+                        highlightClass = highlight.type;
+                        break;
+                    }
+                }
+                highlightedSeq += highlightClass
+                    ? `<span class="${highlightClass}">${seq[i]}</span>`
+                    : seq[i];
+            }
+            return highlightedSeq;
+        }
+
+        // 应用高亮到序列
+        document.getElementById('original-sequence').innerHTML = highlightSequence(originalSeq, originalHighlights);
+
+        if (modifiedSeq && modifiedHighlights.length) {
+            document.getElementById('modified-sequence').innerHTML = highlightSequence(modifiedSeq, modifiedHighlights);
+        }
+    } catch (error) {
+        console.error('Error parsing JSON:', error);
+    }
 </script>
 {% endblock %}
 

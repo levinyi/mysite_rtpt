@@ -1,0 +1,354 @@
+
+{% extends "user_center/base.html" %}
+{% load custom_filters %}
+{% load static %}
+{% block title %}Shopping Cart{% endblock %}
+{% block extra_head %}
+<style>
+    .main-content {
+        margin-bottom: 100px; /* 调整这个值以确保足够空间 */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container main-content">
+    <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
+        <div class="row">
+            <div class="col-6">
+                <h4 class="mb-3"><i class="bi bi-list-ul"></i> Shopping Cart</h4>
+            </div>
+            <div class="col-6 text-end">
+                <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-clipboard-plus"></i> Add More</a>
+            </div>
+        </div>
+        <!-- select -->
+        <div class="row">
+            <div class="col-md-4">
+                <select class="form-control" id="statusFilter">
+                    <option value="all">All Statuses</option>
+                    <option value="saved">Saved</option>
+                    <option value="validated">Validated</option>
+                    <option value="optimizing">Optimizing</option>
+                    <option value="optimized">Optimized</option>
+                    <option value="failed">Failed</option>
+                    <option value="forbidden">Forbidden</option>
+                    <!-- 其他状态 -->
+                </select>
+            </div>
+        </div>
+        <table class="table table-striped table-hover" style="text-align:center">
+            <thead>
+                <tr>
+                    <th scope="col"><input type="checkbox" id="selectAllTop" name="gene_id" value="all"></th>
+                    <th scope="col">ID</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Vector</th>
+                    <th scope="col">Species</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Length</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in grouped_shopping_cart %}
+                <tr class="date-header">
+                    <td class="table-info" > 
+                        <input type="checkbox" class="date-select-checkbox" data-date="{{ group.date }}"> 
+                    </td>
+                    <td colspan="7" class="table-info text-start"> {{ group.date }}</td>
+                </tr>
+                {% for gene in group.genes %}
+                <tr data-status="{{ gene.status }}">
+                    <td>
+                        <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}" 
+                            data-length="{{ gene.saved_seq|length }}" data-date="{{ group.date }}">
+                    </td>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ gene.gene_name }}</td>
+                    <td>{{ gene.vector }}</td>
+                    <td>{{ gene.species }}</td>
+                    <td> 
+                        {% if gene.status == 'saved' %}
+                            <span class="badge bg-secondary">Saved</span>
+                        {% elif gene.status == 'validated' %}
+                            <span class="badge bg-primary">Validated</span>
+                        {% elif gene.status == 'optimizing' %}
+                            <span class="badge bg-info">Optimizing</span>
+                        {% elif gene.status == 'optimized' %}
+                            <span class="badge bg-success">Optimized</span>
+                        {% elif gene.status == 'failed' %}
+                            <span class="badge bg-danger">Failed</span>
+                        {% elif gene.status == 'forbidden' %}
+                            <span class="badge bg-warning text-dark">Forbidden</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ gene.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ gene.saved_seq|length }}</td>
+                    <td>
+                        {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See detail" 
+                                href="{% url 'user_center:protein_edit' gene.id %}" class="text-decoration-none">
+                                <i class="bi bi-eye me-2"></i>
+                            </a>
+                        {% else %}
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}" 
+                                class="text-decoration-none">
+                                <i class="bi bi-pencil-square me-2"></i>
+                            </a>
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download GeneBank File" 
+                                href="{% url 'user_center:cart_genbank_download' gene.id %}" 
+                                class="text-decoration-none">
+                                <i class="bi bi-download me-2"></i>
+                            </a>
+                        {% endif %}
+                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" 
+                            href="javascript:" onclick="del_gene(this, {{ gene.id }})" class="text-decoration-none">
+                            <i class="bi bi-trash text-danger me-2"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Fixed bottom checkout bar -->
+<div class="container fixed-bottom" style="background-color: #F9F9F9;">
+    <!-- Select All -->
+    <div class="row mt-4">
+        <!-- left -->
+        <div class="col-lg-5 text-end">
+            <input type="checkbox" id="selectAllBottom" name="gene_id" value="all">
+            <label class="form-check-label me-3" for="flexCheckDefault">Select All</label>
+            <button class="btn btn-outline-danger" onclick="deleteSelected()">
+                <i class="bi bi-trash me-1"></i>Delete Selected 
+            </button> 
+        </div>
+        <!-- right -->
+        <div class="col-lg-7">
+            <div class="row">
+                <div class="col">
+                    <p id="total-genes">Total 0 Genes</p>
+                    <p id="total-length">Total 0 bp</p>
+                </div>
+                <div class="col">
+                    <p>Delivery:</p>
+                    <p id="delivery-fee"> $0 delivery fee </p>
+                </div>
+                <div class="col">
+                    <p id="total-price">Total: $0</p>
+                </div>
+                <div class="col">
+                    <button type="button" class="btn btn-primary" id="checkoutButton">
+                        <i class="bi bi-check2-square me-1"></i>Submit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block javascript %}
+<script>
+    // 为全选复选框添加点击事件, 页面有两个全选复选框，一个是在顶部，一个是在底部，两者状态应该同步
+    $(document).ready(function() {
+        // 更新总价格
+        function updateTotalPrice() {
+            var totalPrice = 0;
+            var totalLength = 0;
+            var pricePerLength = 0.30; // 设定每个长度单位的价格
+
+            // Only consider checked and visible checkboxes for calculation
+            $('input.gene-checkbox:checked:visible').each(function() {
+                var length = parseInt($(this).data('length'));
+                totalLength += length;
+            });
+
+            totalPrice = totalLength * pricePerLength; // 计算总价格
+
+            // 更新页面上显示的总长度和总价格
+            $('#total-price').text('Total: $' + totalPrice.toFixed(2));
+            $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
+            $('#total-length').text('Total ' + totalLength + ' bp');
+        }
+
+        // 页面加载完成后，更新一次总价格
+        $('input.gene-checkbox').change(function() {
+            updateTotalPrice(); // Update totals when any gene checkbox changes state
+        });
+
+        // 为全选复选框添加点击事件
+        $('#selectAllTop, #selectAllBottom').click(function() {
+            var state = this.checked;
+            $('input[name="gene_id"]:not(.modal .gene-checkbox)').each(function() {
+                if (!this.disabled && $(this).closest('tr').css('display') !== 'none') {
+                    this.checked = state;
+                }
+            });
+            
+            $('#selectAllTop, #selectAllBottom').prop('checked', state);
+            
+            // 更新总价格
+            updateTotalPrice();
+        });
+
+        // 为日期复选框添加点击事件
+        // Date select checkboxes
+        $('.date-select-checkbox').on('click', function() {
+            var date = $(this).data('date');
+            var isChecked = this.checked;
+            $('.gene-checkbox[data-date="' + date + '"]:visible').each(function() {
+                if (!this.disabled) {
+                    this.checked = isChecked;
+                }
+            });
+            updateTotalPrice();
+        });
+
+
+        // 状态筛选器的 change 事件
+        $('#statusFilter').on('change', function() {
+            var selectedStatus = this.value;
+            $('tbody tr[data-status]').each(function() {
+                $(this).toggle(selectedStatus === 'all' || $(this).data('status') === selectedStatus);
+            });
+
+            updateTotalPrice(); // Recalculate when filter changes
+        });
+
+        // Handle checkout process
+        // Handle the checkout button click event directly without modal
+        $('#checkoutButton').on('click', function() {
+            var selectedGenes = $('input.gene-checkbox:checked').map(function() { return this.value; }).get();
+            //var forbidden = $('input.gene-checkbox:checked[data-status="forbidden"]').length > 0;
+            var forbidden = $('input.gene-checkbox:checked').closest('tr[data-status="forbidden"]').length > 0;
+
+            //console.log("gene-checkbox:forbidden length: ", $('input.gene-checkbox:checked[data-status="forbidden"]').length);
+            console.log("select genes:", selectedGenes);
+            console.log("select genes length :", selectedGenes.length);
+            console.log("forbidden: ", forbidden);
+
+            if (selectedGenes.length === 0) {
+                alert('Please select at least one item!');
+                return;
+            }
+
+            if (forbidden) {
+                alert('Forbidden items cannot be submitted!');
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            selectedGenes.forEach(function(id) { formData.append('gene_ids', id); });
+
+            fetch('{% url "user_center:checkout" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Submit successfully!');
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    });
+</script>
+<script>
+    function del_gene(the, gene_id) {
+        layer.open({
+            type: 1,
+            skin: 'layui-layer-rim',
+            area: ['420px', '240px'],
+            title: 'Delete',
+            content: '<div style="padding: 20px 80px;">Are you sure to delete this item?</div>',
+            btn: ['Yes', 'No'],
+            btnAlign: 'c',
+            yes: function (index, layero) {
+                $.ajax({
+                    url: "{% url 'user_center:gene_delete' %}",
+                    type: "POST",
+                    data: {
+                        'csrfmiddlewaretoken': '{{ csrf_token }}',
+                        'gene_id': gene_id,
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        if (data.status === 'success') {
+                            layer.msg('Delete successfully!', { icon: 1 });
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg(data.message, { icon: 2 });
+                        }
+                    },
+                    error: function (xhr, errmsg, err) {
+                        layer.msg('Delete failed!', { icon: 2 });
+                    }
+                });
+            },
+        })
+    };
+    function deleteSelected() {
+        var selectedGenes = [];
+
+        // Iterate through selected checkboxes
+        $('.gene-checkbox:checked').each(function () {
+            selectedGenes.push($(this).val());
+        });
+
+        if (selectedGenes.length === 0) {
+            alert('Please select at least one item to delete.');
+            return;
+        }
+
+        var url = "{% url 'user_center:gene_delete' %}" ;
+        var itemCount = selectedGenes.length;
+        layer.open({
+            type: 1,
+            skin: 'layui-layer-rim',
+            area: ['420px', '240px'],
+            title: 'Delete',
+            content: '<div style="padding: 20px 80px;">Are you sure you want to delete <span style="color:red"><strong> ' + itemCount + '</strong></span> selected item(s)?</div>',  // Show count in the message
+            btn: ['Yes', 'No'],
+            btnAlign: 'c',
+            yes: function (index, layero) {
+                $.ajax({
+                    url: url,
+                    type: "POST",
+                    data: {
+                        'csrfmiddlewaretoken': '{{ csrf_token }}',
+                        'gene_ids': selectedGenes,
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        if (data.status === 'success') {
+                            layer.msg('Delete successfully!', { icon: 1 });
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg(data.message, { icon: 2 });
+                        }
+                    },
+                    error: function (xhr, errmsg, err) {
+                        layer.msg('Delete failed!', { icon: 2 });
+                    }
+                });
+            },
+        });
+    }
+</script>
+{% endblock %}

@@ -57,6 +57,13 @@
             <td>18/3/2022</td>
             <td hidden>18/3/2022</td>
             <td>
+                <button type="button" class="btn btn-link row-button bi-download icon-btn"
+                        onclick="downloadReq({{ row.order_id }})">
+                    Download
+                </button>
+            </td>
+
+            <td>
                 <a href="" class="row-button"><i class="bi bi-cloud-download"></i></a>
                 <button disabled type="button" class="btn btn-link row-button"><i class="bi bi-cloud-download"></i>
                 </button>
@@ -164,7 +171,6 @@
 
 {% block javascript %}
     <script>
-
         const TmpRow = document.querySelector("#tmp-table-row"),
             TmpTd = TmpRow.content.querySelectorAll("td"),
             tableBody = document.querySelector("tbody");
@@ -331,7 +337,6 @@
             let rowNum = parseInt(row.querySelector('th').textContent);
             return Rows[rowNum - 1];
         }
-
 
         // 点击顶部Tab
         function clickTab(e, id) {
@@ -537,6 +542,13 @@
             });
         }
 
+        function downloadReq(orderId) {
+            // Construct the URL with the orderId parameter
+            const reqUrl = `{% url 'super_manage:order_to_REQIN' '' %}` + orderId;
+            // Redirect to the download URL
+            window.location.href = reqUrl;
+        }
+
 
         $(document).ready(function () {  //里面是需要加载的js
             // 通过检查来测试浏览器是否支持 HTML 模板元素
@@ -551,6 +563,4 @@
         });
 
     </script>
-
-
 {% endblock %}

@@ -11,28 +11,28 @@
                 <div class="card-body">
                     <h1 class="text-center mb-4">Registration</h1>
                     <p class="text-center mb-3">If you already have an account, please go to the 
-                    <strong><a class="text-decoration-none" href="{% url 'account:user_login' %}">login</a></strong> page.</p>
+                    <strong><a class="text-decoration-none" href="{% url 'account:user_login' %}">Login</a></strong> page.</p>
                     <form method="post" action=".">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
-                            {{ form.username|add_class:"form-control" }}
+                            {{ form.username|add_class:"form-control"|attr:"required:true" }}
                         </div>
                         <div class="mb-3">
-                            <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
-                            {{ form.email|add_class:"form-control" }}
+                            <label for="{{ form.email.id_for_label }}" class="form-label" >Email</label>
+                            {{ form.email|add_class:"form-control"|attr:"required:true" }}
                         </div>
                         <div class="mb-3">
                             <label for="{{ profile.phone.id_for_label }}" class="form-label">Phone Number (WeChat)</label>
-                            {{ profile.phone|add_class:"form-control" }}
+                            {{ profile.phone|add_class:"form-control"|attr:"required:true" }}
                         </div>
                         <div class="mb-3">
                             <label for="{{ profile.company.id_for_label }}" class="form-label">Company</label>
-                            {{ profile.company|add_class:"form-control" }}
+                            {{ profile.company|add_class:"form-control"|attr:"required:true" }}
                         </div>
                         <div class="mb-3">
                             <label for="{{ form.password.id_for_label }}" class="form-label">Password</label>
-                            {{ form.password|add_class:"form-control" }}
+                            {{ form.password|add_class:"form-control"|attr:"required:true" }}
                         </div>
                         <div class="mb-3">
                             <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>

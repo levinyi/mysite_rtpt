@@ -74,6 +74,12 @@
                 $('[data-bs-toggle="tooltip"]').tooltip()
             })
         </script>
+        <!-- Algolia Search客户端库 V4.x -->
+        {% comment %} <script src="https://cdn.jsdelivr.net/npm/algoliasearch/dist/algoliasearch-lite.umd.js"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/instantsearch.js@4"></script>
+        <script src="//cdn.jsdelivr.net/g/algoliasearch,algoliasearch.helper"></script> {% endcomment %}
+
         {% block javascript %} {% endblock %}
         {% include "footer.html" %}
     </body>

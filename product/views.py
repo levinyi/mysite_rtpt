@@ -1,59 +1,30 @@
+import json
+import os
+from pathlib import Path
 from django.shortcuts import get_object_or_404, render
 
+from mysite import settings
 from user_center.models import ShoppingCart
-from .models import Product, ExpressionHost, PurificationMethod, Addon, ExpressionScale, Vector
+from .models import Product, ExpressionHost, PurificationMethod, Addon, ExpressionScale, Species, Vector
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 import pandas as pd
+import re
 
+
+species_dir = os.path.join(settings.MEDIA_ROOT, 'codon_usage_table')
+# print("species_dir: ", species_dir)
+BASE_DIR = Path(__file__).resolve().parent.parent
+# print("BASE_DIR: ", BASE_DIR)
 # Create your views here.
 def product_list(request):
     products = Product.objects.all()
     return render(request, 'product/products.html' , {'products': products})
 
-def create_order(request):
-    pass
 
-'''
-def create_order(request):
-    if request.method == "GET":
-        return render(request, 'product/create_order.html', {})
-    else:
-        product_button  = request.POST.get('product_type')
-        selected_button = request.POST.get('selected_button')
-        print("product_button: ", product_button)  # btn1, btn2
-        print("selected_button: ", selected_button) # HT, Fast
-        
-        btn_dict = {
-            'btn1': 'Plasmid',
-            'btn2': 'Antibody',
-        }
-        product_type = btn_dict[product_button]
-        product_name = f"{selected_button} {product_type}"
-        print("product_name: ", product_name)
-        print("product_type: ", product_type)
-        product = get_object_or_404(Product, product_type=product_type, product_name=product_name)
-        price = product.price
-        print("price: ", price)
-
-        # 判读是否登录
-        if not request.user.is_authenticated:
-            temp_user, created = User.objects.get_or_create(username='temp_user')
-            # 创建一个新的购物车
-            shopping_cart = ShoppingCart.objects.create(
-                product=product,
-                user=temp_user,
-            )
-        else:
-            shopping_cart = ShoppingCart.objects.create(
-                user=request.user,
-                product=product,
-            )
-        return JsonResponse({'redirect_url': '/product/order_selection/', 'order_id': shopping_cart.id})
-'''
 def order_selection(request, order_id):
     if request.method == "GET":
         # 判读是否登录
@@ -168,3 +139,80 @@ def vector_validation(request):
         return JsonResponse({'redirect_url': '/user_center/manage_vector/'})
     else:
         return JsonResponse({'status': 'error', 'message': 'Please use POST.'}, status=401)
+    
+
+def read_codon_usage_table(file):
+    codon_df = pd.read_excel(file, header=None, names=["Triplet", "Amino acid", "Fraction", "Frequency", "Number"])
+    # use regex to extract species name
+    pattern = r'Excel_CodonUsage_(.+)\.xlsx'
+    match = re.search(pattern, file)
+    species_name = match.group(1)
+
+    aminoAcid = {}
+    triplet_dict = {}
+    # convert codon_df to dict
+    for _, row in codon_df.iterrows():
+        amino_acid = row["Amino acid"]
+        triplet = row["Triplet"]
+        aminoAcid.setdefault(amino_acid, []).append(row.to_dict())
+        triplet_dict[triplet] = row.to_dict()
+
+    return aminoAcid, triplet_dict, species_name
+
+
+def upload_species_codon_file(request):
+    if request.method == "POST":
+        # 判读是否登录
+        if not request.user.is_authenticated:
+            return JsonResponse({'status': 'error', 'message': 'Please login.'}, status=401)
+        
+        species_name = request.POST.get('species_name')
+        species_note = request.POST.get('species_note', '')
+        species_codon_file = request.FILES.get('species_codon_file')
+
+        species, created = Species.objects.update_or_create(
+            # 如果名字相同，就更新，否则就创建
+            species_name=species_name,
+            defaults={'species_note': species_note, 'species_codon_file': species_codon_file}
+        )
+
+        # update js file 
+        # species_dir is a global variable
+        species_files = [file for file in os.listdir(species_dir) if file.endswith(".xlsx")]
+        # print("found species files: ", species_files)
+        aminoAcid = {}
+        triplet = {}
+        for file in species_files:
+            aminoacid_dict, triplet_dict, species_name = read_codon_usage_table(os.path.join(species_dir, file))
+            aminoAcid[species_name] = aminoacid_dict
+            triplet[species_name] = triplet_dict
+
+        JS_file_path = os.path.join(BASE_DIR,'static', 'species')
+        # print("JS_file_path: ", JS_file_path)
+        with open(os.path.join(JS_file_path, "amino_acid_data.js"), "w") as f:
+            f.write("var aminoAcid = ")
+            json.dump(aminoAcid, f, indent=4)
+
+        with open(os.path.join(JS_file_path, "species_data.js"), "w") as f:
+            f.write("var species = ")
+            json.dump(triplet, f, indent=4)
+        # print("triplet: ", triplet)
+        # print("all down")
+        return JsonResponse({'status': 'success', 'message': 'Upload success.'})
+    return render(request, '/super_manage/species_codon_manage.html')
+
+
+def species_delete(request):
+    if request.method == "POST":
+        species_id = request.POST.get('species_id')
+        
+        species = get_object_or_404(Species, id=species_id)
+    
+        if species.species_codon_file:
+            file_path = species.species_codon_file.path
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        species.delete()
+        return JsonResponse({'status': 'success', 'message': 'Species deleted Successfully'})
+    else:
+        return JsonResponse({'status': 'failed', 'message': 'Not A Post Request.'})

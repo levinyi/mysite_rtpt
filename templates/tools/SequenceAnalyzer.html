@@ -7,28 +7,44 @@
 
 {% block content %}
 <div class="container">
+    <!-- Breadcrumb -->
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'tools:tools_list' %}" class="text-decoration-none">Tools List</a></li>
             <li class="breadcrumb-item active" aria-current="page">{{ tools_name }}</li>
         </ol>
     </nav>
-
+    <!-- Tools of {{ tools_name }} Usage -->
     <div class="card mt-2">
         <h4 class="card-header">Tools of {{ tools_name }} Usage</h4>
         <div class="card-body">
-            <h5 class="card-title">Sorry, this tool is not available yet.</h5>
-            <a class="btn btn-primary" href="{% url 'tools:tools_list' %}">My Inquiry List</a>
+            <!-- <h5 class="card-title">this tool is under development.</h5> -->
+            <!-- a list of features -->
+            <h5 class="card-title">Features:</h5>
+            <ul>
+                <li>Tandem Repeats</li>
+                <li>Dispersed Repeats</li>
+                <li>Palindrome Repeats </li>
+                <li>Iverted Repeats </li>
+                <li>Homopolymers</li>
+                <li>Special Motifs (W8S8) >=8 </li>
+                <li>Local GC content per window </li>
+            </ul>
+            <h5 class="card-title">Some Notes:</h5>
+            <ul>
+                Detail information can be found <a href="https://t114xle63y.feishu.cn/wiki/Nl0SwJxbQiG1IkkYeSHcGSO6nVe" target="_blank">Here</a>.
+            </ul>
         </div>
     </div>
-
-    <div class="card mt-5">
-        <h4 class="card-header">INQUIRY Form</h4>
+    <!-- Sequence main checking function -->
+    <div class="card mt-3">
+        <h4 class="card-header">Submit Sequence</h4>
         <div class="card-body">
-            <h5 class="card-title">Please upload the INQUIRY form in the following format.</h5>
-            <div id="example" class="mt-3">
-                <button onclick="postData()" class="btn btn-primary mt-4">Submit & Analyze Sequences</button>
+            <h5 class="card-title">Provide your gene names and DNA sequences in the table. Then click 'Submit' for sequence evaluation. </h5>
+            <div id="excelTable" class="mt-3">
+                <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
             </div>
+            <button onclick="postData()" class="btn btn-primary mt-3"><i class="bi bi-clipboard-pulse"></i> Submit & Analyze Sequences</button>
         </div>
     </div>
 </div>
@@ -36,23 +52,60 @@
 
 {% block javascript %}
 <script>
-    const container = document.querySelector('#example');
+    const container = document.querySelector('#excelTable');
     const hot = new Handsontable(container, {
-        colHeaders: ['GeneName', 'Seq5NC', 'SeqAA', 'Seq3NC', 'forbiddenSeqs'],
+        colHeaders: ['GeneName', 'SeqNT'],
         rowHeaders: true,
-        colWidths: [100, 200, 400, 200, 100],  // 设置每列的宽度
+        colWidths: [200, 800],  // 设置每列的宽度
+        columns: [
+            { data: 'GeneName' },
+            { data: 'SeqNT' },
+        ],
 
         height: 'auto',
-        // width: 'auto',
+        width: 'auto',
         licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
     });
+    hot.addHook('afterValidate', function (isValid, value, row, prop, source) {
+        if (!isValid) {
+            validationFailed = true;
+            let errorMessage = '';
+            if (prop === 'GeneName') {
+                errorMessage = geneNameValidator(value, () => {});
+            } else if (prop === 'Sequence') {
+                errorMessage = sequenceValidator(value, () => {});
+            }
+            alert('Validation error at row ' + (row + 1) + ': ' + errorMessage);
+        }
+    });
 
+    // "+" 按钮的点击事件
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        hot.alter('insert_row_below');
+    });
+    
+    // 提交数据到服务器
     function postData() {
-        // 获取Handsontable中的数据
-        const data = hot.getData();
+        const hotData = hot.getData();
+        const data = {
+            'genetable': hotData,
+            };
+
+        // 检查数据是否为空
+        let isEmpty = true;
+        for (let row of hotData) {
+            if (row.some(cell => cell !== null && cell !== '')) {
+                isEmpty = false;
+                break;
+            }
+        }
+        if (isEmpty) {
+            alert('Cannot submit empty data');
+            return
+        }
 
         // 使用fetch API发送数据到服务器
-        fetch('/tools/inquiry_create/', {
+        fetch('/tools/SequenceAnalyzer/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -62,8 +115,11 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Success:', data);
-            window.location.href = '/tools/inquiry_list/';
+            if (data.status === 'success') {
+                window.location.href = data.redirect_url
+            } else {
+                alert('Data submission failed');
+            }
         })
         .catch((error) => {
             console.error('Error:', error);

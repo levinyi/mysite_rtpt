@@ -1,19 +1,19 @@
+import itertools
 import json, re, os
 import tempfile
 import pandas as pd
-from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from product.models import GeneSynEnzymeCutSite, Species, Vector
-from tools.scripts.ParsingGenBank import addFeaturesToGeneBank
-from user_center.utils.pagination import Pagination
-from .models import Cart, GeneInfo, OrderInfo
-from .utils.render_to_pdf import render_to_pdf
+from django.core.serializers import serialize
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, JsonResponse
-from django.contrib.auth.models import User
+
+from product.models import GeneSynEnzymeCutSite, Species, Vector
+from tools.scripts.ParsingGenBank import addFeaturesToGeneBank
+from .models import Cart, GeneInfo, OrderInfo
+from .utils.render_to_pdf import render_to_pdf
 from urllib.parse import quote
 
 # Create your views here.
@@ -31,6 +31,117 @@ def dashboard(request):
 
 # Step 1 create an order.
 @login_required
+# def order_create(request):
+#     '''创建订单页'''
+#     # 这里只能是GET请求，因为POST请求是提交订单
+#     if request.method == 'POST':
+#         # 这里的逻辑是创建订单
+#         data = json.loads(request.body.decode('utf-8'))
+#         vector_id = data.get("vectorId")
+#         gene_table = data.get("genetable")
+#         # print(gene_table)
+#         if not gene_table:
+#             return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
+
+#         try:
+#             vector = Vector.objects.get(id=vector_id)
+#         except Vector.DoesNotExist:
+#             return JsonResponse({'status': 'error', 'message': 'Invalid vector ID'})
+
+#         iu20 = vector.iu20
+#         id20 = vector.id20
+
+#         cart, created = Cart.objects.get_or_create(user=request.user)
+#         response_message = ""
+
+#         new_gene_ids_for_session = []
+#         for row in gene_table:
+#             if not any(cell is not None for cell in row):
+#                 # print("Empty row")
+#                 continue
+
+#             gene_name = row[0]
+#             original_seq = row[1]
+#             original_seq = original_seq.replace("\n","").replace("\r","").replace(" ","") # 去掉换行符和空格
+#             species = None
+#             forbid_seq = None
+#             combined_seq = original_seq
+#             saved_seq = original_seq
+#             gc_content = None
+#             forbidden_check_list = None
+#             contained_forbidden_list = None
+#             status = 'saved'
+#             i5nc = None
+#             i3nc = None
+
+#             # 判断是否为AA序列（通过列数判断）
+#             if len(row) > 2:
+#                 # print("Processing AA sequence")
+#                 try:
+#                     species_name = row[2]
+#                     species = Species.objects.get(species_name=species_name)
+#                 except Species.DoesNotExist:
+#                     return JsonResponse({'status': 'error', 'message': f'Species {species_name} not found'})
+
+#                 forbid_seq = row[3].replace(" ", "").replace(",", ";") if row[3] is not None else None
+#                 i5nc = row[4] or ''
+#                 i3nc = row[5] or ''
+#                 status = 'optimizing'
+#                 forbidden_check_list = forbid_seq
+#                 response_message = 'AA sequence submitted for codon optimization. Please wait 10-20 minutes to check the result.'
+#             else:
+#                 # print("Processing NT sequence")
+#                 combined_seq = f'{iu20.lower()}{original_seq}{id20.lower()}'
+#                 tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(combined_seq, forbid_seq)
+#                 # print("seq_status: ", seq_status, "forbidden_check_list: ", forbidden_check_list, "contained_forbidden_list: ", contained_forbidden_list)
+#                 if seq_status in ['Protein', 'Invalid Protein']:
+#                     return JsonResponse({'status': 'error', 'message': f'{seq_status} sequence is not allowed.'})
+#                 saved_seq = tagged_seq
+#                 status = seq_status
+
+#             # 创建或更新GeneInfo对象
+#             this_gene = GeneInfo.objects.create(
+#                 user=request.user,
+#                 gene_name=gene_name,
+#                 original_seq = tagged_seq,  # original_seq, 修改成tagged_seq试一下效果
+#                 vector = vector,
+#                 species = species,
+#                 status = status,
+#                 forbid_seq = forbid_seq,
+#                 combined_seq = combined_seq,
+#                 i5nc = i5nc,
+#                 i3nc = i3nc,
+
+#                 saved_seq = saved_seq,
+#                 gc_content = gc_content,
+#                 forbidden_check_list = forbidden_check_list,
+#                 contained_forbidden_list = contained_forbidden_list,
+#             )
+#             cart.genes.add(this_gene)
+#             new_gene_ids_for_session.append(this_gene.id)
+
+#         request.session['new_gene_ids'] = new_gene_ids_for_session
+#         if response_message:
+#             return JsonResponse({'status': 'info', 'message': response_message})
+#         else:
+#             return JsonResponse({'status': 'success', 'message': 'Data saved successfully'})
+#     else:
+#         company_vectors = Vector.objects.filter(user=None)
+#         species_list = Species.objects.all()
+#         # 假设 species_list 是您的物种模型列表
+#         species_names = [species.species_name for species in species_list]
+
+#         # 然后将这个列表转换为 JSON
+#         species_names_json = json.dumps(species_names)
+
+#         # 如果用户已登录
+#         if request.user.is_authenticated:
+#             customer_vectors = Vector.objects.filter(user=request.user, status="ReadyToUse")
+#             return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_names_json': species_names_json})
+#         # 如果用户未登录
+#         else:
+#             return render(request, 'user_center/manage_order_create.html', {'company_vectors': company_vectors, 'species_names_json': species_names_json})
+
 def order_create(request):
     '''创建订单页'''
     # 这里只能是GET请求，因为POST请求是提交订单
@@ -42,18 +153,21 @@ def order_create(request):
         # print(gene_table)
         if not gene_table:
             return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
-
+        ##############################################
+        # deal with Vector 
         try:
             vector = Vector.objects.get(id=vector_id)
         except Vector.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Invalid vector ID'})
-
         iu20 = vector.iu20
         id20 = vector.id20
 
+        ###############################################
+        # create a cart record.
         cart, created = Cart.objects.get_or_create(user=request.user)
         response_message = ""
 
+        new_gene_ids_for_session = []
         for row in gene_table:
             if not any(cell is not None for cell in row):
                 # print("Empty row")
@@ -63,7 +177,7 @@ def order_create(request):
             original_seq = row[1]
             original_seq = original_seq.replace("\n","").replace("\r","").replace(" ","") # 去掉换行符和空格
             species = None
-            forbid_seq = None
+            user_forbidden_seq = None
             combined_seq = original_seq
             saved_seq = original_seq
             gc_content = None
@@ -82,16 +196,16 @@ def order_create(request):
                 except Species.DoesNotExist:
                     return JsonResponse({'status': 'error', 'message': f'Species {species_name} not found'})
 
-                forbid_seq = row[3].replace(" ", "").replace(",", ";") if row[3] is not None else None
+                user_forbidden_seq = row[3].replace(" ", "").replace(",", ";") if row[3] is not None else None
                 i5nc = row[4] or ''
                 i3nc = row[5] or ''
                 status = 'optimizing'
-                forbidden_check_list = forbid_seq
+                forbidden_check_list = user_forbidden_seq
                 response_message = 'AA sequence submitted for codon optimization. Please wait 10-20 minutes to check the result.'
             else:
                 # print("Processing NT sequence")
                 combined_seq = f'{iu20.lower()}{original_seq}{id20.lower()}'
-                tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(combined_seq, forbid_seq)
+                tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, original_gc_content, original_highlights_positions = process_sequence_get_highlight_position(combined_seq, user_forbidden_seq)
                 # print("seq_status: ", seq_status, "forbidden_check_list: ", forbidden_check_list, "contained_forbidden_list: ", contained_forbidden_list)
                 if seq_status in ['Protein', 'Invalid Protein']:
                     return JsonResponse({'status': 'error', 'message': f'{seq_status} sequence is not allowed.'})
@@ -99,27 +213,31 @@ def order_create(request):
                 status = seq_status
 
             # 创建或更新GeneInfo对象
-            this_gene, created = GeneInfo.objects.update_or_create(
+            this_gene = GeneInfo.objects.create(
                 user=request.user,
                 gene_name=gene_name,
-                defaults={
-                    'original_seq': original_seq,
-                    'vector': vector,
-                    'species': species,
-                    'status': status,
-                    'forbid_seq': forbid_seq,
-                    'combined_seq': combined_seq,
-                    'i5nc': i5nc,
-                    'i3nc': i3nc,
+                original_seq = original_seq, 
+                vector = vector,
+                species = species,
+                status = status,
+                forbid_seq = user_forbidden_seq,
+                combined_seq = combined_seq,
+                i5nc = i5nc,
+                i3nc = i3nc,
 
-                    'saved_seq': saved_seq,
-                    'gc_content': gc_content,
-                    'forbidden_check_list': forbidden_check_list,
-                    'contained_forbidden_list': contained_forbidden_list,
-                }
+                saved_seq = saved_seq,
+                forbidden_check_list = forbidden_check_list,
+                contained_forbidden_list = contained_forbidden_list,
+
+                original_gc_content = original_gc_content,
+                modified_gc_content = original_gc_content,
+                original_highlights = original_highlights_positions,
+                modified_highlights = original_highlights_positions,
             )
             cart.genes.add(this_gene)
+            new_gene_ids_for_session.append(this_gene.id)
 
+        request.session['new_gene_ids'] = new_gene_ids_for_session
         if response_message:
             return JsonResponse({'status': 'info', 'message': response_message})
         else:
@@ -152,14 +270,19 @@ def submit_notification(request):
 @login_required
 def gene_detail(request):
     ''' when user click the "submit & analysis" button, this function will be called.'''
-    gene_list = GeneInfo.objects.filter(user=request.user).exclude(status='submitted').exclude(status='optimizing')
+    # 从session中获取新创建的基因
+    new_gene_ids = request.session.get('new_gene_ids', [])
+
+    if not new_gene_ids:
+        gene_list = GeneInfo.objects.filter(user=request.user).exclude(status='submitted').exclude(status='optimizing')
+
+    gene_list = GeneInfo.objects.filter(user=request.user, id__in=new_gene_ids)
 
     species_list = Species.objects.all()
-    # 假设 species_list 是您的物种模型列表
-    species_names = [species.species_name for species in species_list]
+    species_names = sorted([species.species_name for species in species_list])
+    return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names': species_names})
 
-    return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names':species_names})
-
+@login_required
 def save_species(request):
     data = json.loads(request.body.decode('utf-8'))
     species = data['species']
@@ -167,7 +290,6 @@ def save_species(request):
     this_gene = GeneInfo.objects.get(user=request.user, id=gene_id)
     this_gene.species = Species.objects.get(species_name=species)
     this_gene.save()
-    print(this_gene.species)
     return JsonResponse({'status': 'success', 'message': 'Species saved successfully'})
 
 @login_required
@@ -182,7 +304,9 @@ def gene_edit(request, gene_id):
         gene_object = GeneInfo.objects.get(user=request.user, id=gene_id)
         # 将单个对象封装成列表
         gene_list = [gene_object]
-        return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list})
+        species_list = Species.objects.all()
+        species_names = sorted([species.species_name for species in species_list])
+        return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names': species_names})
 
 @login_required
 def protein_edit(request, gene_id):
@@ -196,27 +320,28 @@ def gene_validation(request):
     try:
         user = request.user
         data = json.loads(request.body.decode('utf-8'))
-        # saved_seq = data.get("sequence")
         edited_seq = data.get("sequence") # 换个变量名，好区分
-        gene_name = data.get("gene")
-        gene_object = GeneInfo.objects.get(user=user, gene_name=gene_name)
+        gene_id = data.get("gene_id")  # 应该换成gene_id，
+
+        gene_object = GeneInfo.objects.get(user=user, id=gene_id)
         combined_seq = gene_object.combined_seq     # 不带格式有小写 {iu20}.lower() + seq + {id20}.lower(), 可以直接比较
 
-        print("combined_seq: ", combined_seq)  
-        print("edited_seq from web: ", edited_seq)  # 不带格式有小写 {iu20}.lower() + original_seq + {id20}.lower()
         if combined_seq == edited_seq:
             return JsonResponse({'status': 'error', 'message': 'No changes made.'})
 
-        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(edited_seq, gene_object.forbid_seq)
-        print(f"tagged_seq: {tagged_seq}, seq_status: {seq_status}, forbidden_check_list: {forbidden_check_list}, contained_forbidden_list: {contained_forbidden_list}, gc_content: {gc_content}")
+        # tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(edited_seq, gene_object.forbid_seq)
+        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, modified_gc_content, modified_highlights = process_sequence_get_highlight_position(edited_seq, gene_object.forbid_seq)
+        # print(f"tagged_seq: {tagged_seq}, seq_status: {seq_status}, forbidden_check_list: {forbidden_check_list}, contained_forbidden_list: {contained_forbidden_list}, gc_content: {gc_content}")
         if seq_status in ['Protein', 'Invalid Protein']:
             return JsonResponse({'status': 'error', 'message': 'Squence is not allowed. Your sequence may has '+ seq_status + ' sequence.'})
         gene_object.status = seq_status
         gene_object.saved_seq = tagged_seq
-        gene_object.gc_content = gc_content
+        # gene_object.gc_content = gc_content
         gene_object.forbidden_check_list = forbidden_check_list
         gene_object.contained_forbidden_list = contained_forbidden_list
         gene_object.combined_seq = edited_seq
+        gene_object.modified_highlights = modified_highlights
+        gene_object.modified_gc_content = modified_gc_content
         gene_object.save()
         return JsonResponse({'status': 'success', 'message': 'Validation process finished', 'new_seq': tagged_seq, 'seq_status': seq_status})
     except Vector.DoesNotExist:
@@ -230,7 +355,7 @@ def validation_save(request, id):
     #### 把从前端传来的saved_seq变量名更换成了edited_seq，这样就不会和GeneInfo里面的saved_seq冲突了，方便理解。
     def validation_and_save_seq(gene_object, edited_seq):
         # 这里，combined_seq是不带格式的，全大写 , edited_seq是不带格式的，有小写。
-        original_seq = gene_object.combined_seq
+        original_seq = gene_object.original_seq
         if original_seq == edited_seq:
             if gene_object.status == 'validated' :
                 gene_object.status = 'saved'
@@ -239,9 +364,9 @@ def validation_save(request, id):
             else:
                 return False
 
-        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, gc_content = process_sequence(edited_seq, gene_object.forbid_seq)
+        tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, modified_gc_content, modified_highlights = process_sequence_get_highlight_position(edited_seq, gene_object.forbid_seq)
         gene_object.saved_seq = tagged_seq
-        gene_object.gc_content = gc_content
+        gene_object.gc_content = modified_gc_content
         gene_object.forbidden_check_list = forbidden_check_list
         gene_object.contained_forbidden_list = contained_forbidden_list
         gene_object.combined_seq = edited_seq
@@ -253,7 +378,6 @@ def validation_save(request, id):
             gene_object.status = seq_status
             gene_object.save()
             return False
-
     try:
         user = request.user
         data = json.loads(request.body.decode('utf-8'))
@@ -267,6 +391,25 @@ def validation_save(request, id):
         return JsonResponse({'status': 'error', 'message': 'Vector not found'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+###################### 以下是shopping cart 管理的函数 ############################
+@login_required
+def view_cart(request):
+    cart, created = Cart.objects.get_or_create(user=request.user)
+    shopping_cart = cart.genes.all()
+
+    grouped_shopping_cart = []
+    for key, group in itertools.groupby(shopping_cart, key=lambda x: x.create_date.date()):
+        grouped_shopping_cart.append({
+            'date': key,
+            'genes': list(group)
+        })
+    # print(grouped_shopping_cart)
+    context = {
+        'grouped_shopping_cart': grouped_shopping_cart,
+    }
+    return render(request, 'user_center/shoppingCart_view.html', context)
 
 # checked
 @login_required
@@ -287,19 +430,6 @@ def gene_delete(request):
     else:
         return render(request, 'user_center/manage_order_create.html')
 
-@login_required
-def view_cart(request):
-    cart, created = Cart.objects.get_or_create(user=request.user)
-    shopping_cart = cart.genes.all()
-    # page_object = Pagination(request, shopping_cart)
-    # context = {
-    #     'shopping_cart': page_object.page_queryset,  # 分完页的数据
-    #     'page_string':page_object.html(),  # 页码
-    # }
-    context = {
-        'shopping_cart': shopping_cart,
-    }
-    return render(request, 'user_center/cart_view.html', context)
 
 @login_required
 def cart_genbank_download(request, gene_id):
@@ -314,14 +444,14 @@ def cart_genbank_download(request, gene_id):
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
             addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)
-
+            
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
-            response['Content-Disposition'] = f'attachment; filename="RootPath-Online-Submition-{vector.vector_name}-{gene.gene_name}.gb"'
+            response['Content-Disposition'] = f'attachment; filename="RootPath-Online-Submition-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
             return response
     else:
-        print("no vector_gb")
         return HttpResponse("No vector genbank file found")
+
 
 @login_required
 @require_POST
@@ -357,79 +487,57 @@ def checkout(request):
     # 重定向到订单详情页面
     return JsonResponse({'status': 'success', 'message': 'Order created successfully', 'redirect_url': f'/user_center/manage_order/'})
 
-
 # checked
 @login_required
 def view_order_detail(request, order_id):
     # retrieve the order
     order = OrderInfo.objects.get(id=order_id)
-    return render(request, 'user_center/view_order_detail.html', {'order': order})
+    return render(request, 'user_center/order_detail_view.html', {'order': order})
+
+def get_seq_aa(combined_seq):
+    start_index = 0
+    while start_index < min(20, len(combined_seq)) and combined_seq[start_index].islower():
+        start_index += 1
+
+    end_index = -1
+    while abs(end_index) <= min(20, len(combined_seq)) and combined_seq[end_index].islower():
+        end_index -= 1
+
+    # Check if any lowercase character was found in the first 20 characters
+    if start_index <= min(20, len(combined_seq)):
+        # Check if any lowercase character was found in the last 20 characters
+        if abs(end_index) >= min(20, len(combined_seq)):
+            return combined_seq[start_index:end_index + 1]
+
+    # No lowercase characters found, return the original sequence
+    return combined_seq
 
 @login_required
 def export_order_to_csv(request, order_id):
     # Retrieve the order with optimized query
     order = OrderInfo.objects.get(id=order_id)
-    # Function to get SeqAA
-    def get_seq_aa(combined_seq):
-        start_index = 0
-        while start_index < min(20, len(combined_seq)) and combined_seq[start_index].islower():
-            start_index += 1
-
-        end_index = -1
-        while abs(end_index) <= min(20, len(combined_seq)) and combined_seq[end_index].islower():
-            end_index -= 1
-
-        print(f"start_index: {start_index}, end_index: {end_index}")
-
-        # Check if any lowercase character was found in the first 20 characters
-        if start_index <= min(20, len(combined_seq)):
-            # Check if any lowercase character was found in the last 20 characters
-            if abs(end_index) >= min(20, len(combined_seq)):
-                return combined_seq[start_index:end_index + 1]
-
-        # No lowercase characters found, return the original sequence
-        return combined_seq
-
 
     # Create a list of dictionaries containing gene information
     gene_info_list = [
         {
-            'InquiryID': order.inquiry_id,
             'GeneName': gene_info.gene_name,
-            'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
             'SeqAA': get_seq_aa(gene_info.combined_seq),
-            'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
-            'ForbiddenSeqs': gene_info.forbid_seq,
-            'VectorName': gene_info.vector.vector_name,
-            'VectorID': gene_info.vector.vector_id,
             'Species': gene_info.species.species_name if gene_info.species else None,
+            'ForbiddenSeqs': gene_info.forbid_seq,
+            'VectorID': gene_info.vector.vector_id,
+            'VectorName': gene_info.vector.vector_name,
+            'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
+            'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
             'i5nc': gene_info.i5nc,
             'i3nc': gene_info.i3nc,
+            'InquiryID': order.inquiry_id,
         }
         for gene_info in order.gene_infos.all()
     ]
 
     # Create a DataFrame from the list
     df = pd.DataFrame(gene_info_list)
-    # Convert datetime columns to timezone-unaware format
-    # df['create_date'] = df['create_date'].dt.tz_localize(None)
-    # Create a new column 'order_type' based on the condition
-    
-    # 不用根据长度去订单判断类型了，都注释掉
-    # if df.get('SeqAA') is not None:
-    #     max_sequence_length += df['SeqAA'].str.len().max()
-    # if df.get('Seq5NC') is not None:
-    #     max_sequence_length += df['Seq5NC'].str.len().max()
-    # if df.get('Seq3NC') is not None:
-    #     max_sequence_length += df['Seq3NC'].str.len().max()
 
-    # order_type = 2 if max_sequence_length > 650 else 1
-    
-    # Prepare response with CSV content
-    # response = HttpResponse(content_type='text/csv')
-    # response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{request.user}-RootPath_Gene_Library_Order_Infomation.csv"'
-    # df.to_excel(path_or_buf=response, index=False)
-    
     # Prepare response with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{order.inquiry_id}-{order.user}-RootPath_Gene_Library_Order_Information.xlsx"'
@@ -437,12 +545,10 @@ def export_order_to_csv(request, order_id):
 
     return response
 
-
 @login_required
 def manage_order(request):
     order_list = OrderInfo.objects.filter(user=request.user)
     return render(request, 'user_center/order_view.html', {'order_list': order_list})
-
 
 @login_required
 def order_delete(request):
@@ -459,13 +565,7 @@ def order_delete(request):
             return JsonResponse({'status': 'error', 'message': 'Only cancelled order can be deleted'})
     else:
         return render(request, 'user_center/order_view.html')
-
-@login_required
-def manage_vector(request):
-    '''list vectors of the company and the user'''
-    company_vectors = Vector.objects.filter(user=None)
-    user_vectors = Vector.objects.filter(user=request.user)
-    return render(request, 'user_center/manage_vector.html', {'company_vectors': company_vectors, 'user_vectors': user_vectors})
+         
 
 def check_forbiden_seq(seq, seq_length, customer_forbidden_list=None):
     '''根据序列长度检查正义和反义链'''
@@ -512,7 +612,7 @@ def merge_overlapping_positions(all_positions):
     if not all_positions:
         return []
 
-    all_positions.sort()
+    all_positions.sort(key=lambda x: x[0])
     merged_positions = [all_positions[0]]
 
     for current in all_positions[1:]:
@@ -551,8 +651,7 @@ def check_S8W8G6_sequence(sequence):
 def calculate_gc_content(sequence):
     sequence = sequence.upper().replace(" ", "")
     gc_count = sequence.count('G') + sequence.count('C')
-    total_count = len(sequence)
-    gc_content = (gc_count / total_count) * 100
+    gc_content = (gc_count / len(sequence)) * 100
     return gc_content
 
 def check_regional_gc_content(sequence, window_size=20, threshold_low=20, threshold_high=80):
@@ -636,43 +735,81 @@ def process_sequence(seq, forbid_seq):
     GC_content = calculate_gc_content(seq)
     gc_positions = check_sequence(seq)
 
-    all_positions = forbidden_positions + gc_positions
-
-    all_positions = merge_overlapping_positions(all_positions)
+    all_positions = merge_overlapping_positions(forbidden_positions + gc_positions)
     all_positions.sort(key=lambda x: x[0])
-
-    # print("all_positions: in process sequence: ", all_positions)
 
     ##################################################
     tagged_seq = ""
     current_position = 0
-    # print("all positions: ", all_positions)
+
     for start, end in all_positions:
         tagged_seq += seq[current_position:start]
-
-        # tagged_seq += '<i class="text-warning">'
+        
         if (start, end) in forbidden_positions:
-            # tagged_seq += '<i class="bg-danger">' + seq[start:end] + '</i>'
             for i in range(start, end):
                 tagged_seq += '<i class="bg-danger">' + seq[i] + '</i>'
         else:
-            # tagged_seq += '<em class="text-warning">' + seq[start:end] + '</em>' 
             for i in range(start, end):
                 tagged_seq += '<em class="text-warning">' + seq[i] + '</em>'
-        # tagged_seq += '</i>'
-
+            
         current_position = end
 
-    tagged_seq += seq[current_position:]  # Add the remaining sequence
+    tagged_seq += seq[current_position:]  # 添加剩余的序列
 
-    ##################################################
-    if len(contained_forbidden_list) > 0:
-        seq_status = "forbidden"
-    else:
-        seq_status = "validated"
+    return tagged_seq, "validated", forbidden_check_list, contained_forbidden_list, GC_content
 
-    return tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, GC_content
+def process_sequence_get_highlight_position(seq, forbidden_seq):
+    seq = seq.upper().replace(" ", "")
+    seq = re.sub(r'[^a-zA-Z]', '', seq) # 删除所有非字母的字符
+    seq = seq[:20].lower() + seq[20:-20]  + seq[-20:].lower() # Add lower case to the first and last 20 bases
+    # 删除所有非字母的字符
+    # 如果seq是氨基酸序列，则不需要检查forbid_seq，不需要计算gc_content，不需要检查consecutive NTs，直接返回
+    if identify_sequence(seq) == "Protein sequence":
+        return seq, "Protein", None, None, None
+    elif identify_sequence(seq) == "Invalid sequence, containing: *":
+        return seq, "Invalid Protein", None, None, None
 
+    GC_content = calculate_gc_content(seq)
+    gc_positions = check_sequence(seq)
+
+    contained_forbidden_list, forbidden_check_list, forbidden_positions = check_forbiden_seq(seq, len(seq), forbidden_seq)
+
+    # 把GC_positions和forbidden_positions 都写到json里面，这些都是需要highlight的位置
+    highlights_positions = []
+    for position in gc_positions:
+        highlights_positions.append({
+            'start': position[0],
+            'end': position[1],
+            'type': 'warning'
+        })
+    
+    for position in forbidden_positions:
+        highlights_positions.append({
+            'start': position[0],
+            'end': position[1],
+            'type': 'danger'
+        })
+
+    if len(forbidden_positions) > 0:
+        return seq, "forbidden", forbidden_check_list, contained_forbidden_list, GC_content, highlights_positions
+    
+    return seq, "validated", forbidden_check_list, contained_forbidden_list, GC_content, highlights_positions
+
+
+def gene_info_by_list(request):
+    gene_list = request.GET.getlist('genes')  # 或者 request.POST.getlist()
+    gene_infos = GeneInfo.objects.filter(gene_name__in=gene_list)
+    data = serialize('json', gene_infos, fields=('gene_name', 'original_seq', 'original_highlights', 'combined_seq', 'modified_highlights'))
+    return JsonResponse({'gene_infos': data}, safe=False)
+
+
+
+@login_required
+def manage_vector(request):
+    '''list vectors of the company and the user'''
+    company_vectors = Vector.objects.filter(user=None)
+    user_vectors = Vector.objects.filter(user=request.user)
+    return render(request, 'user_center/manage_vector.html', {'company_vectors': company_vectors, 'user_vectors': user_vectors})
 
 # checked
 @login_required

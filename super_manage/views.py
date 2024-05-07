@@ -1,16 +1,21 @@
+import datetime
 import json
 import os
 from math import ceil
+import tempfile
 from urllib.parse import quote
+import zipfile
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
+import numpy as np
 import pandas as pd
 from account.models import UserProfile
-from product.models import Vector
+from product.models import Species, Vector
 from user_center.models import OrderInfo
 from user_center.views import \
     vector_download as uc_vector_download, \
@@ -19,7 +24,6 @@ from user_center.views import \
 from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
 from user_center.utils.pagination import Pagination
-
 
 def custom_user_passes_test(test_func):
     """
@@ -291,24 +295,175 @@ def change_status(request):
 
 @login_required
 @is_secondary_admin_required
-def order_manage(request):
+def order_manage_zxl(request):
     return render(request, 'super_manage/order_manage.html', get_table_context("order"))
 
+def order_manage(request):
+    order_list = OrderInfo.objects.all()
+    page_object = Pagination(request, order_list, page_size=10)
+    context = {
+        'order_list': page_object.page_queryset,  # 分完页的数据
+        'page_string': page_object.html(),  # 页码
+    }
+    return render(request, 'super_manage/order_manage_dsy.html', context)
 
+def get_seq_aa(combined_seq):
+    start_index = 0
+    while start_index < min(20, len(combined_seq)) and combined_seq[start_index].islower():
+        start_index += 1
+
+    end_index = -1
+    while abs(end_index) <= min(20, len(combined_seq)) and combined_seq[end_index].islower():
+        end_index -= 1
+
+    # Check if any lowercase character was found in the first 20 characters
+    if start_index <= min(20, len(combined_seq)):
+        # Check if any lowercase character was found in the last 20 characters
+        if abs(end_index) >= min(20, len(combined_seq)):
+            return combined_seq[start_index:end_index + 1]
+
+    # No lowercase characters found, return the original sequence
+    return combined_seq
+
+def generate_REQID(index, order_time):
+    # now = datetime.datetime.now()
+    formatted_time = order_time.strftime("%Y%m%d")
+    last_two_digits_year = formatted_time[2:4]  # 获取年份的最后两位
+    return f"R{last_two_digits_year}{formatted_time[4:]}{index:02}"
+
+@login_required
+@is_secondary_admin_required
+def order_to_reqins(request, order_id):
+    """把订单信息转换成REQIN格式"""
+    order = OrderInfo.objects.get(id=order_id)
+    order_time = order.order_time
+    print("order: ", order)
+    # Create a list of dictionaries containing gene information
+    gene_info_list = [
+        {
+            'InquiryID': order.inquiry_id,
+            'GeneName': gene_info.gene_name,
+            'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
+            'PsNTA_CDS': get_seq_aa(gene_info.combined_seq),
+            'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
+            'ForbiddenSeqs': gene_info.forbid_seq,
+            'VectorName': gene_info.vector.vector_name,
+            'VectorID': gene_info.vector.vector_id,
+            'Species': gene_info.species.species_name if gene_info.species else None,
+            'i5nc': gene_info.i5nc,
+            'i3nc': gene_info.i3nc,
+        }
+        for gene_info in order.gene_infos.all()
+    ]
+
+    # Create a DataFrame from the list
+    df = pd.DataFrame(gene_info_list)
+    # Convert datetime columns to timezone-unaware format
+    # 添加新的列
+    df["Plate"] = "NS"
+    df["WellPos"] = "NS"
+    # 将Species列中的空值填充为None，其他有值的不变
+    df["Species"] = df["Species"].fillna("None")
+
+    # 将ForbiddenSeqs列中的值去掉空格，逗号替换成分号
+    df["DoNotBindPrimers"] = np.nan
+    df["Memo"] = np.nan
+    df["BaseRoles"] = np.nan
+    df["FullSeqFAKE"] = np.nan
+    df["FullSeqFAKE_Credit"] = np.nan
+    df["FullSeqREAL"] = np.nan
+    df["FullSeqREAL_Credit"] = np.nan
+
+    df['PsNTA_CDS'] = df['PsNTA_CDS'].str.upper().str.replace(" ", "")
+    df['Seq_length'] = len(df['Seq5NC'] + df['PsNTA_CDS'] + df['Seq3NC'])
+        
+    # workflow type = if seq_length <=500,"WF3p30", IF( seq_length <= 3400,"MWF5p30", IF(seq_length <= 10000, "MWF7p40", else: Toolong
+    df['WorkflowType'] = np.select(
+        [
+            df['Seq_length'] <= 500,
+            df['Seq_length'] <= 3400,
+            df['Seq_length'] <= 10000,
+        ],
+        [
+            'WF3p30',
+            'MWF5p30',
+            'MWF7p40',
+        ],
+        default='Toolong'
+    )
+    
+    ###############################################
+    df['IntraREQSN'] = df.groupby(['WorkflowType', 'InquiryID']).cumcount() + 1
+    # 假设df是你的DataFrame，column_name是你要生成新索引的列名
+    combined = df['InquiryID'].astype(str) + "_" + df['WorkflowType'].astype(str)
+    labels, unique = pd.factorize(combined)
+
+    print(labels, unique)
+    # 将生成的标签添加到DataFrame作为一个新列
+    
+    df['REQ_index'] = labels +1
+    df['REQID'] = df.apply(lambda row: generate_REQID(row['REQ_index'], order_time), axis=1)
+
+    df['IQID'] = df['InquiryID']
+    
+    # 获取当前时间并格式化为指定格式
+    now = datetime.datetime.now()
+    formatted_time = now.strftime("%Y%m%d_%H%M%S")
+
+    # Temporary directory to store files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        full_zip_path = os.path.join(temp_dir, f"{order.inquiry_id}_REQINs.zip")
+        # Creating the zip file
+        with zipfile.ZipFile(full_zip_path, 'w') as zipf:
+            # 对每个WorkFlow和REQID的唯一组合进行遍历
+            for (workflow, reqid, inqid), group in df.groupby(['WorkflowType', 'REQID', 'InquiryID']):
+                # 生成文件名
+                filename = os.path.join(temp_dir, f"REQIN_{workflow}_[{reqid}]_{formatted_time}.txt")
+                file_path = os.path.join(temp_dir, filename)
+                # Select required columns and write to text file
+                required_columns = ["Plate", "WellPos", "GeneName", "IQID", "REQID","IntraREQSN","Seq5NC", "PsNTA_CDS", "Seq3NC","VectorID", "Species", 
+                                    "ForbiddenSeqs", "DoNotBindPrimers", "Memo", "BaseRoles", "FullSeqFAKE", "FullSeqFAKE_Credit", "FullSeqREAL", "FullSeqREAL_Credit"]
+                df_selected = group[required_columns]
+                df_selected.to_csv(file_path, index=False, sep='\t')
+
+                # Add the text file to the zip file
+                zipf.write(file_path, arcname=filename)
+
+        # Serve the zip file as a response
+        with open(full_zip_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/zip')
+            response['Content-Disposition'] = f'attachment; filename={order.inquiry_id}_REQINs.zip'
+            return response     
+
+# not used
 @login_required
 @is_secondary_admin_required
 def vector_manage_zxl(request):
     return render(request, 'super_manage/vector_manage.html', get_table_context("vector"))
 
+# building now
 @login_required
 @is_secondary_admin_required
 def vector_manage(request):
-    '''list vector'''
-    company_vector_list = Vector.objects.filter(user=None).order_by('-create_date')
-    company_page_object = Pagination(request, company_vector_list, page_size=10)
+    search_query = request.GET.get('search_query', '')
+    if search_query:
+        company_vector_list = Vector.objects.filter(
+            Q(vector_id__icontains=search_query) | Q(vector_name__icontains=search_query),
+            user=None
+        ).order_by('-create_date')
+        company_page_object = Pagination(request, company_vector_list, page_size=100)
+        custom_vector_list = Vector.objects.filter(
+            Q(vector_id__icontains=search_query) | Q(vector_name__icontains=search_query),
+            user__isnull=False
+        ).order_by('-create_date')
+        custom_page_object = Pagination(request, custom_vector_list, page_size=100)
+    else:
+        '''list vector'''
+        company_vector_list = Vector.objects.filter(user=None).order_by('-create_date')
+        company_page_object = Pagination(request, company_vector_list, page_size=100)
 
-    custom_vector_list = Vector.objects.filter(user__isnull=False).order_by('-create_date')
-    custom_page_object = Pagination(request, custom_vector_list, page_size=10)
+        custom_vector_list = Vector.objects.filter(user__isnull=False).order_by('-create_date')
+        custom_page_object = Pagination(request, custom_vector_list, page_size=100)
 
     context = {
         'company_vector_list': company_page_object.page_queryset,  # 分完页的数据
@@ -325,7 +480,7 @@ def vector_delete(request):
     if request.method == 'POST':
         vector_id = request.POST.get('gene_id')
         vector = Vector.objects.get(id=vector_id)
-        print(f"{request.user} delete this {vector_id} {vector.vector_id} {vector.vector_name}")
+        # print(f"{request.user} delete this {vector_id} {vector.vector_id} {vector.vector_name}")
     
         if vector.vector_file:
             file_path = vector.vector_file.path
@@ -353,7 +508,7 @@ def vector_upload_file(request):
     if request.method == 'POST':
         uploaded_file = request.FILES.get('file')
         vector_id = request.POST.get('vectorId')
-        print(vector_id)
+        # print(vector_id)
         file_type = request.POST.get('fileType')
 
         if uploaded_file is None or vector_id is None or file_type is None:
@@ -388,15 +543,16 @@ def vector_upload_file(request):
         
         return JsonResponse({'status': 'success', 'message': 'File uploaded Successfully'})
 
-
+@login_required
+@is_secondary_admin_required
 def vector_edit_item(request):
     if request.method == 'POST':
         vector_id = request.POST.get('vector_id')
         new_status = request.POST.get('new_status')
-        print(f"vector_id: {vector_id}, new_status: {new_status}")
+        # print(f"vector_id: {vector_id}, new_status: {new_status}")
         try:
             vector = Vector.objects.get(id=vector_id)
-            print(f"vector: {vector}")
+            # print(f"vector: {vector}")
             vector.status = new_status
             vector.save()
             return JsonResponse({'status': 'success'})
@@ -410,30 +566,49 @@ def vector_edit_item(request):
 @login_required
 @is_secondary_admin_required
 def vector_add_item(request):
-    '''can edit any item in vector model, eg. 'status','''
+    '''添加新的vector'''
     if request.method == 'POST':
         csv_file = request.FILES.get('csvFile')
         if not csv_file.name.endswith('.csv'):
-            return HttpResponse("File is not CSV type", status=400)
-
+            return JsonResponse({"message": "File is not CSV type", "status": "error"}, status=400)
+        
         # 使用 Pandas 读取 CSV 文件
         try:
             df = pd.read_csv(csv_file)
-
             # 对于 DataFrame 中的每一行，创建一个模型实例并保存
+            # 这里 dataframe中的列名与模型中的字段名不一致，它们之间的对应关系是：
+            # dataframe中的列名 -> 模型中的字段名
+            # Vector_ID -> vector_id
+            # Vector_Name -> vector_name
+            # Vector_Seq(From_v3NC_Downstream_to_v5NC_Upstream_withoutV3NCv5NC_Seq) -> vector_map
+            # v5NC -> NC5
+            # v3NC -> NC3
+            # iU20 -> iu20
+            # iD20 -> id20
             for _, row in df.iterrows():
-                model_instance = Vector(**row.to_dict())
-                model_instance.save()
+                vector_data = {
+                    'vector_name': row['Vector_Name'],
+                    'vector_map': row['Vector_Seq(From_v3NC_Downstream_to_v5NC_Upstream_withoutV3NCv5NC_Seq)'],
+                    'NC5': row['v5NC'],
+                    'NC3': row['v3NC'],
+                    'iu20': row['iU20'],
+                    'id20': row['iD20'],
+                    'status': 'ReadyToUse'
+                }
+                
+                Vector.objects.update_or_create(
+                    vector_id=row['Vector_ID'],
+                    defaults=vector_data
+                )
 
-            return HttpResponse("CSV file has been imported", status=200)
+            return JsonResponse({"message": "CSV file has been imported", "status": "success"}, status=200)
 
         except Exception as e:
-            # 处理异常
-            return HttpResponse(str(e), status=500)
-
-    # 如果不是 POST 请求，返回错误
-    return HttpResponse("Invalid request", status=400)
-
+            import traceback
+            print(traceback.format_exc())
+            return JsonResponse({"message": str(e), "status": "error"}, status=500)
+    
+    return JsonResponse({"message": "Invalid request", "status": "error"}, status=400)
 
 @login_required
 @is_secondary_admin_required
@@ -445,3 +620,11 @@ def user_manage(request):
         'page_string':page_object.html(),  # 页码
     }
     return render(request, 'super_manage/user_manage.html', context)
+
+
+@login_required
+@is_secondary_admin_required
+def species_manage(request):
+    species_list = Species.objects.all()
+
+    return render(request, 'super_manage/species_codon_manage.html', {'species_list': species_list})

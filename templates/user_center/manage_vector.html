@@ -123,12 +123,14 @@
                         </td>
                         <td>
                             <div class="hstack gap-3 justify-content-center">
-                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download genebank" href="{% url 'user_center:vector_download' vector.id 'gb' %}"><i class="bi bi-file-earmark-binary"></i></a>
+                                <a type="button" class="text-decoration-none" 
+                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Download genebank" 
+                                    href="{% url 'user_center:vector_download' vector.id 'gb' %}"><i class="bi bi-file-earmark-binary"></i></a>
                                 <a type="button" class="text-decoration-none preview-link" 
                                      data-bs-toggle="tooltip" data-bs-placement="top" title="Click to download map" 
-                                    onmouseover="showPreview(event)" onmouseout="hidePreview()"
+                                    onmouseover="showPreview(event, '{{ forloop.counter }}')" onmouseout="hidePreview('{{ forloop.counter }}')"
                                     href="{% url 'user_center:vector_download' vector.id 'map' %}"><i class="bi bi-filetype-png"></i></a> 
-                                <div class="image-preview" id="imagePreview">
+                                <div class="image-preview" id="imagePreview{{ forloop.counter }}">
                                     <img src="{{ MEDIA_URL }}{{ vector.vector_png }}" alt="Image Preview">
                                 </div>
                             </div>
@@ -391,12 +393,12 @@
     }
 </script>
 <script>
-    function showPreview() {
-        var preview = document.getElementById('imagePreview');
+    function showPreview(event, id) {
+        var preview = document.getElementById('imagePreview' + id);
         preview.style.display = 'block';
     }
-    function hidePreview() {
-        var preview = document.getElementById('imagePreview');
+    function hidePreview(id) {
+        var preview = document.getElementById('imagePreview' + id);
         preview.style.display = 'none';
     }
 </script>

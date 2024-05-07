@@ -26,6 +26,12 @@
                             <span class="link-text">Vector Manage</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="{% url 'super_manage:species_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/species_manage/' %}active{% endif %}">
+                            <i class="bi bi-tools me-2"></i>
+                            <span class="link-text">Species Manage</span>
+                        </a>
+                    </li>
                 </ul>
                 <hr>
             </div>

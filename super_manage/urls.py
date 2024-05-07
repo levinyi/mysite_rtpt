@@ -12,6 +12,7 @@ urlpatterns = [
     path('order_manage/download_report/<int:order_id>', views.download_report, name='download_report'),
     path('order_manage/delete_report', views.delete_report, name='delete_report'),
     path('order_manage/export_order_to_csv/<int:order_id>', export_order_to_csv, name='export_order_to_csv'),
+    path('order_to_reqins/<int:order_id>', views.order_to_reqins, name='order_to_reqins'),
 
     path('vector_manage/', views.vector_manage, name='vector_manage'),
     path('vector_manage/submit_vector_data', views.submit_vector_data, name='submit_vector_data'),
@@ -27,4 +28,7 @@ urlpatterns = [
 
     # user management
     path('user_manage/', views.user_manage, name='user_manage'),
+
+    # species management
+    path('species_manage/', views.species_manage, name='species_manage'),
 ]

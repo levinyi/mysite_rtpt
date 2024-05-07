@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'tools',
     'notice',
     'import_export',  # pip install django-import-export
+    # 'algoliasearch_django',  # pip install algoliasearch-django
 ]
 
 MIDDLEWARE = [
@@ -158,3 +159,9 @@ BASE_URL = config('BASE_URL')
 # 使用 Secure cookie
 # SESSION_COOKIE_SECURE = True
 # CSRF_COOKIE_SECURE = True
+
+# # 使用 Algolia 搜索
+# ALGOLIA = {
+#     'APPLICATION_ID': 'PBCEPI7FYW',
+#     'API_KEY': 'c95065b555b79ef144444c3681edef22',
+# }

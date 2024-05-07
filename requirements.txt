@@ -12,3 +12,6 @@ reportlab
 django-import-export
 alibabacloud-dysmsapi20170525
 biopython
+django-allauth
+algoliasearch-django
+openpyxl

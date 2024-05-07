@@ -5,6 +5,8 @@ register = template.Library()
 
 @register.filter
 def basename(path):
+    if not isinstance(path, str):
+        path = str(path)
     return os.path.basename(path)
 
 
@@ -21,3 +23,8 @@ def check_status(gene_list, status):
         if gene.status != status:
             return False
     return True
+
+@register.filter(name='get_previous')
+def get_previous(value, arg):
+    # used in shopping cart html
+    return value[arg - 1] if arg > 0 else None

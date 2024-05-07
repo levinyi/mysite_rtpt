@@ -1,0 +1,49 @@
+{% extends "super_manage/base.html" %}
+{% load static %}
+{% block title %}Order Manage{% endblock %}
+{% block extra_head %}
+{% endblock %}
+{% block manage_content %}
+
+<div class="container-fluid pt-4">
+    <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
+        <table class="table table-striped table-hover text-center">
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">InQuiry ID</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Create Time</th>
+                <th scope="col">Download REQINs</th>
+                <th scope="col">Status</th>
+            </tr>
+            </thead>
+            <tbody class="table-group-divider">
+                {% for order in order_list %}
+                    <tr>
+                        <th scope="row">{{ forloop.counter }}</th>
+                        <td>{{ order.inquiry_id }}</td>
+                        <td>{{ order.user }}</td>
+                        <td>{{ order.gene_infos.count }}</td>
+                        <td>{{ order.order_time }}</td>
+                        <td>
+                            <a href="{% url 'super_manage:order_to_reqins' order.id %}" class="btn btn-outline-primary">
+                                <i class="bi bi-cloud-download"></i> Download REQINs
+                            </a>
+                        </td>
+                        <td>{{ order.status }}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <!-- 分页 -->
+        <div  class="d-flex justify-content-center">
+            <ul class='pagination'>
+                {{ page_string }}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

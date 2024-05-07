@@ -9,11 +9,29 @@
     <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
         <!-- 搜索框 -->
         <div class="col-4 mb-3">
-            <form id="searchForm" class="d-flex" action="/super_manage/vector_manage/" method="get">
-                <input class="form-control me-2" type="search" name="search_query" placeholder="Search" aria-label="Search">
-                <button class="btn btn-outline-primary" type="submit">Search</button>
-                <a href="/super_manage/vector_manage/" class="btn btn-outline-primary">Reset</a>
-            </form>
+            <div class="input-group">
+                <input type="button" class="form-control" placeholder="Search vector id or name" data-bs-toggle="modal" data-bs-target="#searchResultModal">
+                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#searchResultModal">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+        <!-- 新建一个模态框来展示搜索结果 -->
+        <div class="modal fade" id="searchResultModal" tabindex="-1" aria-labelledby="searchResultModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-top modal-xl">
+                <div class="modal-content">
+                    <div class="modal-body">
+                        <!-- Algolia 搜索框 -->
+                        <div id="algolia-search-box">
+                            <input type="text" class="form-control" placeholder="Search vector id or name">
+                        </div>
+                        <!-- Algolia 搜索结果显示区域 -->
+                        <div id="algolia-hits">
+                        <!-- 搜索结果将会在这里显示 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <!-- 标签页导航 -->
         <ul class="nav nav-tabs">
@@ -242,6 +260,12 @@
 
 {% block javascript %}
 <script>
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
+<script>
     // 删除Vector
     function del_gene(the, gene_id) {
         layer.open({
@@ -366,29 +390,24 @@
         var file = fileInput.files[0];
         var csrftoken = getCookie('csrftoken');
 
+        // 创建 FormData 对象
         var formData = new FormData();
         formData.append('csvFile', file);
         formData.append('csrfmiddlewaretoken', csrftoken);
 
+        // 发送文件到服务器
         fetch('/super_manage/vector_add_item/', {
             method: 'POST',
             body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === "success") {
-                alert(data.message);
-                // 刷新页面
-                window.location.reload();
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('There was an error processing your request.');
+        }).then(response => {
+            // 处理响应
+            console.log(response);
+        }).catch(error => {
+            // 处理错误
+            console.error(error);
         });
 
+        // 关闭模态框
         var modal = bootstrap.Modal.getInstance(document.getElementById('uploadCsvModal'));
         modal.hide();
     });
@@ -411,17 +430,63 @@
     }
 
 </script>
+<script src="//cdn.jsdelivr.net/hogan.js/3.0.2/hogan.min.js"></script>
+
+{% verbatim %}
+<script type="text/template" id="hit-template">
+<!-- 搜索结果模板 -->
+<tr>
+    <td>{{{ _highlightResult.vector_name.value }}}</td>
+    <td>{{{ _highlightResult.vector_id.value }}}</td>
+    <td>{{{ _highlightResult.iu20.value }}}</td>
+    <td>{{{ _highlightResult.id20.value }}}</td>
+</tr>
+</script>
+{% endverbatim %}
+
 <script>
-document.addEventListener("DOMContentLoaded", function(){
-    var searchForm = document.querySelector("#searchForm");
-    searchForm.addEventListener("submit", function(event) {
-        console.log("Form submitted"); // 这里用于调试
-        event.preventDefault(); // 阻止表单默认提交行为
-        var searchQuery = document.querySelector("#searchForm input[name='search_query']").value;
-        var actionUrl = searchForm.getAttribute("action");
-        window.location.href = actionUrl + "?search_query=" + encodeURIComponent(searchQuery);
-        history.pushState({}, '', actionUrl); // 更改URL但不包含查询参数
+$(document).ready(function() {
+    var searchClient = algoliasearch('PBCEPI7FYW', '0ae194bb9575988b2bc5750bfdbb0cd4');
+    var helper = algoliasearchHelper(searchClient, 'vector_index', {
+        // 这里可以添加一些默认的搜索参数
     });
+
+    // 这里假设模态框的搜索框ID为'modal-search-input'
+    var $modalInputField = $('#algolia-search-box input');
+
+    var hitTemplate = Hogan.compile($('#hit-template').text());
+
+    // 模态框中的搜索逻辑
+    $modalInputField.on('keyup', function() {
+        var query = $(this).val();
+        helper.setQuery(query).search();
+    });
+
+    helper.on('result', function(data) {
+        renderHits(data);
+    });
+
+    // 当模态框打开时聚焦搜索框并清空之前的搜索结果
+    $('#searchResultModal').on('shown.bs.modal', function() {
+        $modalInputField.focus().val('');
+        $('#algolia-hits').html(''); // 清空之前的搜索结果
+        helper.setQuery('').search(); // 可选：打开模态框时执行一个空搜索，展示所有结果
+    });
+
+    function renderHits(content) {
+        var hitsHtml = '<table class="table table-striped table-hover text-center"><thead><tr><th>Vector Name</th><th>Vector ID</th><th>iU20</th><th>iD20</th></tr></thead><tbody>';
+
+        if (content.hits.length === 0) {
+            hitsHtml = '<p class="text-center text-danger lead">We didn\'t find any results for your search.</p>';
+        } else {
+            content.hits.forEach(function(hit) {
+                hitsHtml += hitTemplate.render(hit);
+            });
+        }
+
+        $('#algolia-hits').html(hitsHtml);
+    }
 });
 </script>
+
 {% endblock %}

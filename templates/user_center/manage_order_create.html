@@ -26,6 +26,7 @@
             <li class="breadcrumb-item active" aria-current="page"></li>
         </ol>
     </nav>
+    <!-- section title -->
     <div class="card mt-5">
         <div class="card-header text-center">   
             <h2>Order Creation Process</h2>
@@ -57,26 +58,29 @@
             </div>
         </div>
     </div>
+    <!-- Order Creation Form -->
     <div class="card mt-5 mb-5">
         <div class="card-header text-center">
             <h2>Start Ordering</h2>
         </div>
         <div class="card-body">
+            <!-- Choose Vector -->
             <div class="card-title mb-3 mt-2">
                 <h3><i class="bi bi-1-circle"></i> Choose Vector</h3>
-                <p>If your vector is not listed below, you can create your own vector <a class="text-decoration-none" href="{% url 'user_center:manage_vector' %}">here</a> first.</p>
+                <p>If you want to use your own vector, you must first create it <a class="text-decoration-none" href="{% url 'user_center:manage_vector' %}">here</a> and have it verified by us before it can be displayed on this site.</p>
             </div>
             <span class="text-success">Commonly used vectors at RootPath </span> and <span class="text-info">your own vectors</span> are listed below.
-            <select class="form-select mt-2" size="10" aria-label="Multiple select example" id="vector_id">
+            <select class="form-select mt-2" size="10" aria-label="Multiple select example" id="vector_id" data-live-search="true">
                 <option value="" selected >Choose a vector</option>
                 {% for vector in company_vectors %}
-                <option value="{{ vector.id }}" class="text-success">{{ vector.vector_name }}</option>
+                    <option value="{{ vector.id }}" class="text-success">{{ forloop.counter }}. {{ vector.vector_name }}</option>
                 {% endfor %}
 
                 {% for vector in customer_vectors %}
-                <option value="{{ vector.id }}" class="text-info">{{ vector.vector_name }} (user)</option>
+                    <option value="{{ vector.id }}" class="text-info">{{ forloop.counter }}. {{ vector.vector_name }} (user)</option>
                 {% endfor %}
             </select>
+            <!-- Submit Sequence -->
             <div class="card-title mb-3 mt-5">
                 <h3><i class="bi bi-2-circle"></i> Submit Sequence</h3> 
                 <div class="card-body">
@@ -133,11 +137,11 @@
         const target = $(e.target).data("bs-target");
         if (target === '#nt_sequence' && !hot1Initialized) {
             initHot1();
-            console.log('init hot1');
+            // console.log('init hot1');
             hot1Initialized = true;
         } else if (target === '#aa_sequence' && !hot2Initialized) {
             initHot2();
-            console.log('init hot2');
+            // console.log('init hot2');
             hot2Initialized = true;
         }
     });
@@ -146,7 +150,7 @@
     function createGeneNameValidator() {
         let lastError = '';
         return function(value, callback) {
-            var regex = /^[a-zA-Z0-9_-]{1,15}$/;
+            var regex = /^[a-zA-Z0-9_-]{1,60}$/;
             if (!regex.test(value)) {
                 lastError = 'Gene Name "' + value + '" is invalid. It must be 1-15 characters long and can only contain letters, numbers, underscores, and hyphens.';
                 callback(false);
@@ -309,7 +313,7 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Success:', data);
+            // console.log('Success:', data);
             if(data.status == 'error') {
                 alert(data.message);
             } else {
@@ -346,7 +350,7 @@
             'genetable': hotData,
             //'isChecked': isChecked,
         };
-        console.log(data);
+        // console.log(data);
         let isEmpty = true;
         for (let row of hotData) {
             if (row.some(cell => cell !== null && cell !== '')) {
@@ -370,7 +374,7 @@
         })
         .then(response => response.json())
         .then(data => {
-            console.log('Success:', data);
+            // console.log('Success:', data);
             if(data.status == 'error') {
                 alert(data.message);
             } else if (data.status === 'info') {

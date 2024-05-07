@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <div class="row">
+        <div class="col-md-8">
+            <h2>Sequence Analysis Results</h2>
+            <p>Total Genes: {{ gene_table|length }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i> Download CSV</a>
+        </div>
+    </div>
+    <div class="row">
+        {% for g in gene_table %}
+        <div class="col-12 mb-3">
+            <!-- Gene Card -->
+            <!-- set a g.total_penalty_score for test -->
+            <div class="card">
+                <div class="card-header {% if g.total_penalty_score < 10 %}bg-success{% elif g.total_penalty_score < 30 %}bg-warning{% elif g.total_penalty_score > 30 %}bg-danger{% else %}{% endif %}">
+                    <div class="row">
+                        <div class="col-6 text-start">
+                            Gene ID: {{ g.gene_id }}
+                        </div>
+                        <div class="col-6 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <10; yellow:10<score<30; red:score>30">
+                            Total Penalty Score: {{ g.total_penalty_score }}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="card-text" id="seq-{{ forloop.counter }}">{{ g.sequence }}</p>
+                    <!-- Accordion for details -->
+                    <div class="accordion" id="accordion{{ forloop.counter }}">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                                    Show More Details
+                                </button>
+                            </h2>
+                            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordion{{ forloop.counter }}">
+                                <div class="accordion-body">
+                                    <!-- Display other information as list -->
+                                    {% comment %} {{ g }} {% endcomment %}
+                                    <ul>
+                                        {% if g.tandem_repeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">Check Tandem Repeats: {{ g.tandem_repeats_sequence }},score: {{g.tandem_repeats_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if g.inverted_repeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.inverted_repeats_sequence }}">Check Inverted Repeats: {{ g.inverted_repeats_sequence }}, score: {{g.inverted_repeats_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if g.W8S8_motifs_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.W8S8_motifs_sequence }}">Check W8S8 motif: {{ g.W8S8_motifs_sequence }}, score: {{g.W8S8_motifs_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if g.homopolymers_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.homopolymers_sequence }}">Check Homopolymers: {{ g.homopolymers_sequence }}, score: {{g.homopolymers_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if g.long_repeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.long_repeats_sequence }}">Check Long Repeats: {{ g.long_repeats_sequence }}, score: {{g.long_repeats_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if g.local_gc_content_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.local_gc_content_sequence }}">Check Local GC content: {{ g.local_gc_content_sequence }}, score: {{g.local_gc_content_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if g.palindromes_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.palindromes_sequence }}">Check Palindromes: {{ g.palindromes_sequence }}, score: {{g.palindromes_penalty_score}}</li>
+                                        {% endif %}
+
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script type="text/javascript">
+    let allowUnload = true;  // Flag to determine if the unload prompt should be shown
+
+    // 当文档加载完成后，添加事件监听器
+    window.addEventListener('DOMContentLoaded', function () {
+        // 下载按钮的点击事件监听器，用于取消卸载警告
+        const downloadButton = document.getElementById('downloadButton');
+        if (downloadButton) {
+            downloadButton.addEventListener('click', function (e) {
+                e.preventDefault();   // 阻止默认行为
+                allowUnload = false;  // 当按钮被点击时，设置标志为false
+                window.location.href = "/tools/download_gene_table/";  // 重定向到下载链接
+            });
+        }
+
+        // 其他代码： 处理序列高亮显示等
+        document.querySelectorAll('.sequence-highlighter').forEach(function(item) {
+            item.addEventListener('mouseenter', function() {
+                // 提取序列部分，考虑到可能有分号分隔的多个序列
+                const fullText = this.textContent.trim();
+                const targetSequencePart = fullText.split(':')[1].split(',')[0].trim();  // 提取序列部分
+                const targetSequences = targetSequencePart.split(';');  // 处理可能的多序列情况
+                const targetId = this.getAttribute('data-target');
+                const targetElement = document.querySelector(targetId);
+
+                console.log('Target Sequences:', targetSequences);  // 打印目标序列
+                console.log('Target ID:', targetId);  // 打印目标元素的ID
+
+                if (targetElement) {
+                    // console.log('Original Text:', targetElement.textContent);  // 打印原始文本
+                    let highlightedText = targetElement.textContent;
+                    targetSequences.forEach(sequence => {
+                        const regex = new RegExp(sequence, 'g');  // 创建正则表达式，全局匹配目标序列
+                        highlightedText = highlightedText.replace(regex, 
+                            `<span class="bg-warning text-dark">${sequence}</span>`);  // 替换文本以高亮显示
+                    });
+                    
+                    // console.log('Highlighted Text:', highlightedText);  // 打印替换后的高亮文本
+                    targetElement.innerHTML = highlightedText;  // 更新HTML内容
+                }
+            });
+
+            item.addEventListener('mouseleave', function() {
+                const targetId = this.getAttribute('data-target');
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    targetElement.innerHTML = targetElement.textContent; // 移除高亮，恢复原始文本
+                    // console.log('Text after Mouse Leave:', targetElement.textContent); // 打印鼠标离开后的文本
+                }
+            });
+        });
+    });
+
+    // 注册 beforeunload 事件监听器
+    window.addEventListener('beforeunload', function (e) {
+        console.log("allowUnload: ", allowUnload); // 打印当前的 allowUnload 值
+        if (!allowUnload) return;  // 如果标志为false，不显示警告
+        var confirmationMessage = 'Are you sure you want to leave this page?';
+        (e || window.event).returnValue = confirmationMessage; // Gecko and Trident
+        return confirmationMessage; // Gecko and WebKit
+    });
+</script>
+
+{% endblock %}
+

@@ -30,22 +30,30 @@ class ShoppingCart(models.Model):
 class GeneInfo(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     gene_name = models.CharField(verbose_name="Gene name", max_length=200)
+    
     original_seq = models.TextField(verbose_name="original_seq SeqAA NT")
+    combined_seq = models.TextField(null=True, blank=True)
+    saved_seq = models.TextField(null=True, blank=True)
+
     vector = models.ForeignKey(Vector, on_delete=models.SET_NULL, null=True)
     species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=255, default='Need_To_Validate')
     create_date = models.DateTimeField(auto_now_add=True)
 
     forbid_seq = models.CharField(verbose_name="ForbiddenSeqs", max_length=255, null=True, blank=True)
-    combined_seq = models.TextField(null=True, blank=True)
-    saved_seq = models.TextField(null=True, blank=True)
 
-    gc_content = models.FloatField(null=True, blank=True)
+    # gc_content = models.FloatField(null=True, blank=True)
     forbidden_check_list = models.CharField(max_length=255, null=True, blank=True)
     contained_forbidden_list = models.CharField(max_length=255, null=True, blank=True)
 
     i5nc = models.TextField(verbose_name="i5nc", null=True, blank=True)
     i3nc = models.TextField(verbose_name="i3nc", null=True, blank=True)
+
+    # new fields
+    original_highlights = models.JSONField(null=True, blank=True)
+    modified_highlights = models.JSONField(null=True, blank=True)
+    original_gc_content = models.FloatField(null=True, blank=True)
+    modified_gc_content = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return self.gene_name

@@ -13,6 +13,7 @@ urlpatterns = [
     path('protein_edit/<int:gene_id>/', views.protein_edit, name='protein_edit'),
     path('gene_delete/', views.gene_delete, name='gene_delete'),
     path('gene_validation/', views.gene_validation, name='gene_validation'),
+    path('api/geneinfos/filter/', views.gene_info_by_list, name='gene_info_by_list'),
     # shopping cart
     path('view_cart/', views.view_cart, name='view_cart'),
     path('cart_genbank_download/<int:gene_id>/', views.cart_genbank_download, name='cart_genbank_download'),

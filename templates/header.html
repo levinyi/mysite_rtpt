@@ -15,7 +15,6 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav">
                 <!-- 导航项 -->
-                {% comment %} <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'home' %}">Home</a></li> {% endcomment %}
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'user_center:dashboard' %}">User Center</a></li>
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'user_center:order_create' %}">Create New Order</a></li>
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'account:contact_us' %}">Contact Us</a></li>
@@ -25,18 +24,36 @@
             </ul>
 
             <!-- 用户认证逻辑 -->
-            <div class="ms-auto">
+            <div class="ms-auto d-flex align-items-center">
                 {% if user.is_authenticated %}
-                <div class="dropdown" style="color:#FFFFFF;">
-                    <a href="#" class="d-flex align-items-center link-body-emphasis text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <!-- 购物车图标 -->
+                <a href="{% url 'user_center:view_cart' %}" class="d-flex align-items-center text-decoration-none me-3">
+                    <i class="bi bi-cart3 fs-4 text-white"></i>
+                    <span class="badge rounded-circle ms-1"></span>
+                </a>
+                <!-- 用户头像下拉菜单 -->
+                <div class="dropdown">
+                    <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                         {% if user_profile.photo %}
                             <img src="{{ user_profile.photo }}" alt="" width="32" height="32" class="rounded-circle me-2">
                         {% else %}
                             <img src="{% static 'user_avatar/default_icon.jpg' %}" alt="" width="32" height="32" class="rounded-circle me-2">
                         {% endif %}
-                        <strong style="color:#FFFFFF;">{{ user.username }}</strong>
                     </a>
-                    <ul class="dropdown-menu text-small shadow" aria-labelledby="dropdownMenuLink">
+                    <ul class="dropdown-menu text-small shadow">
+                        <div class="dropdown-item-text">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar avatar-sm avatar-circle">
+                                    <img src="{{ user_profile.photo }}" alt="" width="32" height="32" class="rounded-circle me-2">
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h5 class="mb-0">{{user.username}}</h5>
+                                    <p class="card-text text-body">{{user.email}}</p>
+                                </div>
+                            </div>
+                        </div>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'user_center:dashboard' %}">User Center</a></li>
                         <li><a class="dropdown-item" href="{% url 'account:my_information' %}">Profile</a></li>
                         <li><a class="dropdown-item" href="#">Account</a></li>
@@ -45,10 +62,12 @@
                     </ul>
                 </div>
                 {% else %}
-                    <a href="{% url 'account:user_login' %}" role="button" class="btn btn-outline-light me-2">Login</a>
-                    <a href="{% url 'account:user_register' %}" role="button" class="btn btn-warning">Sign-up</a>
+                <!-- 登录和注册按钮 -->
+                <a href="{% url 'account:user_login' %}" role="button" class="btn btn-outline-light me-2">Login</a>
+                <a href="{% url 'account:user_register' %}" role="button" class="btn btn-warning">Sign-up</a>
                 {% endif %}
             </div>
+
         </div>
     </div>
 </nav>

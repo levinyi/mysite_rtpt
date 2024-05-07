@@ -86,7 +86,9 @@ class GeneSynEnzymeCutSite(models.Model):
 
 class Species(models.Model):
     species_name = models.CharField(verbose_name="物种名称", max_length=256)
-    species_note = models.CharField(verbose_name="物种备注", max_length=256)
+    species_note = models.CharField(verbose_name="物种备注", max_length=256, blank=True, null=True)
+
+    species_codon_file = models.FileField(verbose_name="codon文件", upload_to='codon_usage_table/', blank=True, null=True)
 
     def __str__(self):
         return self.species_name
