@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "user_center/base.html" %}
 {% load static %}
 
 {% block title %}order{% endblock %}
@@ -19,15 +19,15 @@
     </style>
 {% endblock %}
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
-            <li class="breadcrumb-item active" aria-current="page"></li>
+            <li class="breadcrumb-item active" aria-current="page">Create Order</li>
         </ol>
     </nav>
     <!-- section title -->
-    <div class="card mt-5">
+    <div class="card mt-2">
         <div class="card-header text-center">   
             <h2>Order Creation Process</h2>
         </div>
@@ -59,7 +59,7 @@
         </div>
     </div>
     <!-- Order Creation Form -->
-    <div class="card mt-5 mb-5">
+    <div class="card mt-2 mb-5">
         <div class="card-header text-center">
             <h2>Start Ordering</h2>
         </div>

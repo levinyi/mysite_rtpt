@@ -32,15 +32,17 @@
                     <span class="badge rounded-circle ms-1"></span>
                 </a>
                 <!-- 用户头像下拉菜单 -->
-                <div class="dropdown">
+                <div class="dropdown dropdown-end">
                     <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                         {% if user_profile.photo %}
                             <img src="{{ user_profile.photo }}" alt="" width="32" height="32" class="rounded-circle me-2">
                         {% else %}
                             <img src="{% static 'user_avatar/default_icon.jpg' %}" alt="" width="32" height="32" class="rounded-circle me-2">
                         {% endif %}
+                        <!-- 用户名 -->
+                        <span style="color:white">{{ user.username }}</span>
                     </a>
-                    <ul class="dropdown-menu text-small shadow">
+                    <ul class="dropdown-menu dropdown-menu-end text-small shadow">
                         <div class="dropdown-item-text">
                             <div class="d-flex align-items-center">
                                 <div class="avatar avatar-sm avatar-circle">

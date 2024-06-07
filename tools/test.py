@@ -62,7 +62,7 @@ def expanded_rows_to_gene_table(df, gene_table):
 def analyze_sequences(gene_table):
     # Remove rows with None
     gene_table = gene_table.dropna().reset_index(drop=True)
-    print(gene_table)
+    # print(gene_table)
 
     finder_dataset = DNARepeatsFinder(data_set=gene_table)
 
@@ -71,19 +71,20 @@ def analyze_sequences(gene_table):
         gene_id = row['WF3_Mfg_ID']
         results[gene_id] = {
             'tandem_repeats': finder_dataset.find_tandem_repeats(index=index, min_unit=3, min_copies=3),
-            'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10, max_distance=20),
+            'long_repeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
+            'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
+            # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
+            'homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
             'W8S8_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=8, min_S_length=8),
             'W12S12_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
             'W16S16_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=16, min_S_length=16),
             'W20S20_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=20, min_S_length=20),
-            'local_gc_content': finder_dataset.find_local_gc_content(index=index),
-            'homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
-            'long_repeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
-            'palindromes': finder_dataset.find_palindrome_repeats(index=index)
+            'local_gc_content': finder_dataset.find_local_gc_content(index=index, window_size=30, min_GC_content=20, max_GC_content=80),
+            'lcc_simp': finder_dataset.get_lcc(index=index),
         }
     #将结果列表转换为DataFrame， 处理长度不一致问题
     df = pd.DataFrame(results).T
-    print(df)
+    # print(df)
     gene_table = expanded_rows_to_gene_table(df, gene_table)
 
     return gene_table
@@ -95,8 +96,7 @@ if __name__ == "__main__":
     gene_table['sequence'] = gene_table['FullSeqREAL']
     gene_table['gene_id'] = gene_table['WF3_Mfg_ID']
 
-    # print(gene_table)
     updated_df = analyze_sequences(gene_table)
-    # print(updated_df)
+    print(updated_df)
     output_file = gene_file.split(".")[0] + "_updated.txt"
     updated_df.to_csv(output_file, sep="\t", index=False)

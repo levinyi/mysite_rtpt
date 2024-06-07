@@ -1967,6 +1967,498 @@ var aminoAcid = {
             }
         ]
     },
+    "HumanE_coli": {
+        "*": [
+            {
+                "Triplet": "TAA",
+                "Amino acid": "*",
+                "Fraction": 0.28,
+                "Frequency": 0.7,
+                "Number": 0
+            },
+            {
+                "Triplet": "TAG",
+                "Amino acid": "*",
+                "Fraction": 0.09,
+                "Frequency": 0.3,
+                "Number": 0
+            },
+            {
+                "Triplet": "TGA",
+                "Amino acid": "*",
+                "Fraction": 0.3,
+                "Frequency": 1.0,
+                "Number": 0
+            }
+        ],
+        "A": [
+            {
+                "Triplet": "GCT",
+                "Amino acid": "A",
+                "Fraction": 0.18,
+                "Frequency": 17.1,
+                "Number": 0
+            },
+            {
+                "Triplet": "GCC",
+                "Amino acid": "A",
+                "Fraction": 0.26,
+                "Frequency": 24.2,
+                "Number": 0
+            },
+            {
+                "Triplet": "GCA",
+                "Amino acid": "A",
+                "Fraction": 0.23,
+                "Frequency": 16.0,
+                "Number": 0
+            },
+            {
+                "Triplet": "GCG",
+                "Amino acid": "A",
+                "Fraction": 0.11,
+                "Frequency": 7.6,
+                "Number": 0
+            }
+        ],
+        "C": [
+            {
+                "Triplet": "TGT",
+                "Amino acid": "C",
+                "Fraction": 0.45,
+                "Frequency": 5.2,
+                "Number": 0
+            },
+            {
+                "Triplet": "TGC",
+                "Amino acid": "C",
+                "Fraction": 0.54,
+                "Frequency": 6.1,
+                "Number": 0
+            }
+        ],
+        "D": [
+            {
+                "Triplet": "GAT",
+                "Amino acid": "D",
+                "Fraction": 0.46,
+                "Frequency": 22.3,
+                "Number": 0
+            },
+            {
+                "Triplet": "GAC",
+                "Amino acid": "D",
+                "Fraction": 0.37,
+                "Frequency": 19.2,
+                "Number": 0
+            }
+        ],
+        "E": [
+            {
+                "Triplet": "GAA",
+                "Amino acid": "E",
+                "Fraction": 0.42,
+                "Frequency": 29.0,
+                "Number": 0
+            },
+            {
+                "Triplet": "GAG",
+                "Amino acid": "E",
+                "Fraction": 0.32,
+                "Frequency": 18.7,
+                "Number": 0
+            }
+        ],
+        "F": [
+            {
+                "Triplet": "TTT",
+                "Amino acid": "F",
+                "Fraction": 0.45,
+                "Frequency": 16.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "TTC",
+                "Amino acid": "F",
+                "Fraction": 0.42,
+                "Frequency": 16.0,
+                "Number": 0
+            }
+        ],
+        "G": [
+            {
+                "Triplet": "GGT",
+                "Amino acid": "G",
+                "Fraction": 0.16,
+                "Frequency": 10.8,
+                "Number": 0
+            },
+            {
+                "Triplet": "GGC",
+                "Amino acid": "G",
+                "Fraction": 0.34,
+                "Frequency": 22.8,
+                "Number": 0
+            },
+            {
+                "Triplet": "GGA",
+                "Amino acid": "G",
+                "Fraction": 0.13,
+                "Frequency": 9.5,
+                "Number": 0
+            },
+            {
+                "Triplet": "GGG",
+                "Amino acid": "G",
+                "Fraction": 0.15,
+                "Frequency": 11.3,
+                "Number": 0
+            }
+        ],
+        "H": [
+            {
+                "Triplet": "CAT",
+                "Amino acid": "H",
+                "Fraction": 0.41,
+                "Frequency": 10.4,
+                "Number": 0
+            },
+            {
+                "Triplet": "CAC",
+                "Amino acid": "H",
+                "Fraction": 0.43,
+                "Frequency": 9.3,
+                "Number": 0
+            }
+        ],
+        "I": [
+            {
+                "Triplet": "ATT",
+                "Amino acid": "I",
+                "Fraction": 0.36,
+                "Frequency": 15.7,
+                "Number": 0
+            },
+            {
+                "Triplet": "ATC",
+                "Amino acid": "I",
+                "Fraction": 0.39,
+                "Frequency": 21.4,
+                "Number": 0
+            },
+            {
+                "Triplet": "ATA",
+                "Amino acid": "I",
+                "Fraction": 0.11,
+                "Frequency": 6.8,
+                "Number": 0
+            }
+        ],
+        "K": [
+            {
+                "Triplet": "AAA",
+                "Amino acid": "K",
+                "Fraction": 0.42,
+                "Frequency": 24.0,
+                "Number": 0
+            },
+            {
+                "Triplet": "AAG",
+                "Amino acid": "K",
+                "Fraction": 0.26,
+                "Frequency": 12.4,
+                "Number": 0
+            }
+        ],
+        "L": [
+            {
+                "Triplet": "TTA",
+                "Amino acid": "L",
+                "Fraction": 0.07,
+                "Frequency": 7.2,
+                "Number": 0
+            },
+            {
+                "Triplet": "TTG",
+                "Amino acid": "L",
+                "Fraction": 0.13,
+                "Frequency": 12.6,
+                "Number": 0
+            },
+            {
+                "Triplet": "CTT",
+                "Amino acid": "L",
+                "Fraction": 0.12,
+                "Frequency": 11.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "CTC",
+                "Amino acid": "L",
+                "Fraction": 0.1,
+                "Frequency": 10.2,
+                "Number": 0
+            },
+            {
+                "Triplet": "CTA",
+                "Amino acid": "L",
+                "Fraction": 0.04,
+                "Frequency": 4.2,
+                "Number": 0
+            },
+            {
+                "Triplet": "CTG",
+                "Amino acid": "L",
+                "Fraction": 0.41,
+                "Frequency": 40.3,
+                "Number": 0
+            }
+        ],
+        "M": [
+            {
+                "Triplet": "ATG",
+                "Amino acid": "M",
+                "Fraction": 1.0,
+                "Frequency": 22.3,
+                "Number": 0
+            }
+        ],
+        "N": [
+            {
+                "Triplet": "AAT",
+                "Amino acid": "N",
+                "Fraction": 0.46,
+                "Frequency": 16.7,
+                "Number": 0
+            },
+            {
+                "Triplet": "AAC",
+                "Amino acid": "N",
+                "Fraction": 0.51,
+                "Frequency": 19.5,
+                "Number": 0
+            }
+        ],
+        "P": [
+            {
+                "Triplet": "CCT",
+                "Amino acid": "P",
+                "Fraction": 0.18,
+                "Frequency": 7.5,
+                "Number": 0
+            },
+            {
+                "Triplet": "CCC",
+                "Amino acid": "P",
+                "Fraction": 0.13,
+                "Frequency": 5.4,
+                "Number": 0
+            },
+            {
+                "Triplet": "CCA",
+                "Amino acid": "P",
+                "Fraction": 0.2,
+                "Frequency": 8.6,
+                "Number": 0
+            },
+            {
+                "Triplet": "CCG",
+                "Amino acid": "P",
+                "Fraction": 0.11,
+                "Frequency": 7.0,
+                "Number": 0
+            }
+        ],
+        "Q": [
+            {
+                "Triplet": "CAA",
+                "Amino acid": "Q",
+                "Fraction": 0.25,
+                "Frequency": 11.8,
+                "Number": 0
+            },
+            {
+                "Triplet": "CAG",
+                "Amino acid": "Q",
+                "Fraction": 0.66,
+                "Frequency": 28.4,
+                "Number": 0
+            }
+        ],
+        "R": [
+            {
+                "Triplet": "CGT",
+                "Amino acid": "R",
+                "Fraction": 0.08,
+                "Frequency": 4.7,
+                "Number": 0
+            },
+            {
+                "Triplet": "CGC",
+                "Amino acid": "R",
+                "Fraction": 0.19,
+                "Frequency": 10.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "CGA",
+                "Amino acid": "R",
+                "Fraction": 0.07,
+                "Frequency": 3.8,
+                "Number": 0
+            },
+            {
+                "Triplet": "CGG",
+                "Amino acid": "R",
+                "Fraction": 0.11,
+                "Frequency": 5.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "AGA",
+                "Amino acid": "R",
+                "Fraction": 0.07,
+                "Frequency": 3.6,
+                "Number": 0
+            },
+            {
+                "Triplet": "AGG",
+                "Amino acid": "R",
+                "Fraction": 0.04,
+                "Frequency": 2.1,
+                "Number": 0
+            }
+        ],
+        "S": [
+            {
+                "Triplet": "TCT",
+                "Amino acid": "S",
+                "Fraction": 0.17,
+                "Frequency": 10.4,
+                "Number": 0
+            },
+            {
+                "Triplet": "TCC",
+                "Amino acid": "S",
+                "Fraction": 0.15,
+                "Frequency": 9.1,
+                "Number": 0
+            },
+            {
+                "Triplet": "TCA",
+                "Amino acid": "S",
+                "Fraction": 0.14,
+                "Frequency": 8.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "TCG",
+                "Amino acid": "S",
+                "Fraction": 0.06,
+                "Frequency": 4.5,
+                "Number": 0
+            },
+            {
+                "Triplet": "AGT",
+                "Amino acid": "S",
+                "Fraction": 0.15,
+                "Frequency": 9.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "AGC",
+                "Amino acid": "S",
+                "Fraction": 0.24,
+                "Frequency": 15.2,
+                "Number": 0
+            }
+        ],
+        "T": [
+            {
+                "Triplet": "ACT",
+                "Amino acid": "T",
+                "Fraction": 0.19,
+                "Frequency": 10.3,
+                "Number": 0
+            },
+            {
+                "Triplet": "ACC",
+                "Amino acid": "T",
+                "Fraction": 0.36,
+                "Frequency": 19.2,
+                "Number": 0
+            },
+            {
+                "Triplet": "ACA",
+                "Amino acid": "T",
+                "Fraction": 0.17,
+                "Frequency": 9.3,
+                "Number": 0
+            },
+            {
+                "Triplet": "ACG",
+                "Amino acid": "T",
+                "Fraction": 0.12,
+                "Frequency": 6.2,
+                "Number": 0
+            }
+        ],
+        "V": [
+            {
+                "Triplet": "GTT",
+                "Amino acid": "V",
+                "Fraction": 0.18,
+                "Frequency": 10.9,
+                "Number": 0
+            },
+            {
+                "Triplet": "GTC",
+                "Amino acid": "V",
+                "Fraction": 0.2,
+                "Frequency": 14.3,
+                "Number": 0
+            },
+            {
+                "Triplet": "GTA",
+                "Amino acid": "V",
+                "Fraction": 0.11,
+                "Frequency": 7.0,
+                "Number": 0
+            },
+            {
+                "Triplet": "GTG",
+                "Amino acid": "V",
+                "Fraction": 0.35,
+                "Frequency": 24.4,
+                "Number": 0
+            }
+        ],
+        "W": [
+            {
+                "Triplet": "TGG",
+                "Amino acid": "W",
+                "Fraction": 1.0,
+                "Frequency": 12.8,
+                "Number": 0
+            }
+        ],
+        "Y": [
+            {
+                "Triplet": "TAT",
+                "Amino acid": "Y",
+                "Fraction": 0.43,
+                "Frequency": 12.0,
+                "Number": 0
+            },
+            {
+                "Triplet": "TAC",
+                "Amino acid": "Y",
+                "Fraction": 0.41,
+                "Frequency": 12.2,
+                "Number": 0
+            }
+        ]
+    },
     "Saccharomyces_cerevisiae": {
         "F": [
             {
@@ -2456,6 +2948,498 @@ var aminoAcid = {
                 "Fraction": 0.12,
                 "Frequency": 6.0,
                 "Number": 39359
+            }
+        ]
+    },
+    "Human_GvymbLt": {
+        "F": [
+            {
+                "Triplet": "TTT",
+                "Amino acid": "F",
+                "Fraction": 0.45,
+                "Frequency": 16.9,
+                "Number": 336562
+            },
+            {
+                "Triplet": "TTC",
+                "Amino acid": "F",
+                "Fraction": 0.55,
+                "Frequency": 20.4,
+                "Number": 406571
+            }
+        ],
+        "L": [
+            {
+                "Triplet": "TTA",
+                "Amino acid": "L",
+                "Fraction": 0.07,
+                "Frequency": 7.2,
+                "Number": 143715
+            },
+            {
+                "Triplet": "TTG",
+                "Amino acid": "L",
+                "Fraction": 0.13,
+                "Frequency": 12.6,
+                "Number": 249879
+            },
+            {
+                "Triplet": "CTT",
+                "Amino acid": "L",
+                "Fraction": 0.13,
+                "Frequency": 12.8,
+                "Number": 253795
+            },
+            {
+                "Triplet": "CTC",
+                "Amino acid": "L",
+                "Fraction": 0.2,
+                "Frequency": 19.4,
+                "Number": 386182
+            },
+            {
+                "Triplet": "CTA",
+                "Amino acid": "L",
+                "Fraction": 0.07,
+                "Frequency": 6.9,
+                "Number": 138154
+            },
+            {
+                "Triplet": "CTG",
+                "Amino acid": "L",
+                "Fraction": 0.41,
+                "Frequency": 40.3,
+                "Number": 800774
+            }
+        ],
+        "Y": [
+            {
+                "Triplet": "TAT",
+                "Amino acid": "Y",
+                "Fraction": 0.43,
+                "Frequency": 12.0,
+                "Number": 239268
+            },
+            {
+                "Triplet": "TAC",
+                "Amino acid": "Y",
+                "Fraction": 0.57,
+                "Frequency": 15.6,
+                "Number": 310695
+            }
+        ],
+        "*": [
+            {
+                "Triplet": "TAA",
+                "Amino acid": "*",
+                "Fraction": 0.28,
+                "Frequency": 0.7,
+                "Number": 14322
+            },
+            {
+                "Triplet": "TAG",
+                "Amino acid": "*",
+                "Fraction": 0.2,
+                "Frequency": 0.5,
+                "Number": 10915
+            },
+            {
+                "Triplet": "TGA",
+                "Amino acid": "*",
+                "Fraction": 0.52,
+                "Frequency": 1.3,
+                "Number": 25383
+            }
+        ],
+        "H": [
+            {
+                "Triplet": "CAT",
+                "Amino acid": "H",
+                "Fraction": 0.41,
+                "Frequency": 10.4,
+                "Number": 207826
+            },
+            {
+                "Triplet": "CAC",
+                "Amino acid": "H",
+                "Fraction": 0.59,
+                "Frequency": 14.9,
+                "Number": 297048
+            }
+        ],
+        "Q": [
+            {
+                "Triplet": "CAA",
+                "Amino acid": "Q",
+                "Fraction": 0.25,
+                "Frequency": 11.8,
+                "Number": 234785
+            },
+            {
+                "Triplet": "CAG",
+                "Amino acid": "Q",
+                "Fraction": 0.75,
+                "Frequency": 34.6,
+                "Number": 688316
+            }
+        ],
+        "I": [
+            {
+                "Triplet": "ATT",
+                "Amino acid": "I",
+                "Fraction": 0.36,
+                "Frequency": 15.7,
+                "Number": 313225
+            },
+            {
+                "Triplet": "ATC",
+                "Amino acid": "I",
+                "Fraction": 0.48,
+                "Frequency": 21.4,
+                "Number": 426570
+            },
+            {
+                "Triplet": "ATA",
+                "Amino acid": "I",
+                "Fraction": 0.16,
+                "Frequency": 7.1,
+                "Number": 140652
+            }
+        ],
+        "M": [
+            {
+                "Triplet": "ATG",
+                "Amino acid": "M",
+                "Fraction": 1.0,
+                "Frequency": 22.3,
+                "Number": 443795
+            }
+        ],
+        "N": [
+            {
+                "Triplet": "AAT",
+                "Amino acid": "N",
+                "Fraction": 0.46,
+                "Frequency": 16.7,
+                "Number": 331714
+            },
+            {
+                "Triplet": "AAC",
+                "Amino acid": "N",
+                "Fraction": 0.54,
+                "Frequency": 19.5,
+                "Number": 387148
+            }
+        ],
+        "K": [
+            {
+                "Triplet": "AAA",
+                "Amino acid": "K",
+                "Fraction": 0.42,
+                "Frequency": 24.0,
+                "Number": 476554
+            },
+            {
+                "Triplet": "AAG",
+                "Amino acid": "K",
+                "Fraction": 0.58,
+                "Frequency": 32.9,
+                "Number": 654280
+            }
+        ],
+        "V": [
+            {
+                "Triplet": "GTT",
+                "Amino acid": "V",
+                "Fraction": 0.18,
+                "Frequency": 10.9,
+                "Number": 216818
+            },
+            {
+                "Triplet": "GTC",
+                "Amino acid": "V",
+                "Fraction": 0.24,
+                "Frequency": 14.6,
+                "Number": 290874
+            },
+            {
+                "Triplet": "GTA",
+                "Amino acid": "V",
+                "Fraction": 0.11,
+                "Frequency": 7.0,
+                "Number": 139156
+            },
+            {
+                "Triplet": "GTG",
+                "Amino acid": "V",
+                "Fraction": 0.47,
+                "Frequency": 28.9,
+                "Number": 575438
+            }
+        ],
+        "D": [
+            {
+                "Triplet": "GAT",
+                "Amino acid": "D",
+                "Fraction": 0.46,
+                "Frequency": 22.3,
+                "Number": 443369
+            },
+            {
+                "Triplet": "GAC",
+                "Amino acid": "D",
+                "Fraction": 0.54,
+                "Frequency": 26.0,
+                "Number": 517579
+            }
+        ],
+        "E": [
+            {
+                "Triplet": "GAA",
+                "Amino acid": "E",
+                "Fraction": 0.42,
+                "Frequency": 29.0,
+                "Number": 577846
+            },
+            {
+                "Triplet": "GAG",
+                "Amino acid": "E",
+                "Fraction": 0.58,
+                "Frequency": 40.8,
+                "Number": 810842
+            }
+        ],
+        "S": [
+            {
+                "Triplet": "TCT",
+                "Amino acid": "S",
+                "Fraction": 0.18,
+                "Frequency": 14.6,
+                "Number": 291040
+            },
+            {
+                "Triplet": "TCC",
+                "Amino acid": "S",
+                "Fraction": 0.22,
+                "Frequency": 17.4,
+                "Number": 346943
+            },
+            {
+                "Triplet": "TCA",
+                "Amino acid": "S",
+                "Fraction": 0.15,
+                "Frequency": 11.7,
+                "Number": 233110
+            },
+            {
+                "Triplet": "TCG",
+                "Amino acid": "S",
+                "Fraction": 0.06,
+                "Frequency": 4.5,
+                "Number": 89429
+            },
+            {
+                "Triplet": "AGT",
+                "Amino acid": "S",
+                "Fraction": 0.15,
+                "Frequency": 11.9,
+                "Number": 237404
+            },
+            {
+                "Triplet": "AGC",
+                "Amino acid": "S",
+                "Fraction": 0.24,
+                "Frequency": 19.4,
+                "Number": 385113
+            }
+        ],
+        "C": [
+            {
+                "Triplet": "TGT",
+                "Amino acid": "C",
+                "Fraction": 0.45,
+                "Frequency": 9.9,
+                "Number": 197293
+            },
+            {
+                "Triplet": "TGC",
+                "Amino acid": "C",
+                "Fraction": 0.55,
+                "Frequency": 12.2,
+                "Number": 243685
+            }
+        ],
+        "W": [
+            {
+                "Triplet": "TGG",
+                "Amino acid": "W",
+                "Fraction": 1.0,
+                "Frequency": 12.8,
+                "Number": 255512
+            }
+        ],
+        "P": [
+            {
+                "Triplet": "CCT",
+                "Amino acid": "P",
+                "Fraction": 0.28,
+                "Frequency": 17.3,
+                "Number": 343793
+            },
+            {
+                "Triplet": "CCC",
+                "Amino acid": "P",
+                "Fraction": 0.33,
+                "Frequency": 20.0,
+                "Number": 397790
+            },
+            {
+                "Triplet": "CCA",
+                "Amino acid": "P",
+                "Fraction": 0.27,
+                "Frequency": 16.7,
+                "Number": 331944
+            },
+            {
+                "Triplet": "CCG",
+                "Amino acid": "P",
+                "Fraction": 0.11,
+                "Frequency": 7.0,
+                "Number": 139414
+            }
+        ],
+        "R": [
+            {
+                "Triplet": "CGT",
+                "Amino acid": "R",
+                "Fraction": 0.08,
+                "Frequency": 4.7,
+                "Number": 93458
+            },
+            {
+                "Triplet": "CGC",
+                "Amino acid": "R",
+                "Fraction": 0.19,
+                "Frequency": 10.9,
+                "Number": 217130
+            },
+            {
+                "Triplet": "CGA",
+                "Amino acid": "R",
+                "Fraction": 0.11,
+                "Frequency": 6.3,
+                "Number": 126113
+            },
+            {
+                "Triplet": "CGG",
+                "Amino acid": "R",
+                "Fraction": 0.21,
+                "Frequency": 11.9,
+                "Number": 235938
+            },
+            {
+                "Triplet": "AGA",
+                "Amino acid": "R",
+                "Fraction": 0.2,
+                "Frequency": 11.5,
+                "Number": 228151
+            },
+            {
+                "Triplet": "AGG",
+                "Amino acid": "R",
+                "Fraction": 0.2,
+                "Frequency": 11.4,
+                "Number": 227281
+            }
+        ],
+        "T": [
+            {
+                "Triplet": "ACT",
+                "Amino acid": "T",
+                "Fraction": 0.24,
+                "Frequency": 12.8,
+                "Number": 255582
+            },
+            {
+                "Triplet": "ACC",
+                "Amino acid": "T",
+                "Fraction": 0.36,
+                "Frequency": 19.2,
+                "Number": 382050
+            },
+            {
+                "Triplet": "ACA",
+                "Amino acid": "T",
+                "Fraction": 0.28,
+                "Frequency": 14.8,
+                "Number": 294223
+            },
+            {
+                "Triplet": "ACG",
+                "Amino acid": "T",
+                "Fraction": 0.12,
+                "Frequency": 6.2,
+                "Number": 123533
+            }
+        ],
+        "A": [
+            {
+                "Triplet": "GCT",
+                "Amino acid": "A",
+                "Fraction": 0.26,
+                "Frequency": 18.6,
+                "Number": 370873
+            },
+            {
+                "Triplet": "GCC",
+                "Amino acid": "A",
+                "Fraction": 0.4,
+                "Frequency": 28.5,
+                "Number": 567930
+            },
+            {
+                "Triplet": "GCA",
+                "Amino acid": "A",
+                "Fraction": 0.23,
+                "Frequency": 16.0,
+                "Number": 317338
+            },
+            {
+                "Triplet": "GCG",
+                "Amino acid": "A",
+                "Fraction": 0.11,
+                "Frequency": 7.6,
+                "Number": 150708
+            }
+        ],
+        "G": [
+            {
+                "Triplet": "GGT",
+                "Amino acid": "G",
+                "Fraction": 0.16,
+                "Frequency": 10.8,
+                "Number": 215544
+            },
+            {
+                "Triplet": "GGC",
+                "Amino acid": "G",
+                "Fraction": 0.34,
+                "Frequency": 22.8,
+                "Number": 453917
+            },
+            {
+                "Triplet": "GGA",
+                "Amino acid": "G",
+                "Fraction": 0.25,
+                "Frequency": 16.3,
+                "Number": 325243
+            },
+            {
+                "Triplet": "GGG",
+                "Amino acid": "G",
+                "Fraction": 0.25,
+                "Frequency": 16.4,
+                "Number": 326879
             }
         ]
     },

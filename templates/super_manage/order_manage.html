@@ -2,565 +2,86 @@
 {% load static %}
 {% block title %}Order Manage{% endblock %}
 {% block extra_head %}
-    <style>
-        {#  label.0 style  #}
-        {#    用于顶部状态标签    #}
-        .tab-table .nav-link {
-            color: black;
-        }
-
-        .tab-table .nav-item {
-            width: 130px;
-            text-align: center;
-        }
-
-        {#    用于表    #}
-        .icon-btn {
-            width: 2rem;
-            display: inline-block;
-        }
-
-        .row-button {
-            padding: 0 4px 0 4px;
-        }
-
-        .input-td {
-            position: relative;
-            min-width: 120px;
-        }
-
-        .input-td input {
-            border: 0px;
-            outline: none;
-            position: absolute;
-            left: 0;
-            top: 0px;
-            height: 100%;
-            width: 100%;
-        }
-
-        .input-td input::placeholder { /* Mozilla Firefox 19+ */
-            color: #c5c5c5;
-        }
-
-    </style>
 {% endblock %}
 {% block manage_content %}
-    <template id="tmp-table-row">
-        {#  label.1 行模板  #}
-        <tr>
-            {#  这里的内容不重要，可作为默认内容，在js中将会动态修改为需要的文本  #}
-            <th scope="row">1</th>
-            <td>PO001</td>
-            <td>PSG</td>
-            <td>2</td>
-            <td>18/3/2022</td>
-            <td hidden>18/3/2022</td>
-            <td>
-                <button type="button" class="btn btn-link row-button bi-download icon-btn"
-                        onclick="downloadReq({{ row.order_id }})">
-                    Download
-                </button>
-            </td>
 
-            <td>
-                <a href="" class="row-button"><i class="bi bi-cloud-download"></i></a>
-                <button disabled type="button" class="btn btn-link row-button"><i class="bi bi-cloud-download"></i>
-                </button>
-            </td>
-            <td>
-                <div class="file-down">
-                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
-                            onclick="clickDelReport(this)">
-                    </button>
-                    <a href="" class="bi bi-download icon-btn"></a>
-                </div>
-                <button type="button" class="btn btn-link row-button upload bi-upload icon-btn"
-                        onclick="this.querySelector('input').click();">
-                    <input type="file" style="display: none;" onchange="fileChange(this)">
-                </button>
-                <div class="pre-upload">
-                    <p style="margin: 0px;font-size: 13px;"></p>
-                    <button type="button" class="btn row-button bi-trash text-danger icon-btn"
-                            onclick="clickDelPreUpload(this)">
-                    </button>
-                    <button type="button" class="btn btn-link row-button upload " onclick="clickUpSubmit(this)">
-                        submit
-                    </button>
-                </div>
-            </td>
-            <td>
-                <button type="button" class="btn btn-link row-button bi-box-arrow-left text-danger icon-btn"
-                        onclick="clickRevokeOrNext(this, 'revoke')">
-                </button>
-                <span style="display: inline-block;color: darkseagreen;min-width: 96px;">Created</span>
-                <button type="button" class="btn btn-link row-button bi-box-arrow-right icon-btn"
-                        onclick="clickRevokeOrNext(this,'next')">
-                </button>
-            </td>
-            <td class="input-td">
-                <input onchange="changeUrl(this)" type="text" class="align-middle" placeholder="Please input..."/>
-            </td>
-        </tr>
-    </template>
-    <template id="page-number">
-        <li class="page-item"><a class="page-link" href="#" onclick="clickPage(this)">1</a></li>
-    </template>
-
-    <div class="tab-table" style="margin-top: 20px;">
-        <ul style="margin-bottom: 15px;" class="nav nav-tabs" id="select-tab">
-            {#      label.2 顶部点击筛选标签      #}
-            <li class="nav-item">
-                <a class="nav-link active" href="#" onclick="clickTab(this,0)">All</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,1)">Cancelled</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,2)">Created</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,3)">Synthesizing</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,4)">Shipped</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#" onclick="clickTab(this,5)">Completed</a>
-            </li>
-        </ul>
-
-        <table class="table table-hover table-bordered align-middle text-center">
-            <thead>
-            <tr>
-                {#      label.3 表头文本      #}
-                <th scope="col">#</th>
-                <th scope="col">ID</th>
-                <th scope="col">Custom</th>
-                <th scope="col">Quantity</th>
-                <th scope="col">Create</th>
-                <th scope="col" hidden>Modify</th>
-                <th scope="col">Export</th>
-                <th scope="col">Report</th>
-                <th scope="col" style="width: 230px;">Status</th>
-                <th scope="col">Url</th>
-            </tr>
-            </thead>
-            <tbody class="table-group-divider">
-            </tbody>
-        </table>
-
-        <nav aria-label="Page navigation example">
-            <ul class="pagination justify-content-center">
-                <li class="page-item">
-                    <a class="page-link" href="#" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                    </a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="#" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
-
+<div class="container-fluid pt-4">
+    <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
+        <div id="order-table"></div>
     </div>
-
+</div>
 {% endblock %}
-
 {% block javascript %}
-    <script>
-        const TmpRow = document.querySelector("#tmp-table-row"),
-            TmpTd = TmpRow.content.querySelectorAll("td"),
-            tableBody = document.querySelector("tbody");
-        let RowMax = {{ max_row }};
-        let SelectedTab = 0;
-        let PageMax = {{ max_page }};
-        let Rows = JSON.parse("{{ rows }}".replace(/\&quot;/g, '\"'));
-
-        // 清除表
-        function clearTable() {
-            tableBody.innerHTML = "";
-        }
-
-        // label.5
-        function setRowReport(e, status, filename = null, filepath = null) {
-            const fileDown = e.querySelector('.file-down'),
-                upload = e.querySelector('.upload'),
-                preUpload = e.querySelector('.pre-upload');
-            if (status == "file-down") {
-                fileDown.hidden = false;
-                upload.hidden = true;
-                preUpload.hidden = true;
-                fileDown.querySelector('a').href = filepath;
-            } else if (status == "upload") {
-                fileDown.hidden = true;
-                upload.hidden = false;
-                preUpload.hidden = true;
-            } else if (status == "pre-upload") {
-                fileDown.hidden = true;
-                upload.hidden = true;
-                preUpload.hidden = false;
-                preUpload.querySelector('p').textContent = filename;
-            } else
-                console.log("Unknown report element status", status, filename, filepath);
-        }
-
-        // label.6
-        function setRowStatus(e, value) {
-            e.querySelector("span").textContent = value;
-
-            {# 设置Status的显示 #}
-            let bns = e.getElementsByTagName("button");
-            if (value.toLowerCase() == "cancelled") {
-            // 末状态，不可向右滑
-                bns[0].disabled = true;
-                bns[0].classList.remove('text-danger')
-            } else {
-                bns[0].disabled = false;
-                bns[0].classList.add('text-danger');
-            }
-            // 初状态，不可向左滑
-            bns[1].disabled = value.toLowerCase() == "completed";
-        }
-
-        // 获取表中一行的html元素
-        // label.4 设置行内容
-        function getTableRow(rowNum, rowJson) {
-            let clone = document.importNode(TmpRow.content, true);
-            let td = clone.querySelectorAll("td");
-            clone.querySelectorAll("th")[0].textContent = rowNum;
-            td[0].textContent = rowJson['inquiry_id'];
-            td[1].textContent = rowJson['custom'];
-            td[2].textContent = rowJson['quantity'];
-            td[3].textContent = rowJson['create'];
-            td[4].textContent = rowJson['modify'];
-
-            let ep = td[5].getElementsByTagName("a"), un = td[5].getElementsByTagName("button");
-            ep[0].href = rowJson['export'];
-
-
-            setRowStatus(td[7], rowJson['status']);
-            td[8].querySelector("input").value = rowJson['url'];
-            {#setInput(td[8].getElementsByTagName("p")[0], );#}
-
-            {# 设置Export的显示 #}
-            if (rowJson['export'].length) {
-                un[0].hidden = true;
-                ep[0].hidden = false;
-            } else {
-                un[0].hidden = false;
-                ep[0].hidden = true;
-            }
-
-            {# 设置Report的显示 #}
-            if (rowJson['report'].length) {
-                setRowReport(td[6], "file-down", null, rowJson['report']);
-            } else {
-                setRowReport(td[6], "upload");
-            }
-
-            return clone
-        }
-
-        // 获取行
-        function getRows(start) {
-            // 根据selectedTab获取rows
-            // 通过请求获取rows
-            {#$.ajax({#}
-            {#    url: "{% url 'super_manage:order_manage' %}",#}
-            {#    type: "GET",#}
-            {#    data: {#}
-            {#        "start": start,#}
-            {#        "tab": selectedTab#}
-            {#    },#}
-            {#    async: false,#}
-            {#    success: function (data) {#}
-            {#        tmp = data;#}
-            {#        // 添加到rows中#}
-            {#        rows = rows.concat(tmp);#}
-            {#    }#}
-            // });
-        }
-
-        // 设置表，page：第几页，pageLen：每页长度
-        function setTable(page, pageLen) {
-            // 根据page和pageLen设置表格
-            // 先计算出需要显示的行数
-            // page从1开始
-            clearTable();
-            let start = (page - 1) * pageLen, end = page * pageLen;
-            if (end > Rows.length)
-                end = Rows.length;
-            if (start > Rows.length)
-                getRows(start);
-            for (let i = start; i < end; i++) {
-                const c = getTableRow(i + 1, Rows[i]);
-                tableBody.appendChild(c);
-            }
-        }
-
-        // 点击底部页项
-        function clickPage(e) {
-            let page = parseInt(e.textContent);
-            setTable(page, RowMax);
-        }
-
-        // 设置底部页项显示，start：开始项，len：长度
-        function setPageItems(start, len) {
-            const pn = document.querySelector("#page-number").content.querySelector('li');
-            const items = document.querySelectorAll('.page-item'), last = items[items.length - 1];
-            const fragment = document.createDocumentFragment()
-            for (let i = start; i <= start + len - 1 && i <= PageMax; i++) {
-                let c = document.importNode(pn, true);
-                c.querySelector('a').textContent = i.toString();
-                fragment.appendChild(c);
-            }
-            for (let i = 1; i < items.length - 1; i++)
-                items[i].remove()
-            last.parentElement.insertBefore(fragment, last);
-            if (start == 1)
-                items[0].hidden = true;
-            else
-                items[0].hidden = false;
-            if (start + len > PageMax)
-                last.hidden = true;
-            else
-                last.hidden = false;
-
-        }
-
-        // 行中元素获取整行数据
-        function get_row_content(e) {
-            let row = e.closest('tr');
-            let rowNum = parseInt(row.querySelector('th').textContent);
-            return Rows[rowNum - 1];
-        }
-
-        // 点击顶部Tab
-        function clickTab(e, id) {
-            if (id == SelectedTab)
-                return;
-            document.querySelector('#select-tab').querySelectorAll('a')[SelectedTab].classList.remove('active');
-            SelectedTab = id;
-            e.classList.add('active')
-            clearTable();
-            let status
-            switch (id) {
-                case 0:
-                    status = 'all';
-                    break;
-                case 1:
-                    status = 'Cancelled';
-                    break;
-                case 2:
-                    status = 'Created';
-                    break;
-                case 3:
-                    status = 'Synthesizing';
-                    break;
-                case 4:
-                    status = 'Shipped';
-                    break;
-                case 5:
-                    status = 'Completed';
-                    break;
-            }
-            $.ajax({
-                url: "{% url 'super_manage:get_rows' %}",
-                type: "GET",
-                data: {
-                    "status": status,
-                    "tableName": "order"
-                },
-                async: false,
-                success: function (res) {
-                    console.log(res.newVal)
-                    if (res.status == 'error') {
-                        alert(res.data.message)
-                    } else {
-                        PageMax = res.data.max_page;
-                        RowMax = res.data.max_row;
-                        Rows = JSON.parse(res.data.rows.replace(/\&quot;/g, '\"'));
-                        setPageItems(1, PageMax);
-                        setTable(1, RowMax);
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        fetch("{% url 'super_manage:order_data_api' %}")
+            .then(response => response.json())
+            .then(data => {
+                new gridjs.Grid({
+                    columns: [
+                        { name: '#' },
+                        { name: 'InQuiry ID' },
+                        { 
+                            name: 'Customer', 
+                            formatter: (cell, row) => {
+                                const userId = cell.userId;
+                                const photo = cell.photo;
+                                const userName = cell.userName;
+                                if (userId) {
+                                    return gridjs.html(`<i class="avatar avatar-sm avatar-circle"><img src="${photo}" alt="" width="32" height="32" class="rounded-circle me-2"></i><a href="/super_manage/view_user_profile/${userId}/" data-bs-toggle="tooltip" data-bs-placement="top" title="See details" class="text-decoration-none">${userName}</a>`);
+                                } else {
+                                    return gridjs.html(`<i class="avatar avatar-sm avatar-circle"><img src="${photo}" alt="" width="32" height="32" class="rounded-circle me-2"></i>${userName}`);
+                                }
+                            }
+                        },
+                        { name: 'Quantity' },
+                        { 
+                            name: 'Create Time',
+                            formatter: (cell) => {
+                                return new Date(cell).toLocaleString();
+                            }
+                        },
+                        { 
+                            name: 'Download REQINs',
+                            formatter: (cell, row) => {
+                                const orderId = cell;
+                                return gridjs.html(`<a href="/super_manage/order_to_reqins/${orderId}/" class="btn btn-outline-primary"><i class="bi bi-cloud-download"></i> Download REQINs</a>`);
+                            }
+                        },
+                        { name: 'Status' }
+                    ],
+                    data: data.data.map((order, inedex) => [
+                        inedex + 1,
+                        order.inquiry_id,
+                        {
+                            userId: order.user__id,
+                            photo: order.user__userprofile__photo,
+                            userName: order.user__username
+                        },
+                        order.gene_infos_count,
+                        order.order_time,
+                        order.id,
+                        order.status
+                    ]),
+                    search: true,
+                    pagination: {
+                        enabled: true,
+                        limit: 10
+                    },
+                    sort: true,
+                    resizable: true,
+                    language: {
+                        'search': {
+                            'placeholder': '🔍 Search...'
+                        },
+                        'pagination': {
+                            'showing': '😃 Displaying',
+                            'results': () => 'Records'
+                        }
                     }
-                },
-                error: function (res) {
-                    alert('Request error.' + res.toString())
-                }
-            });
-        }
-
-        /*** label.7 Begin:Report文件上传下载函数 ***/
-
-        function clickDelPreUpload(e) {
-            let input = e.parentElement.parentElement.querySelector('input');
-            // 删除准备上传的文件
-            input.value = "";
-            setRowReport(e.parentElement.parentElement, "upload");
-        }
-
-        function clickUpSubmit(e) {
-            // 提交准备上传的文件
-            let input = e.parentElement.parentElement.querySelector('input');
-            let row = get_row_content(e);
-            let formData = new FormData();
-            formData.append('id', row.id);
-            formData.append('file', input.files[0]);
-            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}')
-            $.ajax({
-                url: "{% url 'super_manage:upload_report' %}",
-                type: "POST",
-                data: formData,
-                async: false,
-                processData: false,
-                contentType: false,
-                success: function (res) {
-                    console.log(res.newVal)
-                    if (res.status == 'error') {
-                        alert(res.message)
-                    } else {
-                        let newVal = res.newVal;
-                        setRowReport(e.parentElement.parentElement, "file-down", null, newVal);
-                    }
-                },
-                error: function (res) {
-                    alert('Request error. ' + res.toString())
-                }
-            });
-        }
-
-        // 点击report delete按钮
-        function clickDelReport(e) {
-            let row = get_row_content(e);
-            console.log('clickDelReport', e);
-            $.ajax({
-                url: "{% url 'super_manage:delete_report' %}",
-                type: "GET",
-                data: {
-                    "id": row.id
-                },
-                async: false,
-                success: function (res) {
-                    if (res.status == 'success') {
-                        setRowReport(e.parentElement.parentElement, "upload")
-                    }
-
-                },
-                error: function (res) {
-                    alert('Request error.')
-                }
-            });
-        }
-
-        function fileChange(target) {
-            let fileSize = 0;
-            const filepath = target.value;
-            const filemaxsize = 1024 * 2;//2M
-            console.log(target.files[0].name)
-            const isIE = navigator.userAgent.match(/MSIE/) != null;
-            if (isIE && !target.files) {
-                const fileSystem = new ActiveXObject("Scripting.FileSystemObject");
-                if (!fileSystem.FileExists(filePath)) {
-                    alert("File does not exist");
-                    return false;
-                }
-                const file = fileSystem.GetFile(filePath);
-                fileSize = file.Size;
-            } else {
-                fileSize = target.files[0].size;
-            }
-
-            const size = fileSize / 1024;
-            if (size > filemaxsize) {
-                alert("File cannot be larger than 2M");
-                target.value = "";
-                return false;
-            }
-            if (size <= 0) {
-                alert("File cannot be empty");
-                target.value = "";
-                return false;
-            }
-            target.parentElement
-            setRowReport(target.parentElement.parentElement, "pre-upload", target.files[0].name, filepath);
-        }
-
-        /*** label.7 End:Report文件上传下载函数 ***/
-
-        // label.8
-        function changeUrl(e) {
-            let row = get_row_content(e);
-            $.ajax({
-                url: "{% url 'super_manage:change_url' %}",
-                type: "GET",
-                data: {
-                    "id": row.id,
-                    "newVal": e.value
-                },
-                async: false,
-                success: function (res) {
-                    console.log(res.newVal)
-                    if (res.status == 'error') {
-                        alert(res.data.message)
-                    }
-                },
-                error: function (res) {
-                    alert('Request error.' + res.toString())
-                }
-            });
-        }
-
-        // 点击Revoke按钮
-        function clickRevokeOrNext(e, type) {
-            let row = get_row_content(e);
-            $.ajax({
-                url: "{% url 'super_manage:change_status' %}",
-                type: "GET",
-                data: {
-                    "id": row.id,
-                    'opr': type,
-                    'table': 'order'
-                },
-                async: false,
-                success: function (res) {
-                    console.log(res.newVal)
-                    if (res.status == 'error') {
-                        alert(res.message)
-                    } else if (res.status == 'failed') {
-                        alert(res.message + ' Try to refresh this page.')
-                    } else {
-                        let newVal = res.newVal;
-                        setRowStatus(e.parentElement, newVal);
-                    }
-                },
-                error: function (res) {
-                    alert('Request error.')
-                }
-            });
-        }
-
-        function downloadReq(orderId) {
-            // Construct the URL with the orderId parameter
-            const reqUrl = `{% url 'super_manage:order_to_REQIN' '' %}` + orderId;
-            // Redirect to the download URL
-            window.location.href = reqUrl;
-        }
-
-
-        $(document).ready(function () {  //里面是需要加载的js
-            // 通过检查来测试浏览器是否支持 HTML 模板元素
-            if ("content" in document.createElement("template")) {
-                setPageItems(1, PageMax);
-                setTable(1, RowMax);
-            } else {
-                // 找到另一种方法来添加行到表，因为不支持 HTML 模板元素。
-                alert("请更新浏览器")
-            }
-
-        });
-
-    </script>
+                }).render(document.getElementById('order-table'));
+            })
+            .catch(error => console.error('Error:', error));
+    });
+</script>
 {% endblock %}

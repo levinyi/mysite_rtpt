@@ -1,4 +1,6 @@
 import re
+from Bio.Seq import Seq
+from Bio.SeqUtils.lcc import lcc_simp
 
 
 class DNARepeatsFinder:
@@ -26,26 +28,55 @@ class DNARepeatsFinder:
         return sorted(range(len(s)), key=lambda k: s[k:])
 
     @staticmethod
-    def find_lcp(s, sa):
+    def find_lcpss(s, sa):
         """Find the longest common prefix (LCP) array for `s` using the suffix array `sa`."""
         n = len(s)
         lcp = [0] * n
         rank = [0] * n
         for i in range(n):
             rank[sa[i]] = i
-        k = 0
+        # k = 0
+        # for i in range(n):
+        #     if rank[i] == n - 1:  # 末尾
+        #         k = 0
+        #         continue
+        #     j = sa[rank[i] + 1]
+        #     while i + k < n and j + k < n and s[i+k] == s[j+k]:
+        #         k += 1
+        #     lcp[rank[i]] = k
+        #     if k:
+        #         k -= 1
+        h = 0
         for i in range(n):
-            if rank[i] == n - 1:  # 末尾
-                k = 0
-                continue
-            j = sa[rank[i] + 1]
-            while i + k < n and j + k < n and s[i+k] == s[j+k]:
-                k += 1
-            lcp[rank[i]] = k
-            if k:
-                k -= 1
+            if rank[i] > 0:
+                j = sa[rank[i] - 1]
+                while (i + h < n) and (j + h < n) and (s[i + h] == s[j + h]):
+                    h += 1
+                lcp[rank[i]] = h
+                if h > 0:
+                    h -= 1
         return lcp
+    
+    @staticmethod
+    def find_lcp(s, sa):
+        n = len(s)
+        rank = [0] * n
+        lcp = [0] * n
 
+        for i in range(n):
+            rank[sa[i]] = i
+
+        h = 0
+        for i in range(n):
+            if rank[i] > 0:
+                j = sa[rank[i] - 1]
+                while (i + h < n) and (j + h < n) and (s[i + h] == s[j + h]):
+                    h += 1
+                lcp[rank[i]] = h
+                if h > 0:
+                    h -= 1
+        return lcp
+    
     def _get_sequence_data(self, index=None):
         if index is not None:
             return self.data_set.loc[index, 'sequence'], self.suffix_arrays[index], self.lcps_arrays[index]
@@ -67,30 +98,29 @@ class DNARepeatsFinder:
     def calculate_homopolymer_penalty_score(self, length):
         return length *10 if length > 10 else length
     
-    def calculate_local_gc_penalty_score(self, sequence, gc_content, min_GC_threshold=20, max_GC_threshold=80):
-        length = len(sequence)
-        return round(length * abs(min_GC_threshold - gc_content) if gc_content < min_GC_threshold else length * abs(gc_content - max_GC_threshold) / 100, 1)
-    
     def calculate_tandem_repeats_penalty_score(self, length):
         return round((length - 15) / 2 if length > 15 else 0, 1)
     
     def calculate_dispersed_repeats_penalty_score(self, length, count):
-        return round(((length - 15) / 2 if length > 16 else 0) * count, 1)
+        return round(((length - 15) / 2 if length > 15 else 0) * count, 1)
     
     def calculate_palindrome_repeats_penalty_score(self, length):
         return round((length - 15) / 2 if length > 15 else 0, 1)
     
-    def calculate_inverted_repeats_penalty_score(self, length):
-        return round((length - 10) / 2 if length > 15 else 0, 1)
+    def calculate_inverted_repeats_penalty_score(self, length, max_distance):
+        return round((length - 10) - (max_distance-20), 1)
     
     def calculate_WS_motifs_penalty_score(self, length, min_len=8):
         return round((length - min_len + 1) / 2 , 1)
     
+    def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=20, max_GC_threshold=80):
+        return round(abs(min_GC_threshold - gc_content+1) / 10 if gc_content < min_GC_threshold else abs(gc_content - max_GC_threshold+1) / 10, 1)
+    
     # 1) Tandem Repeats
-    def find_tandem_repeats(self, index=None, min_unit=3, min_copies=3):
+    def find_tandem_repeats_OLD(self, index=None, min_unit=3, min_copies=3):
         s, sa, lcp = self._get_sequence_data(index)
         
-        repeats = []
+        repeats_temp = []
         n = len(sa)
 
         for i in range(n):
@@ -100,6 +130,7 @@ class DNARepeatsFinder:
             # 如果长度大于等于最小单元长度乘以最小重复次数，那么就是tandem repeat
             if length >= min_unit * min_copies:
                 start_index = sa[i]
+                print(length, sa[i])
 
                 # 尝试所有可能的单元长度，看看是否能匹配到重复次数
                 for unit_length in range(min_unit, length // min_copies + 1):
@@ -113,20 +144,75 @@ class DNARepeatsFinder:
 
                     # 检查是否有重复,确保重复次数大于等于最小重复次数，
                     # Ensure the sequence matches the exact repeated pattern and aligns with the lcp length
-                    if s[start_index:start_index + actual_length]== full_seq:
-                        repeats.append({
-                            'seqType': 'tandem_repeats',
+                    if s[start_index:start_index + actual_length] == full_seq:
+                        repeats_temp.append({
                             'sequence': full_seq,
                             'start': start_index,
-                            'end': start_index + actual_length - 1,
-                            'length': actual_length,
-                            'gc_content': self.calculate_gc_content(full_seq),
-                            'penalty_score': self.calculate_tandem_repeats_penalty_score(actual_length)
+                            'end': start_index + actual_length-1,
                         })
+                        print(repeats_temp)
+        repeats = []
+        for repeat in repeats_temp:
+            if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
+                old_end = repeats[-1]['end']
+                new_end = max(old_end, repeat['end'])
+                repeats[-1]['end'] = new_end
+                repeats[-1]['sequence'] = s[repeats[-1]['start']:new_end + 1]
+            else:
+                repeats.append(repeat)
+
+        for repeat in repeats:
+            repeat['length'] = len(repeat['sequence'])
+            repeat['seqType'] = 'tandem_repeats'
+            repeat['gc_content'] = self.calculate_gc_content(repeat['sequence'])
+            repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
+
+        return repeats 
+
+    def find_tandem_repeats(self, index=None, min_unit=3, min_copies=3):
+        s, sa, lcp = self._get_sequence_data(index)
+        
+        repeats_temp = []
+        n = len(sa)
+        for start in range(n):
+            for unit_length in range(min_unit, n - start):
+                repeat_unit = s[start:start + unit_length]
+                if self.is_homopolymer(repeat_unit):
+                    continue
+
+                repeat_count = 0
+                for i in range(start, n, unit_length):
+                    if s[i:i + unit_length] == repeat_unit:
+                        repeat_count += 1
+                    else:
                         break
-    
+
+                actual_length = repeat_count * unit_length
+                if repeat_count >= min_copies:
+                    repeats_temp.append({
+                        'sequence': repeat_unit * repeat_count,
+                        'start': start,
+                        'end': start + actual_length - 1,
+                    })
+
+        repeats = []
+        for repeat in repeats_temp:
+            if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
+                old_end = repeats[-1]['end']
+                new_end = max(old_end, repeat['end'])
+                repeats[-1]['end'] = new_end
+                repeats[-1]['sequence'] = s[repeats[-1]['start']:new_end + 1]
+            else:
+                repeats.append(repeat)
+
+        for repeat in repeats:
+            repeat['length'] = len(repeat['sequence'])
+            repeat['seqType'] = 'tandem_repeats'
+            repeat['gc_content'] = self.calculate_gc_content(repeat['sequence'])
+            repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
+
         return repeats
-    
+
     # 2) Dispersed Repeats
     def find_dispersed_repeats(self, index=None, min_len=16):
         s, sa, lcp = self._get_sequence_data(index)
@@ -179,11 +265,6 @@ class DNARepeatsFinder:
         n = len(s)
         palindromes = []
 
-        # 函数：检查两个索引上的字符是否为互补
-        def is_complementary(i, j):
-            complements = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
-            return s[i] == complements[s[j]]
-
         # 遍历每个可能的中心点
         for center in range(n):
             # 奇数长度的回文
@@ -219,42 +300,50 @@ class DNARepeatsFinder:
         return palindromes
 
     # 4) Inverted Repeats
-    def find_inverted_repeats(self, index=None, min_len=4, max_distance=100):
+    def find_inverted_repeats(self, index=None, min_len=10):
         s, sa, lcp = self._get_sequence_data(index)
-        
-        def reverse_complement(seq):
-            seq = seq.upper()
-            complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
-            return ''.join(complement[base] for base in reversed(seq))
-
         n = len(s)
-        inverted_repeats = []
 
-        for i in range(n - min_len + 1):
-            for length in range(min_len, min(n - i, max_distance + min_len)):
+        def reverse_complement(seq):
+            complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+            return ''.join(complement[base] for base in reversed(seq.upper()))
+
+        # 构建反向互补序列的索引
+        rev_comp_index = {}
+        for i in range(n):
+            for length in range(min_len, n - i + 1):
                 segment = s[i:i + length]
                 rev_comp = reverse_complement(segment)
+                if rev_comp not in rev_comp_index:
+                    rev_comp_index[rev_comp] = []
+                rev_comp_index[rev_comp].append((i, length))
 
-                # Check for the presence of this reverse complement within the specified distance
-                # Start the search from i + length to ensure non-overlapping segments within the maximum distance
-                for j in range(i + length, min(i + length + max_distance, n - length + 1)):
-                    if s[j:j + length] == rev_comp:
-                        inverted_repeats.append({
-                            'seqType': 'inverted_repeats',
-                            'sequence': segment,
-                            'inverted_sequence': rev_comp,
-                            'start1': i,
-                            'end1': i + length - 1,
-                            'start2': j,
-                            'end2': j + length - 1,
-                            'length': length,
-                            'penalty_score': self.calculate_inverted_repeats_penalty_score(length),
-                        })
+        inverted_repeats = []
+        # 检索可能的倒置重复
+        for i in range(n - min_len + 1):
+            for length in range(min_len, n - i + 1):
+                segment = s[i:i + length]
+                if segment in rev_comp_index:
+                    for j, l in rev_comp_index[segment]:
+                        if i + length <= j:  # 确保不重叠
+                            distance = j - (i + length)
+                            inverted_repeats.append({
+                                'seqType': 'inverted_repeats',
+                                'sequence': segment,
+                                'inverted_sequence': segment,
+                                'start1': i,
+                                'end1': i + length - 1,
+                                'start2': j,
+                                'end2': j + l - 1,
+                                'length': l,
+                                'distance': distance,
+                                'penalty_score': self.calculate_local_gc_penalty_score(segment, distance),
+                            })
 
         return inverted_repeats
 
     # 5) Homopolymers
-    def find_homopolymers(self, index=None, min_len=9):
+    def find_homopolymers(self, index=None, min_len=7):
         s, sa, lcp = self._get_sequence_data(index)
     
         homopolymers = []
@@ -316,12 +405,16 @@ class DNARepeatsFinder:
             gc_content = self.calculate_gc_content(s)
             if gc_content < min_GC_content or gc_content > max_GC_content:
                 return [{
+                    'seqType': 'local_gc',
+                    'length': n,
                     'sequence': s,
                     'start': 0,
                     'end': n - 1,
                     'gc_content': gc_content,
+                    'penalty_score': self.calculate_local_gc_penalty_score(s, gc_content),
                 }]
             return []
+        
         gc_contents_temp = []
 
         for i in range(n - window_size + 1):
@@ -333,26 +426,50 @@ class DNARepeatsFinder:
                     'sequence': window,
                     'start': i,
                     'end': i + window_size - 1,
-                    # penalty_score 
+                    'gc_content': gc_content,
+                    'penalty_score': self.calculate_local_gc_penalty_score(gc_content, min_GC_content, max_GC_content),
                 })
+
         # Merge overlapping windows according to the continuous sequence, 
         # do not merge windows with different regions.
         gc_contents = []
         for gc_content in gc_contents_temp:
+            # print(gc_content)
+            # print(gc_contents[-1]['end'] if gc_contents else 0, gc_content['start'] - 1)
             if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
                 # 扩展上一个窗口
                 old_end = gc_contents[-1]['end']
                 new_end = max(old_end, gc_content['end'])
                 gc_contents[-1]['end'] = new_end
                 gc_contents[-1]['sequence'] = s[gc_contents[-1]['start']:new_end + 1]
+                # penalty score 要叠加
+                gc_contents[-1]['penalty_score'] += gc_content['penalty_score']
             else:
                 gc_contents.append(gc_content)
-        
+        # print(gc_contents)
         # recalculate the GC content of the merged windows, and calculate the penalty score
         for gc_content in gc_contents:
             gc_content['seqType'] = 'local_gc'
             gc_content['length'] = len(gc_content['sequence'])
             gc_content['gc_content'] = self.calculate_gc_content(gc_content['sequence'])
-            gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(gc_content['sequence'], gc_content['gc_content'])
         return gc_contents
 
+    def get_lcc(self, index=None):
+        s, sa, lcp = self._get_sequence_data(index)
+        n = len(s)
+        lcc = 0
+        dna_seq = Seq(s)
+        protein_seq = dna_seq.translate()
+
+        dna_complexity = lcc_simp(dna_seq)
+        protein_complexity = lcc_simp(protein_seq)
+
+        return {
+            'dna_complexity': dna_complexity,
+            'protein_complexity': protein_complexity,
+        }
+        
+# sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtAAGATAAAGCGCTGCGTAGCATGTATCGTGTGCTGAAACCAGGTGGTCGTCTGCTGGTGCTGGAATTTAGCAAACCGATTATTGAACCGCTGAGCAAAGCGTATGATGCGTATAGCTTTCATGTCCTGCCGCGTATTGGTAGCCTGGTGGCGAACGATGCGGATAGCTATCGTTATCTGGCGGAAAGCATTCGTATGCATCCGGATCAGGATACCCTGAAAGCGATGATGCAGGATGCGGGCTTTGAAAGCGTGGACTACTATAACCTGACAGCTGGCGTTGTCGCCCTGCACCGCGGCTATAAGTTCGGGTCTGGTGGCAGCCATCATCATCATCATCATCATCATTGAGATCCGGCTGCTAACGATGGGTTGAGGATGGTTacccggaaccacatggagattacttgttgtaggagggaggacactatggaaatcaatacacacgcaacaagcatggagacacacatcaacggTAGCTGATCCTTGTCGCATGGTCGACGATTGATGCAcccaccatcgccaacTCGGGAATTCGGATTGGA"
+# sequence = sequence.upper()
+# finder = DNARepeatsFinder(sequence=sequence)
+# print(finder.find_tandem_repeats())

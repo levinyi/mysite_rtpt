@@ -2,7 +2,13 @@
 {% load static %}
 {% block title %}Orders{% endblock %}
 {% block content %}
-<div class="container">
+<div class="container-fluid">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Order</li>
+        </ol>
+    </nav>
     <div class="row pt-3 mt-3 form-control">
         <div class="col-12">
             <h4 class="mb-3"><i class="bi bi-list-ul"></i> My Order History</h4>
@@ -14,7 +20,7 @@
                         <th scope="col">Gene Numbers</th>
                         <th scope="col">Status</th>
                         <th scope="col">Creation Time</th>
-                        <th scope="col">Details</th>
+                        <th scope="col">Price</th>
                         <th scope="col">Action</th>
                     </tr>
                 </thead>
@@ -22,15 +28,21 @@
                     {% for order in order_list %}
                     <tr>
                         <td>{{ forloop.counter }}</td>
-                        <td>{{ order.inquiry_id }}</td>
-                        <td>{{ order.gene_infos.count }}</td>
-                        <td>{{ order.status }}</td>
-                        <td>{{ order.order_time }}</td>
                         <td>
                             <a href="{% url 'user_center:view_order_detail' order.id %}" data-bs-toggle="tooltip" 
                                 data-bs-placement="top" title="See details" class="text-decoration-none">
-                                <i class="bi bi-ticket-detailed"></i> See Details
+                                {{ order.inquiry_id }}
                             </a>
+                        </td>
+                        <td>{{ order.gene_infos.count }}</td>
+                        <td>
+                            <span class="badge {% if order.status == 'Cancelled' %}bg-warning{% else %}bg-primary{% endif %}">
+                                {{ order.status }}
+                            </span>
+                        </td>
+                        <td>{{ order.order_time }}</td>
+                        <td>
+                            
                         </td>
                         {% if order.status == 'Cancelled' %}
                         <td>

@@ -6,23 +6,32 @@
 {% block extra_head %}
 <style>
     .main-content {
-        margin-bottom: 100px; /* 调整这个值以确保足够空间 */
+        margin-bottom: 100px; /* 调整这个值以确保底部有足够的空间 */
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container main-content">
+<div class="container-fluid main-content">
+    <!-- Breadcrumb -->
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Shopping Cart</li>
+        </ol>
+    </nav>
+    <!-- End Breadcrumb -->
     <div class="row pt-3 mt-3 form-control d-flex justify-content-between align-items-center">
         <div class="row">
             <div class="col-6">
                 <h4 class="mb-3"><i class="bi bi-list-ul"></i> Shopping Cart</h4>
             </div>
             <div class="col-6 text-end">
-                <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-clipboard-plus"></i> Add More</a>
+                <a href="{% url 'user_center:order_create' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-clipboard-plus me-2"></i> Add More</a>
             </div>
         </div>
-        <!-- select -->
+        <!-- select Status form-->
         <div class="row">
             <div class="col-md-4">
                 <select class="form-control" id="statusFilter">
@@ -37,6 +46,7 @@
                 </select>
             </div>
         </div>
+        <!-- Table -->
         <table class="table table-striped table-hover" style="text-align:center">
             <thead>
                 <tr>
@@ -61,11 +71,18 @@
                 {% for gene in group.genes %}
                 <tr data-status="{{ gene.status }}">
                     <td>
+                        <!-- 复选框 -->
                         <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}" 
                             data-length="{{ gene.saved_seq|length }}" data-date="{{ group.date }}">
                     </td>
                     <td>{{ forloop.counter }}</td>
-                    <td>{{ gene.gene_name }}</td>
+                    <td>
+                        <!-- 基因名称 -->
+                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See Details" 
+                            href="{% url 'user_center:gene_edit' gene.id %}" class="text-decoration-none">
+                            {{ gene.gene_name }}
+                        </a>
+                    </td>
                     <td>{{ gene.vector }}</td>
                     <td>{{ gene.species }}</td>
                     <td> 
@@ -85,7 +102,10 @@
                             <span class="badge bg-secondary">{{ gene.status }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ gene.saved_seq|length }}</td>
+                    <td>
+                        <!-- 基因长度 -->
+                        {{ gene.saved_seq|safe|base_length }}
+                    </td>
                     <td>
                         {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
                             <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See detail" 
@@ -93,11 +113,7 @@
                                 <i class="bi bi-eye me-2"></i>
                             </a>
                         {% else %}
-                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Modify" href="{% url 'user_center:gene_edit' gene.id %}" 
-                                class="text-decoration-none">
-                                <i class="bi bi-pencil-square me-2"></i>
-                            </a>
-                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download GeneBank File" 
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download GenBank File" 
                                 href="{% url 'user_center:cart_genbank_download' gene.id %}" 
                                 class="text-decoration-none">
                                 <i class="bi bi-download me-2"></i>
@@ -117,40 +133,159 @@
 </div>
 
 <!-- Fixed bottom checkout bar -->
-<div class="container fixed-bottom" style="background-color: #F9F9F9;">
-    <!-- Select All -->
-    <div class="row mt-4">
+<div class="container-fluid fixed-bottom" style="background-color: #F9F9F9;">
+    <div class="row mt-3 mb-3">
         <!-- left -->
-        <div class="col-lg-5 text-end">
-            <input type="checkbox" id="selectAllBottom" name="gene_id" value="all">
-            <label class="form-check-label me-3" for="flexCheckDefault">Select All</label>
-            <button class="btn btn-outline-danger" onclick="deleteSelected()">
-                <i class="bi bi-trash me-1"></i>Delete Selected 
-            </button> 
+        <div class="col-lg-5">
+            <!-- check box and delete button -->
+            <div class="d-flex align-items-center justify-content-end">
+                <input type="checkbox" id="selectAllBottom" name="gene_id" value="all">
+                <label class="form-check-label ms-2 me-3" for="selectAllBottom">Select All</label>
+                <button class="btn btn-outline-danger me-3" id="deleteSelectedButton" onclick="deleteSelected()">
+                    <i class="bi bi-trash me-1"></i>Delete Selected 
+                </button>
+                <!-- Card with three buttons -->
+                <div class="card mt-1 mb-2" style="width: auto; height: auto;">
+                    <div class="card-body me-2 p-2 d-inline-block" style="width: 158px;height: 35px;"> <!-- Adjust width as needed -->
+                        <div class="d-flex justify-content-around p-0">
+                            <a onclick="showToast()" href="#" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Codon Optimization for Selected Items" >
+                                <i class="bi bi-sliders"></i>
+                            </a>
+                            <button onclick="bulkdownloadSelectedGenBank()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Download GenBank Files for selected items">
+                                <i class="bi bi-cloud-download"></i>
+                            </button>
+                            <a onclick="bulkDownloadSelectedExcelInfo()" href="#" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Download detail information for selected items in Excel format">
+                                <i class="bi bi-filetype-xlsx"></i>
+                            </a>
+                            <a onclick="bulkViewSelectedGeneDetails()" href="#" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="View Details for selected items">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- center -->
+        <div class="col-lg-4 d-flex flex-column">
+            <div class="d-flex justify-content-between mb-1">
+                <p id="total-genes" class="mb-0">Total 0 Genes</p>
+                <p class="mb-0">Delivery:
+                    <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Depends on your location. Please fill in your shipping address in your account's profile."></i></p>
+                <p id="total-price" class="mb-0">Total: $0</p>
+            </div>
+            <div class="d-flex justify-content-between">
+                <p id="total-length" class="mb-0">Total 0 bp</p>
+                <p id="delivery-fee" class="mb-0">$0 delivery fee</p>
+                <p class="mb-0">
+                    <a class="text-decoration-none" href="#" data-bs-toggle="modal" data-bs-target="#detailsModal">See details <i class="bi bi-caret-down-fill"></i></a>
+                </p>
+            </div>
         </div>
         <!-- right -->
-        <div class="col-lg-7">
-            <div class="row">
-                <div class="col">
-                    <p id="total-genes">Total 0 Genes</p>
-                    <p id="total-length">Total 0 bp</p>
+        <div class="col-lg-3 d-flex align-items-center justify-content-center">
+            <button type="button" class="btn btn-primary" id="checkoutButton">
+                <i class="bi bi-check2-square me-1"></i>Submit
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailsModalLabel">Quotation Comparison</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row text-center">
+                    <!-- Card 1 -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card pricing-card">
+                            <div class="card-header">
+                                RootPath
+                            </div>
+                            <div class="card-body">
+                                <h2 class="card-title">¥598</h2>
+                                <p class="card-text">$0.23/bp</p>
+                                <ul class="list-unstyled">
+                                    <li>Free Shipping Fee</li>
+                                    <li>turation : 4-5 Week</li>
+                                    <li>Free NGS Validation</li>
+                                    <li>Free Sanger Validation</li>
+                                    <li>Free Sanger Validation</li>
+                                    {% comment %} <li>标准全球节点（选配） <span class="badge bg-danger">新品</span></li> {% endcomment %}
+                                </ul>
+                                <a href="#" class="btn btn-primary">Submit</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 2 -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card pricing-card">
+                            <div class="card-header">
+                                Quintara Inc.
+                            </div>
+                            <div class="card-body">
+                                <h2 class="card-title">¥1280</h2>
+                                <p class="card-text">$0.24/bp</p>
+                                <ul class="list-unstyled">
+                                    <li>Free Shipping Fee</li>
+                                    <li>turation : 4-5 Week</li>
+                                    <li>Free NGS Validation</li>
+                                    <li>Free Sanger Validation</li>
+                                    <li>Free Sanger Validation</li>
+                                </ul>
+                                <a href="#" class="btn btn-primary" onclick="showToast()">Submit</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 3 -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card pricing-card">
+                            <div class="card-header">
+                                Others
+                            </div>
+                            <div class="card-body">
+                                <h2 class="card-title">¥2560</h2>
+                                <p class="card-text">0.38/bp</p>
+                                <ul class="list-unstyled">
+                                    <li>Free Shipping Fee</li>
+                                    <li>turation : 4-5 Week</li>
+                                    <li>Free NGS Validation</li>
+                                    <li>Free Sanger Validation</li>
+                                    <li>Free Sanger Validation</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
-                <div class="col">
-                    <p>Delivery:</p>
-                    <p id="delivery-fee"> $0 delivery fee </p>
-                </div>
-                <div class="col">
-                    <p id="total-price">Total: $0</p>
-                </div>
-                <div class="col">
-                    <button type="button" class="btn btn-primary" id="checkoutButton">
-                        <i class="bi bi-check2-square me-1"></i>Submit
-                    </button>
-                </div>
+            </div>
+            <div class="alert alert-warning" role="alert">
+                This page is under development. If you have any suggestions, you can submit them <a href="https://t114xle63y.feishu.cn/docx/Do0qdSPxho0TBWxwRFQcgTqOnue" class="text-decoration-none" target="_blank">here</a>.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="workingToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
+        <div class="toast-header">
+            <strong class="me-auto">Notice</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Our engineers are still working on it.
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 
@@ -266,6 +401,7 @@
     });
 </script>
 <script>
+    // 删除单个基因
     function del_gene(the, gene_id) {
         layer.open({
             type: 1,
@@ -301,6 +437,7 @@
             },
         })
     };
+    // 删除多个基因
     function deleteSelected() {
         var selectedGenes = [];
 
@@ -349,6 +486,144 @@
                 });
             },
         });
+    }
+    // 获取选中的基因
+    function getSelectedValues() {
+        var selectedValues = [];
+        $('.gene-checkbox:checked').each(function() {
+            selectedValues.push($(this).val());
+        });
+        return selectedValues;
+    }
+    // 优化选中的基因
+    function optimizeSelected() {
+        const selectedValues = getSelectedValues();
+        if (selectedValues.length > 0) {
+            console.log("Optimizing: ", selectedValues);
+            // Example: send data to server
+            // fetch('/optimize', {
+            //     method: 'POST',
+            //     body: JSON.stringify({ ids: selectedValues }),
+            //     headers: { 'Content-Type': 'application/json' }
+            // }).then(response => response.json()).then(data => {
+            //     console.log(data);
+            // });
+        } else {
+            alert("No items selected");
+        }
+    }
+    // 下载GenBank格式文件
+    function bulkdownloadSelectedGenBank() {
+        const selectedValues = getSelectedValues();
+        if (selectedValues.length > 0) {
+            console.log("Downloading: ", selectedValues);
+
+            fetch('{% url "user_center:bulk_download_genbank" %}', {
+                method: 'POST',
+                body: JSON.stringify({ 'gene_ids': selectedValues }),
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                 }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(error => { throw new Error(error.error) });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'RootPath-Online-Submission-GenBank.zip';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        } else {
+            alert("No items selected");
+        }
+    }
+    // 下载Excel格式文件
+    function bulkDownloadSelectedExcelInfo() {
+        const selectedValues = getSelectedValues();
+        if (selectedValues.length > 0) {
+            console.log("Downloading: ", selectedValues);
+            // Example: send data to server
+            fetch('{% url "user_center:bulk_download_geneinfo_excel" %}', {
+                method: 'POST',
+                body: JSON.stringify({ 'gene_ids': selectedValues }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(error => { throw new Error(error.error) });
+                }
+                const disposition = response.headers.get('Content-Disposition');
+                const filename = disposition ? disposition.split('filename=')[1].replace(/"/g, '') : 'download.xlsx';
+                return response.blob().then(blob => ({ blob, filename }));
+            })
+            .then(({ blob, filename }) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        } else {
+            alert("No items selected");
+        }
+    }
+    // 查看基因详情
+    function bulkViewSelectedGeneDetails() {
+        const selectedValues = getSelectedValues();
+        if (selectedValues.length > 0) {
+            console.log("Viewing: ", selectedValues);
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "user_center:bulk_view_gene_detail" %}';
+
+            const csrfToken = document.createElement('input');
+            csrfToken.type = 'hidden';
+            csrfToken.name = 'csrfmiddlewaretoken';
+            csrfToken.value = '{{ csrf_token }}';
+            form.appendChild(csrfToken);
+
+            selectedValues.forEach(value => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'gene_ids';
+                input.value = value;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        } else {
+            alert("No items selected");
+        }
+    }
+</script>
+<script>
+    function showToast() {
+        var toastEl = document.getElementById('workingToast');
+        var toast = new bootstrap.Toast(toastEl);
+        toast.show();
     }
 </script>
 {% endblock %}

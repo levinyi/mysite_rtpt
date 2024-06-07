@@ -1,0 +1,159 @@
+{% extends "super_manage/base.html" %}
+{% load custom_filters %}
+{% load static %}
+{% block title %}Species Manage{% endblock %}
+{% block extra_head %}
+{% endblock %}
+{% block manage_content %}
+<div class="container-fluid">
+    <!-- Company Vectors -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <div class="row">
+                <div class="col-6">
+                    <h4><i class="bi bi-list-ul"></i> RootPath Species</h4>
+                </div>
+                <div class="col-6 text-end">
+                    <button type="button" data-bs-toggle="modal" class="btn btn-primary" data-bs-target="#createModal"><i class="bi bi-plus-circle-dotted"></i> Add New Species</button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="card-title">
+                <h4>Species for codon optimization.</h4>
+            </div>
+            <br>
+            <h5>Commonly used speices at RootPath</h5>
+            <table class="table table-striped table-hover" style="text-align:center">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Species Name</th>
+                        <th scope="col">Species Note</th>
+                        <th scope="col">Species Codon File</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for species in species_list %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ species.species_name }}</td>
+                        <td>{{ species.species_note }}</td>
+                        <td>{{ species.species_codon_file|basename }}</td>
+                        <td>
+                            <a data-bs-toggle="tooltip" data-bs-placement="top" title="Delete this species"
+                                href="javascript:" onclick="del_species(this, {{ species.id }})" class="text-decoration-none">
+                                <i class="bi bi-trash text-danger"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<!-- Modal -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="exampleModalLabel" data-bs-backdrop="static" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createModalLabel">Upload Your Species Codon Usage Excel File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="uploadForm" method="post" enctype="multipart/form-data" action="{% url 'product:upload_species_codon_file' %}">
+                <div class="modal-body">
+                    <div class="card-body">
+                            {% csrf_token %}
+                            <label for="species_name" class="form-label mt-3">Species Name</label>
+                            <input type="text" name="species_name" class="form-control" required="required"
+                                placeholder="Enter Species name, eg. E_Coli">
+                            <label for="species_note" class="form-label mt-3">Species Note</label>
+                            <input type="text" name="species_note" class="form-control" placeholder="Enter Species note, eg. Escherichia coli">
+                            <label for="species_codon_file" class="form-label mt-3">Select species codon excel file. Must be "Excel_CodonUsage_E_coli.xlsx" format.</label>
+                            <input type="file" name="species_codon_file" class="form-control" accept=".xlsx" required="required">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.getElementById('uploadForm');
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent the form from submitting traditionally
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Redirect to a URL on success
+                window.location.href = '/super_manage/species_manage/';
+            } else {
+                alert('Upload failed. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        });
+    });
+});
+</script>
+<script>
+    // delete species
+    function del_species(the, species_id) {
+        layer.open({
+            type: 1,
+            skin: 'layui-layer-rim',
+            area: ['420px', '240px'],
+            title: 'Delete',
+            content: '<div style="padding: 20px 80px;">Are you sure to delete this species? </div>',
+            btn: ['Yes', 'No'],
+            btnAlign: 'c',
+            yes: function(index, layero) {
+                $.ajax({
+                    url: '{% url "product:species_delete" %}',
+                    type: 'POST',
+                    data: {
+                        'species_id': species_id,
+                        'csrfmiddlewaretoken': '{{ csrf_token }}'
+                    },
+                    dataType: 'json',
+                    success: function(data) {
+                        if (data.status == 'success') {
+                            layer.msg('Delete species successfully!', { icon: 1 });
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg('Delete species failed!', { icon: 2 });
+                        }
+                    },
+                    error: function() {
+                        layer.msg('An error occurred. Please try again.', { icon: 2 });
+                    }
+                });
+            },
+        })
+    }
+</script>
+{% endblock %}

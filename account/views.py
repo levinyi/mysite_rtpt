@@ -250,9 +250,7 @@ def password_change_done(request):
 
 @login_required(login_url='/account/login/')
 def myself(request):
-    userprofile = UserProfile.objects.get(user=request.user) if hasattr(request.user,
-                                                                        'userprofile') else UserProfile.objects.create(
-        user=request.user)
+    userprofile = UserProfile.objects.get(user=request.user) if hasattr(request.user,'userprofile') else UserProfile.objects.create(user=request.user)
     return render(request, "account/myself.html", {"user": request.user, "userprofile": userprofile})
 
 

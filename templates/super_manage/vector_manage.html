@@ -1,0 +1,356 @@
+{% extends "super_manage/base.html" %}
+{% load custom_filters %}
+{% load static %}
+{% block title %}Vector Manage{% endblock %}
+{% block extra_head %}
+{% endblock %}
+{% block manage_content %}
+<div class="container-fluid pt-1">
+    <div class="card mt-4">
+        <div class="card-header">
+            <div class="row">
+                <div class="col-6">
+                    <h4><i class="bi bi-list-ul"></i> RootPath Vectors </h4>
+                </div>
+                <div class="col-6 text-end">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
+                        <i class="bi bi-plus-circle-dotted me-2"></i>Add Vector
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="vector-table"></div>
+    </div>
+</div>
+<!-- 修改状态模态框 -->
+<div class="modal fade" id="editVectorModal" tabindex="-1" aria-labelledby="editVectorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel">Change Vector Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 表单 -->
+                <form id="statusForm">
+                    <div class="mb-3">
+                        <label for="statusSelect" class="form-label">New Status</label>
+                        <select class="form-select" id="statusSelect">
+                            <option value="Received">Received</option>
+                            <option value="ReadyToUse">ReadyToUse</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 上传文件模态框 -->
+<div class="modal fade" id="uploadCsvModal" tabindex="-1" aria-labelledby="uploadCsvModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadCsvModalLabel">Upload CSV File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 表单 -->
+                <form id="csvUploadForm">
+                    <div class="mb-3">
+                        <h5>CSV Only:</h5>
+                        <p class="text-muted">The first line of the CSV file must be the header</p>
+                        <p class="text-muted">and the header must contain 
+                        "Vector_ID, Vector_Name, iU20, iD20, v5NC, v3NC,
+                        Vector_Seq(From_v3NC_Downstream_to_v5NC_Upstream_withoutV3NCv5NC_Seq)"</p>
+                        <label for="csvFile" class="form-label">Select CSV file</label>
+                        <input type="file" class="form-control" id="csvFile" accept=".csv">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        fetch("{% url 'super_manage:vector_data_api' %}")
+            .then(response => response.json())
+            .then(data => {
+                new gridjs.Grid({
+                    columns: [
+                        { name: '#', width: '80px'},
+                        { name: 'User', width: '120px', formatter: (cell) => cell ? cell : 'RootPath' },
+                        { name: 'id', hidden: true },
+                        { name: 'ID', width: '200px'},
+                        { name: 'Name' },
+                        { name: 'Seq', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'NC5', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'NC3', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'iu20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'id20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { 
+                            name: 'Vector File', width: '200px',
+                            formatter: (cell, row) => {
+                                const vectorId = row.cells[2].data;
+                                return gridjs.html(`
+                                    ${cell ? `<a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download file" href="/super_manage/vector_manage/vector_download/${vectorId}/file" target="_blank" class="text-decoration-none">${cell}</a>` : ''}
+                                    <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Upload file" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi bi-plus-circle-dotted"></i></a>
+                                    <input type="file" style="display: none;" onchange="submitFile(this, '${vectorId}', 'vector_file')">
+                                `);
+                            }
+                        },
+                        { 
+                            name: 'Vector_png', width: '200px',
+                            formatter: (cell, row) => {
+                                const vectorId = row.cells[2].data;
+                                return gridjs.html(`
+                                    ${cell ? `<a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download map" href="/super_manage/vector_manage/vector_download/${vectorId}/map" target="_blank" class="text-decoration-none">${cell}</a>` : ''}
+                                    <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Upload file" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi bi-plus-circle-dotted"></i></a>
+                                    <input type="file" style="display: none;" onchange="submitFile(this, '${vectorId}', 'vector_png')">
+                                `);
+                            }
+                        },
+                        { 
+                            name: 'Vector_GB', 
+                            formatter: (cell, row) => {
+                                const vectorId = row.cells[2].data;
+                                return gridjs.html(`
+                                    ${cell ? `<a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download gb" href="/super_manage/vector_manage/vector_download/${vectorId}/gb" target="_blank" class="text-decoration-none">${cell}</a>` : ''}
+                                    <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Upload file" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi bi-plus-circle-dotted"></i></a>
+                                    <input type="file" style="display: none;" onchange="submitFile(this, '${vectorId}', 'vector_gb')">
+                                `);
+                            }
+                        },
+                        { 
+                            name: 'Status', 
+                            formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`)
+                        },
+                        { 
+                            name: 'Edit', 
+                            formatter: (cell, row) => {
+                                const vectorId = row.cells[2].data;
+                                return gridjs.html(`
+                                    <div style="display: flex; justify-content: center;">
+                                        <a data-bs-toggle="modal" data-bs-target="#editVectorModal" data-vector-id="${vectorId}" href="javascript:void(0);" class="text-decoration-none"
+                                            data-bs-toggle="tooltip" data-bs-replacement="left" title="Edit Status">
+                                            <i class="bi bi-pencil-square text-primary me-2"></i>
+                                        </a>
+                                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete" href="javascript:" onclick="del_gene(this, ${vectorId})" class="text-decoration-none">
+                                            <i class="bi bi-trash text-danger me-2"></i>
+                                        </a>
+                                    </div>
+                                `);
+                            }
+                        }
+                    ],
+                    data: data.data.map((vector, index) => [
+                        index + 1,
+                        vector.user__username,
+                        vector.id,
+                        vector.vector_id,
+                        vector.vector_name,
+                        vector.vector_map,
+                        vector.NC5,
+                        vector.NC3,
+                        vector.iu20,
+                        vector.id20,
+                        vector.vector_file ? vector.vector_file.split('/').pop() : '',
+                        vector.vector_png ? vector.vector_png.split('/').pop() : '',
+                        vector.vector_gb ? vector.vector_gb.split('/').pop() : '',
+                        vector.status,
+                        '' // Edit and Delete button
+                    ]),
+                    pagination: {
+                        enabled: true,
+                    },
+                    search: true,
+                    sort: true,
+                    resizable: false,
+                    language: {
+                        'search': {
+                            'placeholder': '🔍 Search...'
+                        },
+                        'pagination': {
+                            'showing': '😃 Displaying',
+                            'results': () => 'Records'
+                        }
+                    }
+                }).render(document.getElementById('vector-table'));
+            })
+            .catch(error => console.error('Error:', error));
+    });
+
+    // 删除Vector
+    function del_gene(the, gene_id) {
+        console.log(gene_id);
+        layer.open({
+            type: 1,
+            skin: 'layui-layer-rim',
+            area: ['420px', '240px'],
+            title: 'Delete',
+            content: '<div style="padding: 20px 80px;">Are you sure to delete this item?</div>',
+            btn: ['Yes', 'No'],
+            btnAlign: 'c',
+            yes: function (index, layero) {
+                $.ajax({
+                    url: "{% url 'super_manage:vector_delete' %}",
+                    type: "POST",
+                    data: {
+                        'csrfmiddlewaretoken': '{{ csrf_token }}',
+                        'gene_id': gene_id,
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        if (data.status === 'success') {
+                            layer.msg('Delete successfully!', { icon: 1 });
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            layer.msg(data.message, { icon: 2 });
+                        }
+                    },
+                    error: function (xhr, errmsg, err) {
+                        layer.msg('Delete failed!', { icon: 2 });
+                    }
+                });
+            },
+            btn2: function (index, layero) {
+                layer.close(index);
+            }
+        });
+    }
+
+    $('#editVectorModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget); // Button that triggered the modal
+        var vectorId = button.data('vector-id'); // Extract info from data-* attributes
+        $(this).attr('data-vector-id', vectorId);
+    });
+
+    // 修改Vector状态
+    document.getElementById('statusForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        var modal = document.getElementById('editVectorModal');
+        var vectorId = modal.getAttribute('data-vector-id');
+        var status = document.getElementById('statusSelect').value;
+
+        // 确保 vectorId 实际上已经被设置
+        if (!vectorId) {
+            alert('Vector ID is missing');
+            return;
+        }
+
+        $.ajax({
+            url: '/super_manage/vector_edit_item/',
+            type: 'POST',
+            data: {
+                'csrfmiddlewaretoken': '{{ csrf_token }}',
+                'vector_id': vectorId,
+                'new_status': status
+            },
+            success: function(response) {
+                // 处理成功的响应
+                $('#editVectorModal').modal('hide');
+                alert('修改成功');
+                setTimeout(function () {
+                    window.location.reload();
+                }, 1000);
+            },
+            error: function() {
+                // 处理错误的响应
+                alert('修改失败');
+            }
+        });
+    });
+
+    // 上传文件
+    function uploadFile(uploadLink) {
+        const fileInput = uploadLink.nextElementSibling;
+        fileInput.click();
+    }
+    
+    // 提交文件
+    function submitFile(fileInput, vectorId, fileType) {
+        if (fileInput.files.length === 0) {
+            alert('请选择文件');
+            return;
+        }
+
+        var csrftoken = getCookie('csrftoken');
+
+        var formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('vectorId', vectorId);
+        formData.append('fileType', fileType);
+        formData.append('csrfmiddlewaretoken', csrftoken);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/super_manage/vector_upload_file/');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                alert('文件上传成功');
+                window.location.reload();
+            } else {
+                alert('文件上传失败');
+            }
+        };
+        xhr.send(formData);
+    }
+
+    // submit csv file
+    document.getElementById('csvUploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        var fileInput = document.getElementById('csvFile');
+        var file = fileInput.files[0];
+        var csrftoken = getCookie('csrftoken');
+
+        var formData = new FormData();
+        formData.append('csvFile', file);
+        formData.append('csrfmiddlewaretoken', csrftoken);
+
+        fetch('/super_manage/vector_add_item/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === "success") {
+                alert(data.message);
+                // 刷新页面
+                window.location.reload();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('There was an error processing your request.');
+        });
+
+        var modal = bootstrap.Modal.getInstance(document.getElementById('uploadCsvModal'));
+        modal.hide();
+    });
+    // 获取CSRF token
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

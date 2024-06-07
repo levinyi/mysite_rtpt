@@ -59,8 +59,8 @@ class Vector(models.Model):
     # on_delete=models.SET_NULL,这里有bug，设置成SET_NULL后，如果user被删除了，那么这个vector的user就会变成null, 就会变成公司的vector了，就会展示在公司的vector列表里面，这是不对的
     # 直接设置成CASCADE吧，这样user被删除了，这个vector也会被删除，这样就不会出现这个问题了
 
-    vector_id = models.CharField(verbose_name="Vector_ID", max_length=20, null=True, blank=True)
-    vector_name = models.CharField(verbose_name="Vector_name", max_length=20)
+    vector_id = models.CharField(verbose_name="Vector_ID", max_length=200, null=True, blank=True)
+    vector_name = models.CharField(verbose_name="Vector_name", max_length=200)
     vector_map = models.TextField(verbose_name="Vector_Seq")  # 这里的vector_map是指序列，不是图片
     NC5 = models.TextField(verbose_name="v5NC")
     NC3 = models.TextField(verbose_name="v3NC")

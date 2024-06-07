@@ -2,12 +2,18 @@
 {% load static %}
 {% block title %}User Center{% endblock %}
 {% block content %}
-<div> 
-    <div class="row mt-4 pt-4">
+<div class="container">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
+            <li class="breadcrumb-item active" aria-current="page">dashboard</li>
+        </ol>
+    </nav>
+    <!-- <div class="row mt-4 pt-4">
         <h4>Welcome to your RootPath User Center! </h4>
         <br>
         <h4>We help you elevate the throughput of protein functional interrogation.  </h5>
-    </div>
+    </div> -->
 
     <div class="row mt-4">
         <div class="col-md-4 mt-3" >

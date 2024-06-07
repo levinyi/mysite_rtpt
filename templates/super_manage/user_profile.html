@@ -14,11 +14,11 @@
 {% block content %}
 <div class="card-header bg-transparent border-bottom mt-3 mb-2">
     <h3 class="card-header-title mb-0">Edit Profile</h3>
-    <h5 class="card-header-title mb-2 text-end">Register on {{ userprofile.register_time }}.</h5>
+    <h5 class="card-header-title mb-2 text-end">Register at {{ userprofile.register_time }}.</h5>
 </div>
 <div class="card-body">
     <!-- Form -->
-    <form class="row g-4" method="post" action="{% url 'account:myself_edit' %}" enctype="multipart/form-data">
+    <form class="row g-4" method="post" action="{% url 'super_manage:save_user_profile' userprofile.user.id %}" enctype="multipart/form-data">
         {% csrf_token %}
         <!-- Profile picture -->
         <div class="col-12 justify-content-center align-items-center">
@@ -69,7 +69,7 @@
 
         <!-- Email id -->
         <div class="col-md-6">
-            <label class="form-label">Email id</label>
+            <label class="form-label">Email</label>
             <input class="form-control" name="email" type="email" value="{{ userprofile.email }}" placeholder="Email">
         </div>
 
@@ -116,7 +116,7 @@
     function selectImage(imagePath) {
         // 点击时，将图片路径上传给服务器，保存到数据库
         $.ajax({
-            url: "{% url 'account:avatar_edit' %}",
+            url: "{% url 'super_manage:save_user_avatar' %}",
             type: "POST",
             data: {
                 "csrfmiddlewaretoken": "{{ csrf_token }}",

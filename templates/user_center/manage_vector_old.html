@@ -78,13 +78,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Manage Vectors</li>
-        </ol>
-    </nav>    
+<div class="container">
     <!-- Custmer Vectors -->
     <div class="card mt-4">
         <div class="card-header">
@@ -98,7 +92,64 @@
             </div>
         </div>
         <div class="card-body">
-            <div id="customer-vector-table"></div>
+            <table class="table table-striped table-hover" style="text-align:center">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Vector Name</th>
+                        <th scope="col">Vector File(Original)</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Vector ID</th>
+                        <th scope="col" data-bs-toggle="tooltip" data-bs-placement="top" title="20 bp upstream of insertion site">iU20</th>
+                        <th scope="col" data-bs-toggle="tooltip" data-bs-placement="top" title="20 bp downstream of insertion site">iD20</th>
+                        <th scope="col">Download Map</th>
+                        <th scope="col">Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vector in user_vectors %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.vector_name }}</td>
+                        <td>
+                            {% if vector.vector_file %}
+                            <div class="hstack gap-3 justify-content-center">
+                                <a type="button" href="{% url 'user_center:vector_download' vector.id 'file' %}">{{ vector.vector_file.path|basename }}</a>
+                            </div>
+                            {% endif %}
+
+                        </td>
+                        <td>{{ vector.status }}</td>
+                        <td>{{ vector.vector_id }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC5 }}</td>
+                        <td class="text-truncate" style="max-width: 150px;">{{ vector.NC3 }}</td>
+                        <td>
+                            {% if vector.vector_gb %}
+                                <a type="button" class="text-decoration-none" data-bs-toggle="tooltip" data-bs-placement="top" title="Download genebank" 
+                                    href="{% url 'user_center:vector_download' vector.id 'gb' %}"><i class="bi bi-file-earmark-binary"></i></a>
+                            {% endif %}
+                            {% if vector.vector_png %}
+                                <a class="text-decoration-none preview-link" 
+                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Click to download map" 
+                                    href="{% url 'user_center:vector_download' vector.id 'map' %}" 
+                                    onmouseover="showPreview(event)" onmouseout="hidePreview()"> 
+                                    <i class="bi bi-filetype-png"></i> 
+                                </a>
+                                <div class="image-preview" id="imagePreview">
+                                    <img src="{{ MEDIA_URL }}{{ vector.vector_png }}" alt="Image Preview">
+                                </div>
+                            {% endif %} 
+                        </td>
+                        <td>
+                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete item" href="javascript:"
+                                onclick="del_vector(this, {{ vector.id }})">
+                                <i class="bi bi-trash text-danger"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
     <!-- RootPath Vectors -->
@@ -113,11 +164,57 @@
             </div>
             <br>
             <h5>Commonly used vectors at RootPath</h5>
-            <div id="rootpath-vector-table"></div>
+            <table class="table table-striped table-hover" style="text-align:center">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Vector Name</th>
+                        <th scope="col">Vector ID</th>
+                        <th scope="col" data-bs-toggle="tooltip" data-bs-placement="top" title="20 bp upstream of insertion site">iU20</th>
+                        <th scope="col" data-bs-toggle="tooltip" data-bs-placement="top" title="20 bp downstream of insertion site">iD20</th>
+                        <th scope="col">Download Map</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vector in company_vectors %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ vector.vector_name }}</td>
+                        <td>{{ vector.vector_id }}</td>
+                        <td>
+                            <div class="copy-container">
+                                <span class="text-truncate">{{ vector.iu20 }}</span>
+                                <i class="bi bi-clipboard2 copy-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy" onclick="copyToClipboard(this, event)"></i>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="copy-container">
+                                <span class="text-truncate">{{ vector.id20 }}</span>
+                                <i class="bi bi-clipboard2 copy-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="Copy" onclick="copyToClipboard(this, event)"></i>
+                            </div>
+                            <div id="copy-success" class="copy-success">Copied!</div>
+                        </td>
+                        <td>
+                            <div class="hstack gap-3 justify-content-center">
+                                <a type="button" class="text-decoration-none" 
+                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Download genebank" 
+                                    href="{% url 'user_center:vector_download' vector.id 'gb' %}"><i class="bi bi-file-earmark-binary"></i></a>
+                                <a type="button" class="text-decoration-none preview-link" 
+                                     data-bs-toggle="tooltip" data-bs-placement="top" title="Click to download map" 
+                                    onmouseover="showPreview(event, '{{ forloop.counter }}')" onmouseout="hidePreview('{{ forloop.counter }}')"
+                                    href="{% url 'user_center:vector_download' vector.id 'map' %}"><i class="bi bi-filetype-png"></i></a> 
+                                <div class="image-preview" id="imagePreview{{ forloop.counter }}">
+                                    <img src="{{ MEDIA_URL }}{{ vector.vector_png }}" alt="Image Preview">
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-<!-- Modal -->
 <div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="exampleModalLabel" data-bs-backdrop="static" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -148,135 +245,13 @@
 {% endblock %}
 {% block javascript %}
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        fetch("{% url 'user_center:customer_vector_data_api' %}")
-        .then(response => response.json())
-        .then(data => {
-            new gridjs.Grid({
-                columns: [
-                    { name: '#', width: '50px'},
-                    { name: 'Vector Name', width: '170px'},
-                    { name: 'Vector File(Original)', formatter: (cell, row) => {
-                        const vectorId = row.cells[7].data;
-                        return gridjs.html(`
-                        <a href="/user_center/vector_download/${vectorId}/file/" 
-                            data-bs-toggle="tooltip" data-bs-placement="top" title="See details" class="text-decoration-none">
-                            ${cell}
-                        </a>`);
-                    }},
-                    { name: 'Status', formatter: (cell, row) => {
-                        const badgeClass = cell === 'readyToUse' ? 'bg-primary' : 'bg-info';
-                        return gridjs.html(`<span class="badge ${badgeClass}">${cell}</span>`);
-                    }
-                    },
-                    { name: 'Vector ID' },
-                    { name: 'iU20', width: '150px' },
-                    { name: 'iD20', width: '150px' },
-                    { 
-                        name: 'Download Map', 
-                        formatter: (cell, row) => {
-                            const vectorId = row.cells[7].data;
-                            const pngFile = row.cells[8] && row.cells[8].data;  // PNG file data is in the 9th column
-                            const gbFile = row.cells[9] && row.cells[9].data;   // GB file data is in the 10th column
-                            return gridjs.html(`
-                                ${pngFile ? `<a href="/user_center/vector_download/${vectorId}/map" data-bs-toggle="tooltip" title="Click to download PNG map"><i class="bi bi-filetype-png"></i></a>` : `<i class="bi bi-filetype-png text-muted" data-bs-toggle="tooltip" title="No map file available"></i>`}
-                                ${gbFile ? `<a href="/user_center/vector_download/${vectorId}/gb" data-bs-toggle="tooltip" title="Download genebank"><i class="bi bi-file-earmark-binary"></i></a>` : `<i class="bi bi-file-earmark-binary text-muted" data-bs-toggle="tooltip" title="No genebank file available"></i>`}
-                            `);
-                        }
-                    },
-                    { 
-                        name: 'Delete', width: '50px', 
-                        formatter: (cell, row) => {
-                            const vectorId = row.cells[7].data;
-                            return gridjs.html(`
-                                <a data-bs-toggle="tooltip" title="Delete" href="javascript:" onclick="del_vector(this, ${vectorId})" class="text-decoration-none">
-                                    <i class="bi bi-trash text-danger"></i>
-                                </a>
-                            `);
-                        }
-                    }
-                ],
-                data: data.data.map((vector, index) => [
-                    index + 1,
-                    vector.vector_name,
-                    vector.vector_file ? vector.vector_file.split('/').pop() : '',
-                    vector.status,
-                    vector.vector_id,
-                    vector.iu20,
-                    vector.id20,
-                    vector.id,  // 下载图谱
-                    vector.vector_png ? vector.vector_png : '',
-                    vector.vector_gb ? vector.vector_gb : '',
-                ]),
-                pagination: {
-                    enabled: true,
-                },
-                search: true,
-                sort: true,
-                resizable: true,
-                language: {
-                    'search': {
-                        'placeholder': '🔍 Search...'
-                    },
-                    'pagination': {
-                        'showing': '😃 Displaying',
-                        'results': () => 'Records'
-                    }
-                }
-            }).render(document.getElementById("customer-vector-table"));
-        });
-
-        fetch("{% url 'user_center:rootpath_vector_data_api' %}")
-        .then(response => response.json())
-        .then(data => {
-            new gridjs.Grid({
-                columns: [
-                    { name: '#', width: '80px'},
-                    { name: 'Vector Name' },
-                    { name: 'Vector ID' },
-                    { name: 'iU20' },
-                    { name: 'iD20' },
-                    { 
-                        name: 'Download Map',
-                        formatter: (cell, row) => {
-                            return gridjs.html(`
-                            <div style="display: flex; justify-content: center;">
-                                <a href="/user_center/vector_download/${row.cells[5].data}/map" data-bs-toggle="tooltip" title="Click to download map"><i class="bi bi-filetype-png"></i></a>
-                                <a href="/user_center/vector_download/${row.cells[5].data}/gb" data-bs-toggle="tooltip" title="Download genebank"><i class="bi bi-file-earmark-binary"></i></a>
-                            </div>`);
-                        }
-                    }
-                ],
-                data: data.data.map((vector, index) => [
-                    index + 1,
-                    vector.vector_name,
-                    vector.vector_id,
-                    vector.iu20,
-                    vector.id20,
-                    vector.id,
-                    ''
-                ]),
-                pagination: {
-                    enabled: true,
-                },
-                search: true,
-                sort: true,
-                resizable: true,
-                language: {
-                    'search': {
-                        'placeholder': '🔍 Search...'
-                    },
-                    'pagination': {
-                        'showing': '😃 Displaying',
-                        'results': () => 'Records'
-                    }
-                }
-            }).render(document.getElementById("rootpath-vector-table"));
-        });
-    });
-
-
-
+    // Tooltip
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
+<script>
     function fileChange(target) {
         var fileSize = 0;
         var filetypes = [".txt", ".pdf", ".fa", ".fasta", ".dna"];

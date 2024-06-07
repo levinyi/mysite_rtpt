@@ -42,7 +42,7 @@ class GeneInfo(models.Model):
 
     forbid_seq = models.CharField(verbose_name="ForbiddenSeqs", max_length=255, null=True, blank=True)
 
-    # gc_content = models.FloatField(null=True, blank=True)
+    gc_content = models.FloatField(null=True, blank=True)
     forbidden_check_list = models.CharField(max_length=255, null=True, blank=True)
     contained_forbidden_list = models.CharField(max_length=255, null=True, blank=True)
 
