@@ -1,25 +1,38 @@
 {% extends "user_center/base.html" %}
+{% load custom_filters %}
 {% load static %}
-
-{% block title %}order{% endblock %}
+{% block title %}Start Ordering {% endblock %}
 {% block extra_head %}
-    <style>
-        .workflow-step {
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-            padding: 20px;
-        }
-        .workflow-icon {
-            background-color: #ffe6cc;
-            padding: 30px;
-            border-radius: 50%;
-            margin-bottom: 10px;
-        }
-    </style>
+<!-- Custom CSS -->
+<style>
+    .custom-workflow-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+    }
+
+    .custom-workflow-step {
+        text-align: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+    }
+
+    .custom-workflow-icon {
+        font-size: 2rem;
+        color: #0d6efd;
+    }
+
+    .custom-step-label {
+        font-weight: bold;
+        color: #495057;
+    }
+</style>
 {% endblock %}
+
 {% block content %}
-<div class="container-fluid">
+
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
@@ -27,39 +40,40 @@
         </ol>
     </nav>
     <!-- section title -->
-    <div class="card mt-2">
-        <div class="card-header text-center">   
+    <div class="card mt-4">
+        <div class="card-header text-center">
             <h2>Order Creation Process</h2>
         </div>
-        <div class="d-flex justify-content-between mb-4 mt-3">
-            <div class="workflow-step">
-                <div class="workflow-icon mb-3">
+        <div class="custom-workflow-container mb-4 mt-4">
+            <div class="custom-workflow-step">
+                <div class="custom-workflow-icon mb-3">
                     <i class="bi bi-journal-text"></i>
                 </div>
-                Choose Vector
+                <div class="custom-step-label">Choose Vector</div>
             </div>
-            <div class="workflow-step">
-                <div class="workflow-icon mb-3">
+            <div class="custom-workflow-step">
+                <div class="custom-workflow-icon mb-3">
                     <i class="bi bi-folder-check"></i>
                 </div>
-                Submit Sequence
+                <div class="custom-step-label">Submit Sequence</div>
             </div>
-            <div class="workflow-step">
-                <div class="workflow-icon mb-3">
+            <div class="custom-workflow-step">
+                <div class="custom-workflow-icon mb-3">
                     <i class="bi bi-person-check"></i>
                 </div>
-                Sequence Validation
+                <div class="custom-step-label">Sequence Validation</div>
             </div>
-            <div class="workflow-step">
-                <div class="workflow-icon mb-3">
+            <div class="custom-workflow-step">
+                <div class="custom-workflow-icon mb-3">
                     <i class="bi bi-check-lg"></i>
                 </div>
-                Order Complete
+                <div class="custom-step-label">Order Complete</div>
             </div>
         </div>
     </div>
+
     <!-- Order Creation Form -->
-    <div class="card mt-2 mb-5">
+    <div class="card mt-3 mb-5">
         <div class="card-header text-center">
             <h2>Start Ordering</h2>
         </div>
@@ -122,7 +136,7 @@
             </div>
         </div>
     </div>
-</div>
+
 {% endblock %}
 {% block javascript %}
 <script>

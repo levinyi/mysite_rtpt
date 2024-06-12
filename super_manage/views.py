@@ -5,7 +5,8 @@ from math import ceil
 import tempfile
 from urllib.parse import quote
 import zipfile
-
+from Bio import SeqIO
+from io import BytesIO, StringIO
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Q, Count
@@ -25,6 +26,7 @@ from user_center.views import \
 from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
 from user_center.utils.pagination import Pagination
+from tools.scripts.ParsingGenBank import readGenBank
 
 def custom_user_passes_test(test_func):
     """
@@ -53,7 +55,6 @@ def get_table_context(table_name, status=None, start=0):
     start:开始的页面，目前功能不完善
     """
     def vector_line(data):
-        # print(data.vector_map)
         return {
             'id': data.id,
             'Custom': data.user.username if data.user is not None else '',
@@ -194,7 +195,6 @@ def delete_report(request):
 @login_required
 @is_secondary_admin_required
 def download_report(request, order_id):
-    # print('down report {}'.format(order_id))
     order = OrderInfo.objects.get(id=order_id)
     file = order.report_file
     if file:
@@ -350,7 +350,6 @@ def order_to_reqins(request, order_id):
     """把订单信息转换成REQIN格式"""
     order = OrderInfo.objects.get(id=order_id)
     order_time = order.order_time
-    print("order: ", order)
     # Create a list of dictionaries containing gene information
     gene_info_list = [
         {
@@ -411,7 +410,6 @@ def order_to_reqins(request, order_id):
     combined = df['InquiryID'].astype(str) + "_" + df['WorkflowType'].astype(str)
     labels, unique = pd.factorize(combined)
 
-    print(labels, unique)
     # 将生成的标签添加到DataFrame作为一个新列
     
     df['REQ_index'] = labels +1
@@ -498,7 +496,6 @@ def vector_data_api(request):
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20', 
         'status','user__username', 'vector_file', 'vector_png', 'vector_gb'
     )
-    # print(vector_list)
     return JsonResponse({'data': list(vector_list)})
 
 @login_required
@@ -507,7 +504,6 @@ def vector_delete(request):
     if request.method == 'POST':
         vector_id = request.POST.get('gene_id')
         vector = Vector.objects.get(id=vector_id)
-        # print(f"{request.user} delete this {vector_id} {vector.vector_id} {vector.vector_name}")
     
         if vector.vector_file:
             file_path = vector.vector_file.path
@@ -535,7 +531,6 @@ def vector_upload_file(request):
     if request.method == 'POST':
         uploaded_file = request.FILES.get('file')
         vector_id = request.POST.get('vectorId')
-        # print(vector_id)
         file_type = request.POST.get('fileType')
 
         if uploaded_file is None or vector_id is None or file_type is None:
@@ -550,12 +545,25 @@ def vector_upload_file(request):
                         os.remove(file_path)
                 vector.vector_file = uploaded_file
             elif file_type == 'vector_png':
+                # 先验证文件是否为图片文件
+                if not uploaded_file.name.endswith('.png') and not uploaded_file.name.endswith('.jpg') and not uploaded_file.name.endswith('.jpeg'):
+                    return JsonResponse({'status': 'failed', 'message': 'Not a image file.'})
+                # 如果存在旧的图片文件，先删除
                 if vector.vector_png:
                     file_path = vector.vector_png.path
                     if os.path.exists(file_path):
                         os.remove(file_path)
                 vector.vector_png = uploaded_file
             elif file_type == 'vector_gb':
+                # 先验证文件是否为genebank文件
+                if not uploaded_file.name.endswith('.gb') and not uploaded_file.name.endswith('.gbk'):
+                    return JsonResponse({'status': 'failed', 'message': 'Not a genebank file.'})
+                # 验证文件是否为合法的genebank文件
+                try:
+                    file_content = StringIO(uploaded_file.read().decode('utf-8'))
+                    record = SeqIO.read(file_content, "genbank")
+                except Exception as e:
+                    return JsonResponse({'status': 'failed', 'message': str(e)})
                 # 如果存在旧的genebank文件，先删除
                 if vector.vector_gb:
                     file_path = vector.vector_gb.path
@@ -576,10 +584,8 @@ def vector_edit_item(request):
     if request.method == 'POST':
         vector_id = request.POST.get('vector_id')
         new_status = request.POST.get('new_status')
-        # print(f"vector_id: {vector_id}, new_status: {new_status}")
         try:
             vector = Vector.objects.get(id=vector_id)
-            # print(f"vector: {vector}")
             vector.status = new_status
             vector.save()
             return JsonResponse({'status': 'success'})
@@ -656,7 +662,6 @@ def user_manage(request):
 def user_data_api(request):
     user_list = UserProfile.objects.select_related('user').values(
         'user__id', 'user__username', 'email', 'first_name', 'last_name', 'department', 'phone', 'company', 'shipping_address', 'photo', 'register_time', 'is_verify')
-    print(user_list)
     return JsonResponse({'data': list(user_list)})
 
 @login_required
@@ -708,5 +713,4 @@ def species_manage(request):
 @is_secondary_admin_required
 def species_data_api(request):
     species_list = Species.objects.values('id', 'species_name', 'species_note', 'species_codon_file')
-    print(species_list)
     return JsonResponse({'data': list(species_list)})

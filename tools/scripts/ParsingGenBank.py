@@ -21,10 +21,14 @@ def modify_locations(features, offset):
             feature.location = FeatureLocation(new_start, new_end, feature.location.strand)
 
 
-def addFeaturesToGeneBank(genebank_file, new_sequence, output_file):
-    # 步骤1：读取GenBank文件
+def readGenBank(genebank_file):
     with open(genebank_file, "r") as input_handle:
         record = SeqIO.read(input_handle, "genbank")
+    return record
+
+def addFeaturesToGeneBank(genebank_file, new_sequence, output_file):
+    # 步骤1：读取GenBank文件
+    record = readGenBank(genebank_file)
 
     new_seq_length = len(new_sequence)
     record.seq = Seq(new_sequence + str(record.seq))

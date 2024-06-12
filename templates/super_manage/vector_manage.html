@@ -88,11 +88,6 @@
                         { name: 'id', hidden: true },
                         { name: 'ID', width: '200px'},
                         { name: 'Name' },
-                        { name: 'Seq', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'NC5', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'NC3', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'iu20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'id20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
                         { 
                             name: 'Vector File', width: '200px',
                             formatter: (cell, row) => {
@@ -128,7 +123,10 @@
                         },
                         { 
                             name: 'Status', 
-                            formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`)
+                            formatter: (cell, row) => {
+                                const badgeClass = cell === 'ReadyToUse' ? 'bg-primary' : 'bg-info';
+                                return gridjs.html(`<span class="badge ${badgeClass}">${cell}</span>`);
+                            }
                         },
                         { 
                             name: 'Edit', 
@@ -146,7 +144,12 @@
                                     </div>
                                 `);
                             }
-                        }
+                        },
+                        { name: 'Seq', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'NC5', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'NC3', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'iu20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'id20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
                     ],
                     data: data.data.map((vector, index) => [
                         index + 1,
@@ -154,16 +157,16 @@
                         vector.id,
                         vector.vector_id,
                         vector.vector_name,
+                        vector.vector_file ? vector.vector_file.split('/').pop() : '',
+                        vector.vector_png ? vector.vector_png.split('/').pop() : '',
+                        vector.vector_gb ? vector.vector_gb.split('/').pop() : '',
+                        vector.status,
+                        '', // Edit and Delete button
                         vector.vector_map,
                         vector.NC5,
                         vector.NC3,
                         vector.iu20,
                         vector.id20,
-                        vector.vector_file ? vector.vector_file.split('/').pop() : '',
-                        vector.vector_png ? vector.vector_png.split('/').pop() : '',
-                        vector.vector_gb ? vector.vector_gb.split('/').pop() : '',
-                        vector.status,
-                        '' // Edit and Delete button
                     ]),
                     pagination: {
                         enabled: true,
@@ -294,8 +297,13 @@
         xhr.open('POST', '/super_manage/vector_upload_file/');
         xhr.onload = function() {
             if (xhr.status === 200) {
-                alert('文件上传成功');
-                window.location.reload();
+                var response = JSON.parse(xhr.responseText);
+                if (response.status === 'success') {
+                    alert('文件上传成功');
+                    window.location.reload();
+                } else {
+                    alert('文件上传失败: ' + response.message);
+                }
             } else {
                 alert('文件上传失败');
             }

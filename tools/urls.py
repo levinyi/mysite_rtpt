@@ -7,4 +7,8 @@ urlpatterns = [
     path('SequenceAnalyzer/', views.SequenceAnalyzer, name='SequenceAnalyzer'),
     path('sequence_analysis_detail/', views.sequence_analysis_detail, name='sequence_analysis_detail'),
     path('download_gene_table/', views.download_gene_table, name='download_gene_table'),
+
+    # 2
+    path('GenePlateExplorer/', views.GenePlateExplorer, name='GenePlateExplorer'),
+    path('plate_view/', views.plate_view, name='plate_view'),
 ]

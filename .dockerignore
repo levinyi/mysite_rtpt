@@ -12,3 +12,6 @@ db.sqlite3-journal
 mysite.backup.sql
 *.yml
 media/
+*.tar
+*.sql
+staticfiles

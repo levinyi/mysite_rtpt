@@ -16,3 +16,4 @@ migrations/
 *.sql
 script_tool/process/
 script_tool/temp/
+*.tar
