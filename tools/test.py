@@ -1,7 +1,4 @@
 import sys
-import json
-
-from django.http import JsonResponse
 import pandas as pd
 sys.path.append("/cygene4/dushiyi/mysite_rtpt/tools/scripts/")
 from scripts.AnalysisSequence import DNARepeatsFinder
@@ -71,16 +68,16 @@ def analyze_sequences(gene_table):
         gene_id = row['WF3_Mfg_ID']
         results[gene_id] = {
             'tandem_repeats': finder_dataset.find_tandem_repeats(index=index, min_unit=3, min_copies=3),
-            'long_repeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
-            'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
-            # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
+            'long_repeats': finder_dataset.find_dispersed_repeats(index=index, min_len=10),
+            # 'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
+            # # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
             'homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
             'W8S8_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=8, min_S_length=8),
-            'W12S12_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
-            'W16S16_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=16, min_S_length=16),
-            'W20S20_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=20, min_S_length=20),
+            # 'W12S12_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
+            # 'W16S16_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=16, min_S_length=16),
+            # 'W20S20_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=20, min_S_length=20),
             'local_gc_content': finder_dataset.find_local_gc_content(index=index, window_size=30, min_GC_content=20, max_GC_content=80),
-            'lcc_simp': finder_dataset.get_lcc(index=index),
+            # 'lcc_simp': finder_dataset.get_lcc(index=index),
         }
     #将结果列表转换为DataFrame， 处理长度不一致问题
     df = pd.DataFrame(results).T

@@ -164,7 +164,6 @@
                 <li class="breadcrumb-item"><a href="{% url 'user_center:view_cart' %}" class="text-decoration-none">Shopping Cart</a></li>
                 <li class="breadcrumb-item active" aria-current="page">Gene Details</li>
             </ol>
-            <!-- <li class="badge ms-auto"><a href="{% url 'user_center:gene_detail_old' %}" class="text-decoration-none">back to old version</a></li> -->
         </div>
     </nav>
 
@@ -184,7 +183,7 @@
                 {% with allowed_genes=total_genes|minus_gene:forbidden_genes %}
                 <!-- Forbidden Progress -->
                 <div class="progress" role="progressbar" aria-label="Forbidden" aria-valuenow="{{ forbidden_genes }}" aria-valuemin="0" 
-                aria-valuemax="{{ total_genes }}" data-bs-toggle="tooltip" style="width: {{ forbidden_genes|percentage_of:total_genes|floatformat:0 }}%"
+                aria-valuemax="{{ total_genes }}" style="width: {{ forbidden_genes|percentage_of:total_genes|floatformat:0 }}%"
                 data-bs-toggle="tooltip"  data-bs-placement="top" title="Failed: {{ forbidden_genes }}">
                     <div class="progress-bar bg-danger">{{ forbidden_genes }}</div>
                 </div>

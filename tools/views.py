@@ -202,10 +202,10 @@ def plate_view(request):
             df = pd.read_csv(file, sep='\t')
             df['GeneID'] = 'G' + df['IntraPRJSN'].astype(str).str.zfill(4)
             df = df[['Plate', 'WellPos', 'GeneID', 'FullSeqREAL_Credit']]
+            df['FullSeqREAL_Credit_Copy'] = df['FullSeqREAL_Credit']
             df = df.assign(FullSeqREAL_Credit=df['FullSeqREAL_Credit'].str.split(';')).explode('FullSeqREAL_Credit').reset_index(drop=True)
             df['subplate'] = 'R' + (df.groupby(['Plate', 'WellPos']).cumcount() + 1).astype(str)
-            df['FullSeqREAL_Credit_Copy'] = df['FullSeqREAL_Credit']
-            return df
+            return df[['Plate', 'WellPos', 'GeneID', 'FullSeqREAL_Credit', 'FullSeqREAL_Credit_Copy', 'subplate']]
         except FileNotFoundError:
             raise BadRequest(f"File not found: {file}")
         except pd.errors.ParserError:
@@ -254,9 +254,11 @@ def plate_view(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f"Unexpected error during merge: {str(e)}"}, status=500)
 
+
     all_data = {'plates': {}, 'subplates': {}, 'missing_data': {}, 'extra_data': []}
 
     for _, row in df_merge.iterrows():
+        Mfg_ID = row['Mfg_ID']
         plate_id = row['Plate']
         well_pos = row['WellPos']
         gene_id = row['GeneID']
@@ -267,6 +269,7 @@ def plate_view(request):
         wf3_synthon_gene_name = row['WF3_Synthon_GeneName']
         wf3_mfg_id = row['WF3_Mfg_ID']
 
+        # plate data
         if pd.notna(plate_id) and pd.notna(well_pos) and pd.notna(gene_id):
             all_data['plates'].setdefault(plate_id, {'well_positions': {}})['well_positions'][well_pos] = {
                 'gene_id': gene_id,
@@ -277,14 +280,24 @@ def plate_view(request):
                 'wf3_mfg_id': wf3_mfg_id if pd.notna(wf3_mfg_id) else ''
             }
 
+        # subplate data
         if pd.notna(plate_id) and pd.notna(subplate) and pd.notna(well_pos) and pd.notna(fullseq):
             all_data['subplates'].setdefault(plate_id, {}).setdefault(subplate, {})[well_pos] = fullseq
 
-        if pd.isna(plate_id) and gene_name not in all_data['extra_data']:
-            all_data['extra_data'].append(gene_name)
+        # extra data
+        if pd.isna(plate_id) and pd.notna(Mfg_ID):
+            all_data['extra_data'].append(Mfg_ID)
 
+        # missing data
         if pd.isna(wf3_mfg_id):
             all_data['missing_data'].setdefault(plate_id, {}).setdefault(subplate, []).append(well_pos)
 
-    return JsonResponse({'status': 'success', 'all_data': all_data})
+    # 最后再重新处理一下df_merge，将不需要的列删除
+    deleted_columns = ['GeneID','FullSeqREAL_Credit','FullSeqREAL_Credit_Copy','GeneName', 'MWF5_Mfg_ID','PRJIN_PLT_ID','PRJIN_WellPos','Dialout_PLT_ID','Dialout_WellPos']
+    df_merge = df_merge.drop(columns=deleted_columns)
+    df_merge_json = df_merge.to_json(orient='records')
+
+    with open('media/temp/all_data.json', 'w') as f:
+        json.dump(all_data, f, indent=4)
+    return JsonResponse({'status': 'success', 'all_data': all_data, 'df_merge': df_merge_json})
 

@@ -25,40 +25,15 @@ class DNARepeatsFinder:
 
     @staticmethod
     def build_suffix_array(s):
-        return sorted(range(len(s)), key=lambda k: s[k:])
+        """Build suffix array of s in O(n log n)"""
+        n = len(s)
+        suffixes = sorted((s[i:], i) for i in range(n))
+        sa = [suffix[1] for suffix in suffixes]
+        return sa
 
     @staticmethod
-    def find_lcpss(s, sa):
-        """Find the longest common prefix (LCP) array for `s` using the suffix array `sa`."""
-        n = len(s)
-        lcp = [0] * n
-        rank = [0] * n
-        for i in range(n):
-            rank[sa[i]] = i
-        # k = 0
-        # for i in range(n):
-        #     if rank[i] == n - 1:  # 末尾
-        #         k = 0
-        #         continue
-        #     j = sa[rank[i] + 1]
-        #     while i + k < n and j + k < n and s[i+k] == s[j+k]:
-        #         k += 1
-        #     lcp[rank[i]] = k
-        #     if k:
-        #         k -= 1
-        h = 0
-        for i in range(n):
-            if rank[i] > 0:
-                j = sa[rank[i] - 1]
-                while (i + h < n) and (j + h < n) and (s[i + h] == s[j + h]):
-                    h += 1
-                lcp[rank[i]] = h
-                if h > 0:
-                    h -= 1
-        return lcp
-    
-    @staticmethod
     def find_lcp(s, sa):
+        """Find the longest common prefix (LCP) array for `s` using the suffix array `sa`."""
         n = len(s)
         rank = [0] * n
         lcp = [0] * n
@@ -117,86 +92,38 @@ class DNARepeatsFinder:
         return round(abs(min_GC_threshold - gc_content+1) / 10 if gc_content < min_GC_threshold else abs(gc_content - max_GC_threshold+1) / 10, 1)
     
     # 1) Tandem Repeats
-    def find_tandem_repeats_OLD(self, index=None, min_unit=3, min_copies=3):
-        s, sa, lcp = self._get_sequence_data(index)
-        
-        repeats_temp = []
-        n = len(sa)
-
-        for i in range(n):
-            length = lcp[i]
-
-            # 根据长度去判断它符合什么类型的重复，
-            # 如果长度大于等于最小单元长度乘以最小重复次数，那么就是tandem repeat
-            if length >= min_unit * min_copies:
-                start_index = sa[i]
-                print(length, sa[i])
-
-                # 尝试所有可能的单元长度，看看是否能匹配到重复次数
-                for unit_length in range(min_unit, length // min_copies + 1):
-                    repeat_unit = s[start_index:start_index + unit_length]
-                    if self.is_homopolymer(repeat_unit):
-                        continue
-
-                    full_seq = repeat_unit * min_copies
-                    repeat_count = length // unit_length
-                    actual_length = repeat_count * unit_length
-
-                    # 检查是否有重复,确保重复次数大于等于最小重复次数，
-                    # Ensure the sequence matches the exact repeated pattern and aligns with the lcp length
-                    if s[start_index:start_index + actual_length] == full_seq:
-                        repeats_temp.append({
-                            'sequence': full_seq,
-                            'start': start_index,
-                            'end': start_index + actual_length-1,
-                        })
-                        print(repeats_temp)
-        repeats = []
-        for repeat in repeats_temp:
-            if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
-                old_end = repeats[-1]['end']
-                new_end = max(old_end, repeat['end'])
-                repeats[-1]['end'] = new_end
-                repeats[-1]['sequence'] = s[repeats[-1]['start']:new_end + 1]
-            else:
-                repeats.append(repeat)
-
-        for repeat in repeats:
-            repeat['length'] = len(repeat['sequence'])
-            repeat['seqType'] = 'tandem_repeats'
-            repeat['gc_content'] = self.calculate_gc_content(repeat['sequence'])
-            repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
-
-        return repeats 
-
     def find_tandem_repeats(self, index=None, min_unit=3, min_copies=3):
         s, sa, lcp = self._get_sequence_data(index)
+        n = len(s)
         
         repeats_temp = []
-        n = len(sa)
-        for start in range(n):
-            for unit_length in range(min_unit, n - start):
-                repeat_unit = s[start:start + unit_length]
+        for i in range(n):
+            for unit_length in range(min_unit, n - sa[i]):
+                repeat_unit = s[sa[i]:sa[i] + unit_length]
                 if self.is_homopolymer(repeat_unit):
                     continue
 
-                repeat_count = 0
-                for i in range(start, n, unit_length):
-                    if s[i:i + unit_length] == repeat_unit:
+                repeat_count = 1
+                for j in range(sa[i] + unit_length, n, unit_length):
+                    if s[j:j + unit_length] == repeat_unit:
                         repeat_count += 1
                     else:
                         break
 
-                actual_length = repeat_count * unit_length
                 if repeat_count >= min_copies:
+                    actual_length = repeat_count * unit_length
                     repeats_temp.append({
                         'sequence': repeat_unit * repeat_count,
-                        'start': start,
-                        'end': start + actual_length - 1,
+                        'start': sa[i],
+                        'end': sa[i] + actual_length - 1,
                     })
+        # 根据start位置对repeats_temp进行排序
+        repeats_temp.sort(key=lambda x: x['start'])
 
+        # 合并重复序列
         repeats = []
         for repeat in repeats_temp:
+            print(repeat)
             if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
                 old_end = repeats[-1]['end']
                 new_end = max(old_end, repeat['end'])
@@ -264,7 +191,13 @@ class DNARepeatsFinder:
 
         n = len(s)
         palindromes = []
+        excluded_combinations = {"AT", "TA", "CG", "GC","AC", "CA", "GT", "TG"}
 
+        def is_excluded(sequence):
+            if len(set(sequence)) == 2 and sequence[:2] in excluded_combinations:
+                return True
+            return False
+        
         # 遍历每个可能的中心点
         for center in range(n):
             # 奇数长度的回文
@@ -296,8 +229,24 @@ class DNARepeatsFinder:
                     })
                 start -= 1
                 end += 1
+        
+        # 合并重复序列
+        palindromes.sort(key=lambda x: x['start'])
 
-        return palindromes
+        merged_palindromes = []
+        for palindrome in palindromes:
+            if merged_palindromes and merged_palindromes[-1]['end'] >= palindrome['start'] - 1:
+                old_end = merged_palindromes[-1]['end']
+                new_end = max(old_end, palindrome['end'])
+                merged_palindromes[-1]['end'] = new_end
+                merged_palindromes[-1]['sequence'] = s[merged_palindromes[-1]['start']:new_end + 1]
+                merged_palindromes[-1]['length'] = new_end - merged_palindromes[-1]['start'] + 1
+                merged_palindromes[-1]['gc_content'] = self.calculate_gc_content(merged_palindromes[-1]['sequence'])
+                merged_palindromes[-1]['penalty_score'] = self.calculate_palindrome_repeats_penalty_score(merged_palindromes[-1]['length'])
+            else:
+                merged_palindromes.append(palindrome)
+
+        return merged_palindromes
 
     # 4) Inverted Repeats
     def find_inverted_repeats(self, index=None, min_len=10):
@@ -470,6 +419,7 @@ class DNARepeatsFinder:
         }
         
 # sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtAAGATAAAGCGCTGCGTAGCATGTATCGTGTGCTGAAACCAGGTGGTCGTCTGCTGGTGCTGGAATTTAGCAAACCGATTATTGAACCGCTGAGCAAAGCGTATGATGCGTATAGCTTTCATGTCCTGCCGCGTATTGGTAGCCTGGTGGCGAACGATGCGGATAGCTATCGTTATCTGGCGGAAAGCATTCGTATGCATCCGGATCAGGATACCCTGAAAGCGATGATGCAGGATGCGGGCTTTGAAAGCGTGGACTACTATAACCTGACAGCTGGCGTTGTCGCCCTGCACCGCGGCTATAAGTTCGGGTCTGGTGGCAGCCATCATCATCATCATCATCATCATTGAGATCCGGCTGCTAACGATGGGTTGAGGATGGTTacccggaaccacatggagattacttgttgtaggagggaggacactatggaaatcaatacacacgcaacaagcatggagacacacatcaacggTAGCTGATCCTTGTCGCATGGTCGACGATTGATGCAcccaccatcgccaacTCGGGAATTCGGATTGGA"
+# sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtCAGTCACTATTCTTGATGGCAAGCAATATTCTGGCAACATTTGACATAAAGAAGAAGATTGCTGCTGATGGTACTATTCTGGAACCTTCTATTGAGTGGACTGGATCAATGGCCATGTGAAAGCTTGGTACCGCGGCTAGCTAAGATCCGCTCTGATGGGTTGAGGATGGTTaacacccacgagcggatcggcatcaactttagccccgaatgtattgagagcatcaatactagggactgcacaatcaactggcatgaaaacaacgctagggatcatatgtccgaagcaggactcgaggccagcaatgctaccagggccctcatcagcactatttgggctagcatgtgccatagcactcggtgtaagtggattacacattgcgagagaaccgccatcaacttcgcctgcaccagcatcaacacccacgaggacatcagcacccggatcaccatcaacttcacccacgagatcaatTTGCAACGTACCTGGACTTGGTCGACGATTGATGCAaacaaccggtgtgAATCGTTGCCATCTTGCC"
 # sequence = sequence.upper()
 # finder = DNARepeatsFinder(sequence=sequence)
 # print(finder.find_tandem_repeats())
