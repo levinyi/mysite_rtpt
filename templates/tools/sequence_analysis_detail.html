@@ -10,6 +10,17 @@
         <div class="col-md-8">
             <h2>Sequence Analysis Results</h2>
             <p>Total Genes: {{ gene_table|length }}</p>
+            <div class="progress mb-4">
+                <div class="progress-bar bg-success" role="progressbar" style="width: {{ green_percentage }}%" aria-valuenow="{{ green_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                    <span class="text-dark">{{ green_count }}</span>
+                </div>
+                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ yellow_percentage }}%" aria-valuenow="{{ yellow_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                    <span class="text-dark">{{ yellow_count }}</span>
+                </div>
+                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ red_percentage }}%" aria-valuenow="{{ red_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                    <span class="text-light">{{ red_count }}</span>
+                </div>
+            </div>
         </div>
         <div class="col-md-4 text-end">
             <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i> Download CSV</a>
@@ -19,9 +30,8 @@
         {% for g in gene_table %}
         <div class="col-12 mb-3">
             <!-- Gene Card -->
-            <!-- set a g.total_penalty_score for test -->
             <div class="card">
-                <div class="card-header {% if g.total_penalty_score < 10 %}bg-success{% elif g.total_penalty_score < 30 %}bg-warning{% elif g.total_penalty_score > 30 %}bg-danger{% else %}{% endif %}">
+                <div class="card-header {% if g.total_penalty_score < 10 %}bg-success{% elif g.total_penalty_score < 30 %}bg-warning{% elif g.total_penalty_score >= 30 %}bg-danger{% endif %}">
                     <div class="row">
                         <div class="col-6 text-start">
                             Gene ID: {{ g.gene_id }}
@@ -44,7 +54,6 @@
                             <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordion{{ forloop.counter }}">
                                 <div class="accordion-body">
                                     <!-- Display other information as list -->
-                                    {% comment %} {{ g }} {% endcomment %}
                                     <ul>
                                         {% if g.tandem_repeats_sequence %}
                                         <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">Check Tandem Repeats: {{ g.tandem_repeats_sequence }},score: {{g.tandem_repeats_penalty_score}}</li>
@@ -146,4 +155,3 @@
 </script>
 
 {% endblock %}
-

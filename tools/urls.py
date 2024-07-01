@@ -11,4 +11,8 @@ urlpatterns = [
     # 2
     path('GenePlateExplorer/', views.GenePlateExplorer, name='GenePlateExplorer'),
     path('plate_view/', views.plate_view, name='plate_view'),
+
+
+    # test
+    path('test/', views.test, name='test'),
 ]

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Handsontable Custom Headers</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@8.4.0/dist/handsontable.full.min.css">
+    <style>
+        .custom-col-header {
+            background-color: #4CAF50 !important;
+            color: white !important;
+        }
+        .custom-row-header {
+            background-color: #2196F3 !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="example1" class="handsontable"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@8.4.0/dist/handsontable.full.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const container = document.getElementById('example1');
+            const hot = new Handsontable(container, {
+                data: Handsontable.helper.createSpreadsheetData(16, 24),
+                colHeaders: true,
+                rowHeaders: true,
+                width: '100%',
+                height: 'auto',
+                rowHeights: 25,
+                colWidths: 50,
+                afterGetColHeader: function (col, TH) {
+                    TH.classList.add('custom-col-header');
+                },
+                afterGetRowHeader: function (row, TH) {
+                    TH.classList.add('custom-row-header');
+                },
+                licenseKey: 'non-commercial-and-evaluation'
+            });
+        });
+    </script>
+</body>
+</html>

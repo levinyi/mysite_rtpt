@@ -18,21 +18,19 @@
     <div class="card mt-2">
         <h4 class="card-header">Tools of {{ tools_name }} Usage</h4>
         <div class="card-body">
-            <!-- <h5 class="card-title">this tool is under development.</h5> -->
-            <!-- a list of features -->
             <h5 class="card-title">Features:</h5>
             <ul>
-                <li>Tandem Repeats</li>
-                <li>Dispersed Repeats</li>
-                <li>Palindrome Repeats </li>
-                <li>Iverted Repeats </li>
+                <li><del>Tandem Repeats</del></li>
+                <li>Long Repeats</li>
+                <li><del>Palindrome Repeats</del></li>
+                <li><del>Inverted Repeats</del></li>
                 <li>Homopolymers</li>
-                <li>Special Motifs (W8S8) >=8 </li>
-                <li>Local GC content per window </li>
+                <li>Special Motifs (W12S12)</li>
+                <li>Local GC content per window</li>
             </ul>
             <h5 class="card-title">Some Notes:</h5>
             <ul>
-                Detail information can be found <a href="https://t114xle63y.feishu.cn/wiki/Nl0SwJxbQiG1IkkYeSHcGSO6nVe" target="_blank">Here</a>.
+                Detail information can be found <a class="text-decoration-none" href="https://t114xle63y.feishu.cn/wiki/Nl0SwJxbQiG1IkkYeSHcGSO6nVe" target="_blank">Here</a>.
             </ul>
         </div>
     </div>
@@ -40,10 +38,102 @@
     <div class="card mt-3">
         <h4 class="card-header">Submit Sequence</h4>
         <div class="card-body">
-            <h5 class="card-title">Provide your gene names and DNA sequences in the table. Then click 'Submit' for sequence evaluation. </h5>
-            <div id="excelTable" class="mt-3">
-                <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
+            <h5 class="card-title">Provide your gene names and DNA sequences in the table or upload a Fasta file. Then click 'Submit' for sequence evaluation.</h5>
+            
+            <button class="btn btn-primary mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#parameterSettings" aria-expanded="false" aria-controls="parameterSettings">
+                参数设置
+            </button>
+
+            <div class="collapse mb-3" id="parameterSettings">
+                <div class="card card-body">
+                    <form id="parameterForm">
+                        <!-- Long Repeats -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="longRepeatsMinLen" class="form-label">Long Repeats Minimum Length</label>
+                                <input type="number" class="form-control" id="longRepeatsMinLen" value="16">
+                            </div>
+                        </div>
+
+                        <!-- Homopolymers -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="homopolymersMinLen" class="form-label">Homopolymers Minimum Length</label>
+                                <input type="number" class="form-control" id="homopolymersMinLen" value="7">
+                            </div>
+                        </div>
+
+                        <!-- W8S8 Motifs -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="minWLength" class="form-label">Minimum W Length (A or T)</label>
+                                <input type="number" class="form-control" id="minWLength" value="12">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="minSLength" class="form-label">Minimum S Length (G or C)</label>
+                                <input type="number" class="form-control" id="minSLength" value="12">
+                            </div>
+                        </div>
+
+                        <!-- Local GC Content by Window -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="windowSize" class="form-label">Local GC Window Size</label>
+                                <input type="number" class="form-control" id="windowSize" value="30">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="minGCContent" class="form-label">Minimum GC Content (%)</label>
+                                <input type="number" class="form-control" id="minGCContent" value="20">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="maxGCContent" class="form-label">Maximum GC Content (%)</label>
+                                <input type="number" class="form-control" id="maxGCContent" value="80">
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
+
+            <!-- Tabs for Table and File Upload -->
+            <ul class="nav nav-tabs" id="inputMethodTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link active" id="table-tab" data-bs-toggle="tab" href="#table" role="tab" aria-controls="table" aria-selected="true">Input Table</a>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" id="file-tab" data-bs-toggle="tab" href="#file" role="tab" aria-controls="file" aria-selected="false">Upload File</a>
+                </li>
+            </ul>
+            <div class="tab-content" id="inputMethodTabsContent">
+                <div class="tab-pane fade show active" id="table" role="tabpanel" aria-labelledby="table-tab">
+                    <div id="excelTable" class="mt-3">
+                        <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="file" role="tabpanel" aria-labelledby="file-tab">
+                    <div class="mt-3">
+                        <label for="fastaFile" class="form-label">Upload Fasta File</label>
+                        <input class="form-control" type="file" id="fastaFile">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading modal -->
+            <div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="loadingModalLabel">Processing</h5>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Your sequence is being analyzed. Please wait...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button onclick="postData()" class="btn btn-primary mt-3"><i class="bi bi-clipboard-pulse"></i> Submit & Analyze Sequences</button>
         </div>
     </div>
@@ -56,7 +146,7 @@
     const hot = new Handsontable(container, {
         colHeaders: ['GeneName', 'SeqNT'],
         rowHeaders: true,
-        colWidths: [200, 800],  // 设置每列的宽度
+        colWidths: [200, 800],
         columns: [
             { data: 'GeneName' },
             { data: 'SeqNT' },
@@ -64,7 +154,7 @@
 
         height: 'auto',
         width: 'auto',
-        licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+        licenseKey: 'non-commercial-and-evaluation',
     });
     hot.addHook('afterValidate', function (isValid, value, row, prop, source) {
         if (!isValid) {
@@ -79,50 +169,53 @@
         }
     });
 
-    // "+" 按钮的点击事件
     document.getElementById('addRowBtn').addEventListener('click', function () {
         hot.alter('insert_row_below');
     });
     
-    // 提交数据到服务器
     function postData() {
+        // Show loading modal
+        var loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+        loadingModal.show();
+
         const hotData = hot.getData();
-        const data = {
-            'genetable': hotData,
-            };
+        const fastaFile = document.getElementById('fastaFile').files[0];
+        const formData = new FormData();
 
-        // 检查数据是否为空
-        let isEmpty = true;
-        for (let row of hotData) {
-            if (row.some(cell => cell !== null && cell !== '')) {
-                isEmpty = false;
-                break;
-            }
-        }
-        if (isEmpty) {
-            alert('Cannot submit empty data');
-            return
+        if (fastaFile) {
+            formData.append('fastaFile', fastaFile);
+        } else {
+            formData.append('genetable', JSON.stringify(hotData));
         }
 
-        // 使用fetch API发送数据到服务器
+        formData.append('longRepeatsMinLen', document.getElementById('longRepeatsMinLen').value);
+        formData.append('homopolymersMinLen', document.getElementById('homopolymersMinLen').value);
+        formData.append('minWLength', document.getElementById('minWLength').value);
+        formData.append('minSLength', document.getElementById('minSLength').value);
+        formData.append('windowSize', document.getElementById('windowSize').value);
+        formData.append('minGCContent', document.getElementById('minGCContent').value);
+        formData.append('maxGCContent', document.getElementById('maxGCContent').value);
+
         fetch('/tools/SequenceAnalyzer/', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}'
             },
-            body: JSON.stringify(data)
+            body: formData
         })
         .then(response => response.json())
         .then(data => {
+            loadingModal.hide();
             if (data.status === 'success') {
-                window.location.href = data.redirect_url
+                window.location.href = data.redirect_url;
             } else {
                 alert('Data submission failed');
             }
         })
         .catch((error) => {
+            loadingModal.hide();
             console.error('Error:', error);
+            alert('An error occurred while submitting the data');
         });
     }
 </script>

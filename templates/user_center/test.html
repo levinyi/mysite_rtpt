@@ -1,36 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Progress Bar</title>
-    <style>
-        .progress-container {
-            width: 100%;
-            background-color: #e0e0e0;
-            border-radius: 25px;
-            overflow: hidden;
-            height: 30px;
-            display: flex;
-        }
-        .progress-bar {
-            height: 100%;
-            background-color: #dc3545; /* Change this to your desired color */
-            text-align: center;
-            line-height: 30px; /* Make sure this matches the height */
-            color: white;
-            width: 100%;
-            transition: width 0.5s;
-        }
-    </style>
-</head>
-<body>
-
+{% extends "user_center/base.html" %}
+{% load custom_filters %}
+{% load static %}
+{% block title %}Shopping Cart{% endblock %}
+{% block extra_head %}
+{% endblock %}
+{% block content %}
 <div class="container mt-5">
-    <div class="progress-container">
-        <div class="progress-bar">100%</div>
+    <div class="progress-stacked">
+        <div class="progress" role="progressbar" aria-label="Segment two" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
+            <div class="progress-bar bg-success"></div>
+        </div>
+        <div class="progress" role="progressbar" aria-label="Segment three" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">
+            <div class="progress-bar bg-info"></div>
+        </div>
     </div>
 </div>
 
-</body>
-</html>
+{% endblock %}

@@ -4,21 +4,62 @@ from Bio.Seq import Seq
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
-def modify_locations(features, offset):
+def modify_locations(features, start_pos, end_pos, new_seq_length):
+    offset = new_seq_length - (end_pos - start_pos)
+    new_features = []
     for feature in features:
-        if isinstance(feature.location, CompoundLocation):
-            # 处理复合位置
-            new_parts = []
-            for part in feature.location.parts:
-                new_start = part.start + offset
-                new_end = part.end + offset
-                new_parts.append(FeatureLocation(new_start, new_end, part.strand))
-            feature.location = CompoundLocation(new_parts)
+        if feature.location.end <= start_pos:
+            # Feature before the insertion point, no change
+            new_features.append(feature)
+        elif feature.location.start >= end_pos:
+            # Feature after the insertion point, adjust location
+            if isinstance(feature.location, CompoundLocation):
+                new_parts = []
+                for part in feature.location.parts:
+                    new_start = part.start + offset
+                    new_end = part.end + offset
+                    new_parts.append(FeatureLocation(new_start, new_end, part.strand))
+                feature.location = CompoundLocation(new_parts)
+            else:
+                new_start = feature.location.start + offset
+                new_end = feature.location.end + offset
+                feature.location = FeatureLocation(new_start, new_end, feature.location.strand)
+            new_features.append(feature)
         else:
-            # 处理单一位置
-            new_start = feature.location.start + offset
-            new_end = feature.location.end + offset
-            feature.location = FeatureLocation(new_start, new_end, feature.location.strand)
+            # Feature overlaps with the insertion point, adjust or split feature
+            new_parts = []
+            if isinstance(feature.location, CompoundLocation):
+                for part in feature.location.parts:
+                    if part.end <= start_pos:
+                        new_parts.append(part)
+                    elif part.start >= end_pos:
+                        new_start = part.start + offset
+                        new_end = part.end + offset
+                        new_parts.append(FeatureLocation(new_start, new_end, part.strand))
+                    else:
+                        if part.start < start_pos:
+                            new_parts.append(FeatureLocation(part.start, start_pos, part.strand))
+                        if part.end > end_pos:
+                            new_start = start_pos + new_seq_length
+                            new_parts.append(FeatureLocation(new_start, new_start + (part.end - end_pos), part.strand))
+                if new_parts:
+                    feature.location = CompoundLocation(new_parts)
+                    new_features.append(feature)
+            else:
+                if feature.location.start < start_pos and feature.location.end > end_pos:
+                    new_parts.append(FeatureLocation(feature.location.start, start_pos, feature.location.strand))
+                    new_start = start_pos + new_seq_length
+                    new_parts.append(FeatureLocation(new_start, new_start + (feature.location.end - end_pos), feature.location.strand))
+                    feature.location = CompoundLocation(new_parts)
+                    new_features.append(feature)
+                elif feature.location.start < start_pos:
+                    feature.location = FeatureLocation(feature.location.start, start_pos, feature.location.strand)
+                    new_features.append(feature)
+                elif feature.location.end > end_pos:
+                    new_start = start_pos + new_seq_length
+                    feature.location = FeatureLocation(new_start, new_start + (feature.location.end - end_pos), feature.location.strand)
+                    new_features.append(feature)
+    features[:] = new_features
 
 
 def readGenBank(genebank_file):
@@ -26,28 +67,55 @@ def readGenBank(genebank_file):
         record = SeqIO.read(input_handle, "genbank")
     return record
 
-def addFeaturesToGeneBank(genebank_file, new_sequence, output_file):
-    # 步骤1：读取GenBank文件
+
+def addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_feature, end_feature, new_feature_name):
     record = readGenBank(genebank_file)
-
     new_seq_length = len(new_sequence)
-    record.seq = Seq(new_sequence + str(record.seq))
-
-    # 修改特征位置
-    modify_locations(record.features, new_seq_length)
-
-    # 添加新特征
-    new_feature = SeqFeature(FeatureLocation(0, new_seq_length), type="misc_feature", qualifiers={"label": "GOI"})
-    record.features.insert(0, new_feature)  # 将新特征插入特征列表的开始位置
-
-    # 步骤2：写入GenBank文件
+    
+    start_pos = None
+    end_pos = None
+    
+    for feature in record.features:
+        print(feature)
+        if feature.qualifiers.get("label") == [start_feature]:
+            start_pos = feature.location.end
+            print("start_pos: ", start_pos)
+        elif feature.qualifiers.get("label") == [end_feature]:
+            end_pos = feature.location.start
+            print("end pos: ", end_pos)
+    
+    if start_pos is None or end_pos is None:
+        raise ValueError("Start or end feature not found in the GenBank file")
+    
+    # Replace the sequence
+    record.seq = record.seq[:start_pos] + Seq(new_sequence) + record.seq[end_pos:]
+    print(record.seq)
+    # Modify locations of existing features
+    modify_locations(record.features, start_pos, end_pos, new_seq_length)
+    
+    # Add new feature
+    new_feature = SeqFeature(FeatureLocation(start_pos, start_pos + new_seq_length), type="misc_feature", qualifiers={"label": new_feature_name})
+    record.features.append(new_feature)
+    
+    # Write to the output file
     with open(output_file, "w") as output_handle:
         SeqIO.write(record, output_handle, "genbank")
+
+
+def extractFeatureSequenceFromGenBank(genebank_file, feature_label):
+    record = readGenBank(genebank_file)
+    for feature in record.features:
+        if feature.qualifiers.get("label") == [feature_label]:
+            return feature.location.extract(record.seq)
+    raise ValueError("Feature not found in the GenBank file")
 
 
 if __name__ == "__main__":
     genebank_file = sys.argv[1] # full path
     new_sequence = sys.argv[2] # sequence
     output_file = sys.argv[3]  # full path
+    start_feature = sys.argv[4] # start feature label
+    end_feature = sys.argv[5] # end feature label
+    new_feature_name = sys.argv[6] # new feature name
 
-    addFeaturesToGeneBank(genebank_file, new_sequence, output_file)
+    addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_feature, end_feature, new_feature_name)

@@ -484,11 +484,12 @@ def cart_genbank_download(request, gene_id):
     if vector.vector_gb:
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
-            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)
+            # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)  # old
+            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', gene)
             
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
-            response['Content-Disposition'] = f'attachment; filename="RootPath-Online-Submition-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
+            response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
             return response
     else:
         return HttpResponse("No vector genbank file found")
@@ -514,10 +515,11 @@ def bulk_download_genbank(request):
                     if vector.vector_gb:
                         vector_genbank_file_path = vector.vector_gb.path
                         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
-                            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)
+                            # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)
+                            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', gene)
                             temp_file.seek(0)
                             genbank_content = temp_file.read()
-                            genbank_filename = f"RootPath-Online-Submission-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
+                            genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
                             zf.writestr(genbank_filename, genbank_content)
                     else:
                         zf.writestr(f"Error-{gene_id}.txt", "No vector GenBank file found")

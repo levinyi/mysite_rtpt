@@ -17,3 +17,6 @@ migrations/
 script_tool/process/
 script_tool/temp/
 *.tar
+*.png
+*.csv
+*.txt

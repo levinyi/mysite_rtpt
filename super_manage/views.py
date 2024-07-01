@@ -26,7 +26,7 @@ from user_center.views import \
 from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
 from user_center.utils.pagination import Pagination
-from tools.scripts.ParsingGenBank import readGenBank
+from tools.scripts.ParsingGenBankOld import readGenBank
 
 def custom_user_passes_test(test_func):
     """

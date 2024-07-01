@@ -26,9 +26,6 @@
             padding: 10px 0;
             text-align: center; /* 居中文字 */
         }
-        .text-center {
-            text-align: center;
-        }
         .fixed-right {
             position: fixed;
             right: 0;
@@ -38,8 +35,10 @@
             max-height: calc(100vh - 100px); /* Adjust to match the header height */
             width: 25%; /* Adjust width as needed */
         }
+        .test {
+            background-color: #60ada0;
+        }
     </style>
-</head>
 {% endblock %}
 {% block content %}
 <div class="container-fluid mt-3 mb-5">
@@ -69,19 +68,21 @@
         <div class="fixed-right">
             <div class="card mb-3">
                 <div class="card-body">
-                    <table id="example" class="display" style="width:100%">
-                        <thead>
-                            <tr>
-                                <th>Plate</th>
-                                <th>Sub</th>
-                                <th>Pos</th>
-                                <th>GeneID</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- 内容由 Javascript 动态生成 -->
-                        </tbody>
-                    </table>
+                    <div style="overflow: auto; max-height: 100vh; width: 100%;">
+                        <table id="example" class="display" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th>Plate</th>
+                                    <th>Sub</th>
+                                    <th>Pos</th>
+                                    <th>GeneID</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 内容由 Javascript 动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -96,7 +97,6 @@
 
         // Simulate data loading delay
         setTimeout(function() {
-
             let dfMerge = [];
             let handsontableInstances = [];
             let previousCoords = [];
@@ -105,22 +105,35 @@
             const file1 = "{{ file1 }}";
             const file2 = "{{ file2 }}";
             const file3 = "{{ file3 }}";
+
+            // Construct the request body based on available files
+            const requestBody = {};
+            if (file1 !== 'None' && file2 !== 'None') {
+                requestBody.file1 = file1;
+                requestBody.file2 = file2;
+            } else if (file3 !== 'None') {
+                requestBody.file3 = file3;
+            } else {
+                console.log("No valid file combination provided");
+                return;
+            }
+            
             fetch('/tools/plate_view/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
-                body: JSON.stringify({ 
-                    file1: file1, 
-                    file2: file2, 
-                    file3: file3 
-                })
+                body: JSON.stringify(requestBody)
             })
             .then(response => response.json())
             .then(data => {
                 let allData = data.all_data;
                 dfMerge = JSON.parse(data.df_merge);
+                let WF3_gene_assembly_data = data.WF3_gene_assembly;
+                let WF5_gene_assembly_data = data.WF5_gene_assembly;
+                let WF5_PRJ_name = data.WF5_PRJ_name;
+                let WF3_PRJ_name = data.WF3_PRJ_name;
 
                 const container = document.getElementById('wellPlateContainer');
                 let currentTooltip = null;
@@ -162,7 +175,6 @@
                     }
                 }
 
-                // Functions for data manipulation
                 function collectAllData() {
                     const allDataArray = [];
 
@@ -173,11 +185,11 @@
                             row.forEach((cell, colIndex) => {
                                 if (cell) {
                                     const wellPos = String.fromCharCode(65 + rowIndex) + (colIndex + 1);
+                                    const dialoutPltId = subplateId ? `${plateId}_${subplateId}` : plateId;
                                     allDataArray.push({
-                                        NewPlate: plateId,
-                                        NewSubplate: subplateId,
-                                        NewWellPos: wellPos,
-                                        NewGeneID: cell
+                                        Dialout_PLT_ID: dialoutPltId,
+                                        Dialout_WellPos: wellPos,
+                                        GeneID: cell,
                                     });
                                 }
                             });
@@ -188,20 +200,54 @@
                 }
 
                 function mergeData(updatedData, dfMerge) {
-                    console.log("updatedData:", updatedData);
-                    console.log("dfMerge:", dfMerge);
+                    // console.log("updatedData", updatedData)
+                    // console.log("dfMerge", dfMerge)
                     const updatedDataMap = updatedData.reduce((acc, row) => {
-                        const key = row.NewGeneID;
+                        const key = row.GeneID;
                         acc[key] = row;
                         return acc;
                     }, {});
 
                     const mergedData = dfMerge.map(row => {
-                        const key = row.Mfg_ID;
-                        return updatedDataMap[key] ? { ...row, ...updatedDataMap[key] } : row;
+                        const key = row.WF3_Mfg_ID;
+                        const newRow = updatedDataMap[key] ? { ...row, ...updatedDataMap[key] } : row;
+                        return renameColumns(newRow);
                     });
-
+                    // console.log("mergedData", mergedData)
                     return mergedData;
+                }
+
+                function renameColumns(row) {
+                    const columnMapping = {
+                        // 'WellPos': '5p30_WellPos',
+                        // 'Plate': '5p30_Plate',  
+                        // 'subplate': '5p30_SubPlate',  
+                        // Add other columns that need to be renamed
+                    };
+
+                    const columnsToDelete = ['GeneID'];  // List of columns to delete
+
+                    const newRow = {};
+                    for (const [oldKey, newKey] of Object.entries(columnMapping)) {
+                        if (row.hasOwnProperty(oldKey)) {
+                            newRow[newKey] = row[oldKey];
+                            delete row[oldKey];
+                        }
+                    }
+
+                    // Add other columns that need to be renamed
+                    for (const key in row) {
+                        if (!columnMapping.hasOwnProperty(key) && !columnsToDelete.includes(key)) {
+                            newRow[key] = row[key];
+                        }
+                    }
+
+                    // Delete specified columns
+                    for (const column of columnsToDelete) {
+                        delete newRow[column];
+                    }
+
+                    return newRow;
                 }
 
                 function convertToCSV(data) {
@@ -210,28 +256,32 @@
                     return csvRows.join('\n');
                 }
 
-                function clearPreviousCoords() {
-                    previousCoords.forEach(({ row, col, instance }) => {
-                        const cellValue = instance.getDataAtCell(row, col);
-                        const cellMeta = instance.getCellMeta(row, col);
-                        if (!cellValue) {
-                            if (cellMeta.className === 'moved-cell' || cellMeta.className === 'missing-cell') {
-                                console.log("Removing moved-cell style:", cellMeta);
-                                instance.setCellMeta(row, col, 'className', '');
-                                const cell = instance.getCell(row, col);
-                                if (cell) {
-                                    cell.removeAttribute('data-bs-toggle');
-                                    cell.removeAttribute('data-bs-placement');
-                                    cell.removeAttribute('title');
-                                    cell.style.backgroundColor = ''; // Reset background color
-                                }
-                            }
-                        }
-                    });
-                    previousCoords = [];
-                    handsontableInstances.forEach(({ instance }) => instance.render()); // Refresh all instances
-                }
+                function jsonToCsv(jsonData) {
+                    const array = typeof jsonData !== 'object' ? JSON.parse(jsonData) : jsonData;
+                    let str = '';
 
+                    // 提取CSV标题
+                    let line = '';
+                    for (let index in array[0]) {
+                        if (line !== '') line += ',';
+                        line += index;
+                    }
+
+                    str += line + '\r\n';
+
+                    // 提取CSV数据行
+                    for (let i = 0; i < array.length; i++) {
+                        let line = '';
+                        for (let index in array[i]) {
+                            if (line !== '') line += ',';
+                            line += array[i][index];
+                        }
+
+                        str += line + '\r\n';
+                    }
+
+                    return str;
+                }
 
                 function plateCellRenderer(instance, td, row, col, prop, value, cellProperties) {
                     Handsontable.renderers.TextRenderer.apply(this, arguments);
@@ -241,7 +291,7 @@
                     } else if (value && value.gene_id) {
                         td.className = 'subplate-cell';
                         td.setAttribute('data-fullseq', value.hover_info);
-                        td.style.backgroundColor = '##616161';
+                        td.style.backgroundColor = '';
                         td.textContent = value.gene_id;
                     }
                 }
@@ -257,11 +307,111 @@
                     } else if (value) {
                         td.className = 'subplate-cell';
                         td.setAttribute('data-fullseq', value);
-                        td.style.backgroundColor = '#ffcccb';
+                        td.style.backgroundColor = '#ffcccb'; // 设置背景颜色为粉红色
                         td.textContent = String.fromCharCode(65 + row) + (col + 1);
                     } else {
                         td.textContent = '';
                     }
+                }
+
+                function extraCellRenderer(instance, td, row, col, prop, value, cellProperties) {
+                    Handsontable.renderers.TextRenderer.apply(this, arguments);
+                    if (cellProperties.className === 'missing-cell') {
+                        td.style.backgroundColor = 'yellow';
+                        td.textContent = String.fromCharCode(65 + row) + (col + 1);
+                    } else if (cellProperties.className === 'moved-cell') {
+                        td.style.backgroundColor = '#8ec5f3';
+                        td.textContent = value ? String.fromCharCode(65 + row) + (col + 1) : '';
+                    } else if (value) {
+                        td.className = 'subplate-cell';
+                        td.setAttribute('data-fullseq', value); // set the tooltip value
+                        td.style.backgroundColor = 'lightgreen';
+                        td.textContent = String.fromCharCode(65 + row) + (col + 1);  // 显示位置
+                    } else {
+                        td.textContent = '';
+                    }
+                }
+
+                function AntibodyCellRenderer(instance, td, row, col, prop, value, cellProperties) {
+                    Handsontable.renderers.TextRenderer.apply(this, arguments);
+                    if (cellProperties.className === 'missing-cell') {
+                        td.style.backgroundColor = 'yellow';
+                        td.textContent = String.fromCharCode(65 + row) + (col + 1);
+                    } else if (cellProperties.className === 'moved-cell') {
+                        td.style.backgroundColor = '#8ec5f3';
+                        td.textContent = value ? String.fromCharCode(65 + row) + (col + 1) : '';
+                    } else if (value) {
+                        td.className = 'subplate-cell';
+                        td.setAttribute('data-fullseq', value); // set the tooltip value
+                        td.style.backgroundColor = '#7bd1c3';
+                        td.textContent = String.fromCharCode(65 + row) + (col + 1);  // 显示位置
+                    } else {
+                        td.textContent = '';
+                    }
+                }
+                
+                function plateCellHeader(index, TH) {
+                    TH.style.backgroundColor = '#666666';
+                    TH.style.color = 'white';
+                }
+                
+                function subplateCellHeader(index, TH) {
+                    TH.style.backgroundColor = '#9c4e47';
+                    TH.style.color = 'white';
+                }
+
+                function extraPlateCellHeader(index, TH) {
+                    TH.style.backgroundColor = '#416843';
+                    TH.style.color = 'white';
+                }
+
+                function antibodyPlateCellHeader(index, TH) {
+                    TH.style.backgroundColor = '#60ada0';
+                    TH.style.color = 'white';
+                }
+
+                function afterOnCellMouseOverCallback(event, coords, TD) {
+                    if (coords) {
+                        const cell = this.getCell(coords.row, coords.col);
+                        const cellData = this.getDataAtCell(coords.row, coords.col);
+                        if (cell && cellData) {
+                            cell.setAttribute('data-bs-toggle', 'tooltip');
+                            cell.setAttribute('data-bs-placement', 'top');
+                            cell.setAttribute('title', cellData.hover_info || cellData );
+                            initializeTooltip(cell);
+                        }
+                    }
+                }
+
+                // 清除单元格样式的函数
+                function clearCellStyles(instance, row, col) {
+                    const cellMeta = instance.getCellMeta(row, col);
+                    if (cellMeta.className) {
+                        instance.setCellMeta(row, col, 'className', '');
+                    }
+                    if (cellMeta.customClassName) {
+                        instance.setCellMeta(row, col, 'customClassName', '');
+                    }
+                    const cell = instance.getCell(row, col);
+                    if (cell) {
+                        cell.style.backgroundColor = ''; // Reset background color
+                    }
+                }
+
+                // beforePaste 回调：可选的粘贴前检查
+                function beforePasteCallback(data, coords) {
+                    const hasValue = coords.some(coord => {
+                        for (let i = coord.startRow; i <= coord.endRow; i++) {
+                            for (let j = coord.startCol; j <= coord.endCol; j++) {
+                                if (this.getDataAtCell(i, j)) {
+                                    alert('Cannot paste to the position with value.');
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    });
+                    return !hasValue;
                 }
 
                 // Loop to create Handsontable instances for each plate and subplate
@@ -270,14 +420,16 @@
                     row.className = 'row mt-2 mb-3';
 
                     const plateDescCol = document.createElement('div');
-                    plateDescCol.className = 'col-1';
+                    plateDescCol.className = 'col-12 d-flex align-items-center justify-content-center';
+                    // plateDescCol.className = 'row';
                     const plateTitle = document.createElement('h3');
                     plateTitle.textContent = `${plateId}`;
                     plateDescCol.appendChild(plateTitle);
                     row.appendChild(plateDescCol);
 
                     const plateContainerCol = document.createElement('div');
-                    plateContainerCol.className = 'col-11';
+                    plateContainerCol.className = 'col-12';
+                    // plateContainerCol.className = 'row';
                     const hotElement = document.createElement('div');
                     hotElement.className = 'mx-auto';
                     plateContainerCol.appendChild(hotElement);
@@ -290,7 +442,7 @@
                         const col = parseInt(wellPos.slice(1)) - 1;
                         hotData[row][col] = wellData;
                     }
-
+                    // main Plate
                     const hotInstance = new Handsontable(hotElement, {
                         data: hotData,
                         colHeaders: Array.from({ length: 24 }, (_, i) => (i + 1).toString()),
@@ -306,28 +458,18 @@
                         maxRows: 16,
                         maxCols: 24,
                         readOnly: true,
-                        afterOnCellMouseOver: function(event, coords, TD) {
-                            if (coords) {
-                                const cell = this.getCell(coords.row, coords.col);
-                                const cellData = this.getDataAtCell(coords.row, coords.col);
-                                if (cell && cellData && cellData.hover_info) {
-                                    cell.setAttribute('data-bs-toggle', 'tooltip');
-                                    cell.setAttribute('data-bs-placement', 'top');
-                                    cell.setAttribute('title', cellData.hover_info);
-                                    initializeTooltip(cell);
-                                }
-                            }
-                        },
-                        afterOnCellMouseOut: function(event, coords, TD) {
-                            destroyTooltip();
-                        },
+                        afterGetColHeader: plateCellHeader,
+                        afterGetRowHeader: plateCellHeader,
+                        afterOnCellMouseOver: afterOnCellMouseOverCallback,
+                        afterOnCellMouseOut: function(event, coords, TD) {destroyTooltip();},
                         cells: function(row, col) {
                             var cellProperties = {};
                             const wellPos = String.fromCharCode(65 + row) + (col + 1);
                             cellProperties.renderer = plateCellRenderer;
+
                             if (allData.missing_data[plateId]) {
                                 for (const [subplateId, missingWells] of Object.entries(allData.missing_data[plateId])) {
-                                    if (missingWells.includes(wellPos)) {
+                                    if (missingWells.includes(wellPos) && Object.keys(allData.plates[plateId]["well_positions"]).includes(wellPos)) {
                                         cellProperties.className = 'missing-cell';
                                         return cellProperties;
                                     }
@@ -336,24 +478,33 @@
                             return cellProperties;
                         }
                     });
-
-                    // handsontableInstances.push({ instance: hotInstance, plateId, subplateId: '' });
-
-                    // 
+                    // subplate 
                     if (allData.subplates && allData.subplates[plateId]) {
-                        for (const [subplateId, subplateData] of Object.entries(allData.subplates[plateId])) {
+                        // 获取所有subplateId，并按照自然顺序进行排序
+                        const sortedSubplateIds = Object.keys(allData.subplates[plateId]).sort((a, b) => {
+                            // 提取数字部分进行比较
+                            const numA = parseInt(a.slice(1));
+                            const numB = parseInt(b.slice(1));
+                            return numA - numB;
+                        });
+                        
+                        // 按排序后的顺序进行后续操作
+                        for (const subplateId of sortedSubplateIds) {
+                            const subplateData = allData.subplates[plateId][subplateId];
+                        // for (const [subplateId, subplateData] of Object.entries(allData.subplates[plateId])) {
+                            console.log("subplateId: ", subplateId)
                             const row = document.createElement('div');
                             row.className = 'row mb-3';
 
                             const subplateDescCol = document.createElement('div');
-                            subplateDescCol.className = 'col-2';
+                            subplateDescCol.className = 'col-12 d-flex align-items-center justify-content-center';
                             const subplateTitle = document.createElement('h4');
                             subplateTitle.textContent = `${plateId}-${subplateId}`;
                             subplateDescCol.appendChild(subplateTitle);
                             row.appendChild(subplateDescCol);
 
                             const subplateContainerCol = document.createElement('div');
-                            subplateContainerCol.className = 'col-10 text-center';
+                            subplateContainerCol.className = 'col-12';
                             const subHotElement = document.createElement('div');
                             subHotElement.className = 'mx-auto';
                             subplateContainerCol.appendChild(subHotElement);
@@ -368,6 +519,7 @@
                                 subHotData[row][col] = wellData;
                             }
 
+                            // subplate table
                             const subHotInstance = new Handsontable(subHotElement, {
                                 data: subHotData,
                                 colHeaders: Array.from({ length: 24 }, (_, i) => (i + 1).toString()),
@@ -380,125 +532,33 @@
                                 manualRowResize: false,
                                 contextMenu: false,
                                 licenseKey: 'non-commercial-and-evaluation',
-                                beforePaste: (data, coords) => {
-                                    const hasValue = coords.some(coord => {
-                                        for (let i = coord.startRow; i <= coord.endRow; i++) {
-                                            for (let j = coord.startCol; j <= coord.endCol; j++) {
-                                                if (subHotData[i][j]) {
-                                                    return true;
-                                                }
-                                            }
-                                        }
-                                        return false;
-                                    });
-                                    if (hasValue) {
-                                        alert('Cannot paste to the position with value.');
-                                        return false;
-                                    }
-                                    coords.forEach(coord => {
-                                        coord.endRow = coord.startRow + data.length - 1;
-                                        coord.endCol = coord.startCol + data[0].length - 1;
-                                    });
-                                    const exceedsLimits = coords.some(coord => coord.endRow >= 16 || coord.endCol >= 24);
-                                    if (exceedsLimits) {
-                                        alert('Cannot paste to the position outside the range.');
-                                        return false;
-                                    }
-                                },
-                                
-                                afterPaste: (data, coords) => {
-                                    clearPreviousCoords();
-
-                                    // Track the source coordinates
-                                    let sourceCoords = [];
-
-                                    coords.forEach(coord => {
-                                        for (let rowIndex = coord.startRow; rowIndex <= coord.endRow; rowIndex++) {
-                                            for (let colIndex = coord.startCol; colIndex <= coord.endCol; colIndex++) {
-                                                previousCoords.push({ row: rowIndex, col: colIndex, instance: subHotInstance });
-                                                let cellValue = subHotInstance.getDataAtCell(rowIndex, colIndex);
-                                                if (cellValue) {
-                                                    sourceCoords.push({ row: rowIndex, col: colIndex, instance: subHotInstance });
-                                                }
-                                            }
-                                        }
-                                    });
-
-                                    coords.forEach(coord => {
-                                        for (let rowIndex = coord.startRow; rowIndex <= coord.endRow; rowIndex++) {
-                                            for (let colIndex = coord.startCol; colIndex <= coord.endCol; colIndex++) {
-                                                let cellValue = subHotInstance.getDataAtCell(rowIndex, colIndex);
-
-                                                if (cellValue && typeof cellValue === 'string') {
-                                                    subHotInstance.setDataAtCell(rowIndex, colIndex, cellValue);
-                                                    subHotInstance.setCellMeta(rowIndex, colIndex, 'className', 'moved-cell');
-                                                } else {
-                                                    subHotInstance.setCellMeta(rowIndex, colIndex, 'className', '');
-                                                }
-                                            }
-                                        }
-                                    });
-
-                                    // Clear source cells' styles after paste
-                                    sourceCoords.forEach(({ row, col, instance }) => {
-                                        const cellValue = instance.getDataAtCell(row, col);
-                                        if (!cellValue) {
-                                            instance.setCellMeta(row, col, 'className', '');
-                                            const cell = instance.getCell(row, col);
-                                            if (cell) {
-                                                cell.removeAttribute('data-bs-toggle');
-                                                cell.removeAttribute('data-bs-placement');
-                                                cell.removeAttribute('title');
-                                                cell.style.backgroundColor = ''; // Reset background color
-                                            }
-                                        }
-                                    });
-
-                                    subHotInstance.render();
-                                    updateDataTableAll();
-                                },
-
+                                afterGetColHeader: subplateCellHeader,
+                                afterGetRowHeader: subplateCellHeader,
+                                afterOnCellMouseOver: afterOnCellMouseOverCallback,
+                                afterOnCellMouseOut: function(event, coords, TD) {destroyTooltip();},
                                 afterChange: function(changes, source) {
-                                    if (source === 'edit' || source === 'CopyPaste.paste') {
+                                    if (source === 'CopyPaste.cut') {
                                         changes.forEach(change => {
-                                            const [row, col, oldVal, newVal] = change;
-                                            if (oldVal && !newVal) {
-                                                if (!previousCoords[`${row},${col}`]) {
-                                                    previousCoords.push({ row, col, instance: subHotInstance });
-                                                }
-                                                const cellMeta = this.getCellMeta(row, col);
-                                                if (cellMeta.className === 'moved-cell') {
-                                                    this.setCellMeta(row, col, 'className', '');
-                                                    const cell = this.getCell(row, col);
-                                                    if (cell) {
-                                                        cell.removeAttribute('data-bs-toggle');
-                                                        cell.removeAttribute('data-bs-placement');
-                                                        cell.removeAttribute('title');
-                                                        cell.style.backgroundColor = ''; // Reset background color
-                                                    }
-                                                }
-                                            }
+                                            const [row, col] = change;
+                                            clearCellStyles(this, row, col);
                                         });
-                                        clearPreviousCoords();
                                     }
+                                    // 其他处理逻辑...
                                     updateDataTableAll();
                                 },
-
-
-                                afterOnCellMouseOver: function(event, coords, TD) {
-                                    if (coords) {
-                                        const cell = this.getCell(coords.row, coords.col);
-                                        const cellData = this.getDataAtCell(coords.row, coords.col);
-                                        if (cell && cellData) {
-                                            cell.setAttribute('data-bs-toggle', 'tooltip');
-                                            cell.setAttribute('data-bs-placement', 'top');
-                                            cell.setAttribute('title', cellData.value || cellData);
-                                            initializeTooltip(cell);
+                                beforePaste: beforePasteCallback,
+                                afterPaste: function afterPaste(data, coords) {
+                                    coords.forEach(coord => {
+                                        for (let row = coord.startRow; row <= coord.endRow; row++) {
+                                            for (let col = coord.startCol; col <= coord.endCol; col++) {
+                                                this.setCellMeta(row, col, 'className', 'moved-cell');
+                                                const cell = this.getCell(row, col);
+                                                if (cell) {
+                                                    cell.style.backgroundColor = '#8ec5f3';  // 设置高亮背景颜色为蓝色
+                                                }
+                                            }
                                         }
-                                    }
-                                },
-                                afterOnCellMouseOut: function(event, coords, TD) {
-                                    destroyTooltip();
+                                    });
                                 },
                                 cells: function(row, col) {
                                     var cellProperties = {};
@@ -515,165 +575,243 @@
                                     return cellProperties;
                                 }
                             });
-
                             handsontableInstances.push({ instance: subHotInstance, plateId, subplateId});
                         }
                     }
                 }
 
                 // Extra Data
-                if (allData.extra_data && allData.extra_data.length > 0) {
-                    console.log("yes, extra data here");
-                    const extraDataContainer = document.createElement('div');
-                    extraDataContainer.className = 'row';
+                if (allData.extra_data && Object.keys(allData.extra_data).length > 0) {
+                    for (const [plateId, plateData] of Object.entries(allData.extra_data)){
+                        const extraDataContainer = document.createElement('div');
+                        extraDataContainer.className = 'row mb-3';
 
-                    const extraDescCol = document.createElement('div');
-                    extraDescCol.className = 'col-1';
-                    const extraDataTitle = document.createElement('h3');
-                    extraDataTitle.textContent = 'Extra Data';
-                    extraDescCol.appendChild(extraDataTitle);
-                    extraDataContainer.appendChild(extraDescCol);
+                        const extraDescCol = document.createElement('div');
+                        extraDescCol.className = 'col-12 d-flex align-items-center justify-content-center';
+                        const extraDataTitle = document.createElement('h4');
+                        extraDataTitle.textContent = plateId;
+                        extraDescCol.appendChild(extraDataTitle);
+                        extraDataContainer.appendChild(extraDescCol);
 
-                    const extraContainerCol = document.createElement('div');
-                    extraContainerCol.className = 'col-11 text-content-center';
-                    const extraHotElement = document.createElement('div');
-                    extraHotElement.className = 'mx-auto';
-                    extraContainerCol.appendChild(extraHotElement);
-                    extraDataContainer.appendChild(extraContainerCol);
+                        const extraContainerCol = document.createElement('div');
+                        extraContainerCol.className = 'col-12 d-flex align-items-right justify-content-right';
+                        const extraHotElement = document.createElement('div');
+                        extraHotElement.className = 'mx-auto';
+                        extraContainerCol.appendChild(extraHotElement);
+                        extraDataContainer.appendChild(extraContainerCol);
 
-                    container.appendChild(extraDataContainer);
+                        container.appendChild(extraDataContainer);
 
-                    const extraHotData = Handsontable.helper.createEmptySpreadsheetData(16, 24);
-                    allData.extra_data.forEach((value, index) => {
-                        const row = index % 16;
-                        const col = Math.floor(index / 16);
-                        extraHotData[row][col] = value;
-                    });
+                        const extraHotData = Handsontable.helper.createEmptySpreadsheetData(16, 24);
+                        for (const [wellPos, wellData] of Object.entries(plateData)) {
+                            const row = wellPos.charCodeAt(0) - 65;
+                            const col = parseInt(wellPos.slice(1)) - 1;
+                            extraHotData[row][col] = wellData;
+                        }
 
-
-                    const extraHotInstance = new Handsontable(extraHotElement, {
-                        data: extraHotData,
-                        colHeaders: Array.from({ length: 24 }, (_, i) => (i + 1).toString()),
-                        rowHeaders: Array.from({ length: 16 }, (_, i) => String.fromCharCode(65 + i)),
-                        width: '100%',
-                        height: 'auto',
-                        rowHeights: 25,
-                        colWidths: 50,
-                        manualColumnResize: true,
-                        manualRowResize: false,
-                        contextMenu: false,
-                        licenseKey: 'non-commercial-and-evaluation',
-                        beforePaste: (data, coords) => {
-                            console.log("beforePaste data:", data); // 输出粘贴的数据
-                            const exceedsLimits = coords.some(coord => coord.endRow >= 16 || coord.endCol >= 24);
-                            if (exceedsLimits) {
-                                alert('Cannot paste to the position outside the range.');
-                                return false;
-                            }
-                        },
-                        afterPaste: (data, coords) => {
-                            clearPreviousCoords();
-                            coords.forEach(coord => {
-                                for (let rowIndex = coord.startRow; rowIndex <= coord.endRow; rowIndex++) {
-                                    for (let colIndex = coord.startCol; colIndex <= coord.endCol; colIndex++) {
-                                        previousCoords.push({ row: rowIndex, col: colIndex, instance: extraHotInstance });
-                                    }
+                        // Extra table
+                        const extraHotInstance = new Handsontable(extraHotElement, {
+                            data: extraHotData,
+                            colHeaders: Array.from({ length: 24 }, (_, i) => (i + 1).toString()),
+                            rowHeaders: Array.from({ length: 16 }, (_, i) => String.fromCharCode(65 + i)),
+                            width: '100%',
+                            height: 'auto',
+                            rowHeights: 25,
+                            colWidths: 35,
+                            manualColumnResize: false,
+                            manualRowResize: false,
+                            contextMenu: false,
+                            licenseKey: 'non-commercial-and-evaluation',
+                            afterGetColHeader: extraPlateCellHeader,
+                            afterGetRowHeader: extraPlateCellHeader,
+                            afterOnCellMouseOver: afterOnCellMouseOverCallback,
+                            afterOnCellMouseOut: function(event, coords, TD) {destroyTooltip();},
+                            afterChange: function(changes, source) {
+                                if (source === 'CopyPaste.cut') {
+                                    changes.forEach(change => {
+                                        const [row, col] = change;
+                                        clearCellStyles(this, row, col);
+                                    });
                                 }
-                            });
-                            coords.forEach(coord => {
-                                for (let rowIndex = coord.startRow; rowIndex <= coord.endRow; rowIndex++) {
-                                    for (let colIndex = coord.startCol; colIndex <= coord.endCol; colIndex++) {
-                                        let cellValue = extraHotInstance.getDataAtCell(rowIndex, colIndex);
-                                        if (cellValue && typeof cellValue === 'string') {
-                                            extraHotInstance.setDataAtCell(rowIndex, colIndex, cellValue);
-                                            extraHotInstance.setCellMeta(rowIndex, colIndex, 'className', 'moved-cell');
-                                        } else {
-                                            extraHotInstance.setCellMeta(rowIndex, colIndex, 'className', '');
-                                        }
-                                    }
-                                }
-                            });
-
-                            extraHotInstance.render();
-                            updateDataTableAll();
-                        },
-                        afterChange: function(changes, source) {
-                            if (source === 'edit' || source === 'CopyPaste.paste') {
-                                changes.forEach(change => {
-                                    const [row, col, oldVal, newVal] = change;
-                                    if (oldVal && !newVal) {
-                                        if (!previousCoords[`${row},${col}`]) {
-                                            previousCoords.push({ row, col, instance: extraHotInstance });
-                                        }
-                                        const cellMeta = this.getCellMeta(row, col);
-                                        if (cellMeta.className === 'moved-cell') {
-                                            this.setCellMeta(row, col, 'className', '');
+                                // 其他处理逻辑...
+                                updateDataTableAll();
+                            },
+                            beforePaste: beforePasteCallback,
+                            afterPaste: function afterPaste(data, coords) {
+                                coords.forEach(coord => {
+                                    for (let row = coord.startRow; row <= coord.endRow; row++) {
+                                        for (let col = coord.startCol; col <= coord.endCol; col++) {
+                                            this.setCellMeta(row, col, 'className', 'moved-cell');
                                             const cell = this.getCell(row, col);
                                             if (cell) {
-                                                cell.removeAttribute('data-bs-toggle');
-                                                cell.removeAttribute('data-bs-placement');
-                                                cell.removeAttribute('title');
+                                                cell.style.backgroundColor = '#8ec5f3';  // 设置高亮背景颜色为蓝色
                                             }
                                         }
                                     }
                                 });
-                                clearPreviousCoords();
-                            }
-                            updateDataTableAll();
-                        },
-                        afterOnCellMouseOver: function(event, coords, TD) {
-                            if (coords) {
-                                const cell = this.getCell(coords.row, coords.col);
-                                const cellData = this.getDataAtCell(coords.row, coords.col);
-                                if (cell && cellData) {
-                                    cell.setAttribute('data-bs-toggle', 'tooltip');
-                                    cell.setAttribute('data-bs-placement', 'top');
-                                    cell.setAttribute('title', cellData);
-                                    initializeTooltip(cell);
-                                }
-                            }
-                        },
-                        afterOnCellMouseOut: function(event, coords, TD) {
-                            destroyTooltip();
-                        },
-                        cells: function(row, col) {
-                            var cellProperties = {};
-                            if (extraHotData[row][col]) {
+                            },
+                            cells: function(row, col) {
+                                var cellProperties = {};
+                                const wellPos = String.fromCharCode(65 + row) + (col + 1);
                                 cellProperties.renderer = extraCellRenderer;
+                                if (allData.missing_data[plateId]) {
+                                    for (const [missingSubplateId, missingWells] of Object.entries(allData.missing_data[plateId])) {
+                                        if (missingWells.includes(wellPos)) {
+                                            console.log("")
+                                            cellProperties.className = 'missing-cell';
+                                            return cellProperties;
+                                        }
+                                    }
+                                }
+                                return cellProperties;
                             }
-                            return cellProperties;
-                        }
-                    });
+                        });
 
-                    handsontableInstances.push({ instance: extraHotInstance, plateId: 'Extra Data', subplateId: '' });
-
-                    function extraCellRenderer(instance, td, row, col, prop, value, cellProperties) {
-                        Handsontable.renderers.TextRenderer.apply(this, arguments);
-                        if (cellProperties.className === 'moved-cell') {
-                            td.style.backgroundColor = '#8ec5f3';
-                        } else if (value) {
-                            td.className = 'subplate-cell';
-                            td.setAttribute('data-fullseq', value); // set the tooltip value
-                            td.style.backgroundColor = 'lightgreen';
-                            td.textContent = value; // show the value in the cell
-                        } else {
-                            td.textContent = '';
-                        }
+                        handsontableInstances.push({ instance: extraHotInstance, plateId: plateId, subplateId: '' });
                     }
                 } else {
                     console.log("no extra data here");
                 }
 
+                // Antibody Data
+                if (allData.ab_data && Object.keys(allData.ab_data).length > 0) {
+                    for (const [plateId, plateData] of Object.entries(allData.ab_data)){
+                        const abDataContainer = document.createElement('div');
+                        abDataContainer.className = 'row mb-3';
+
+                        const abDescCol = document.createElement('div');
+                        abDescCol.className = 'col-12 d-flex align-items-center justify-content-center';
+                        const abDataTitle = document.createElement('h4');
+                        abDataTitle.textContent = plateId;
+                        abDescCol.appendChild(abDataTitle);
+                        abDataContainer.appendChild(abDescCol);
+
+                        const abContainerCol = document.createElement('div');
+                        abContainerCol.className = 'col-12 d-flex align-items-right justify-content-right';
+                        const abHotElement = document.createElement('div');
+                        abHotElement.className = 'mx-auto';
+                        abContainerCol.appendChild(abHotElement);
+                        abDataContainer.appendChild(abContainerCol);
+
+                        container.appendChild(abDataContainer);
+
+                        const abHotData = Handsontable.helper.createEmptySpreadsheetData(16, 24);
+                        for (const [wellPos, wellData] of Object.entries(plateData)) {
+                            const row = wellPos.charCodeAt(0) - 65;
+                            const col = parseInt(wellPos.slice(1)) - 1;
+                            abHotData[row][col] = wellData;
+                        }
+
+                        // Antibody table
+                        const abHotInstance = new Handsontable(abHotElement, {
+                            data: abHotData,
+                            colHeaders: Array.from({ length: 24 }, (_, i) => (i + 1).toString()),
+                            rowHeaders: Array.from({ length: 16 }, (_, i) => String.fromCharCode(65 + i)),
+                            width: '100%',
+                            height: 'auto',
+                            rowHeights: 25,
+                            colWidths: 35,
+                            manualColumnResize: false,
+                            manualRowResize: false,
+                            contextMenu: false,
+                            licenseKey: 'non-commercial-and-evaluation',
+                            afterGetColHeader: antibodyPlateCellHeader,
+                            afterGetRowHeader: antibodyPlateCellHeader,
+                            afterOnCellMouseOver: afterOnCellMouseOverCallback,
+                            afterOnCellMouseOut: function(event, coords, TD) {destroyTooltip();},
+                            afterChange: function(changes, source) {
+                                if (source === 'CopyPaste.cut') {
+                                    changes.forEach(change => {
+                                        const [row, col] = change;
+                                        clearCellStyles(this, row, col);
+                                    });
+                                }
+                                // 其他处理逻辑...
+                                updateDataTableAll();
+                            },
+                            beforePaste: beforePasteCallback,
+                            afterPaste: function afterPaste(data, coords) {
+                                coords.forEach(coord => {
+                                    for (let row = coord.startRow; row <= coord.endRow; row++) {
+                                        for (let col = coord.startCol; col <= coord.endCol; col++) {
+                                            this.setCellMeta(row, col, 'className', 'moved-cell');
+                                            const cell = this.getCell(row, col);
+                                            if (cell) {
+                                                cell.style.backgroundColor = '#8ec5f3';  // 设置高亮背景颜色为蓝色
+                                            }
+                                        }
+                                    }
+                                });
+                            },
+                            cells: function(row, col) {
+                                var cellProperties = {};
+                                const wellPos = String.fromCharCode(65 + row) + (col + 1);
+                                cellProperties.renderer = AntibodyCellRenderer;
+                                if (allData.missing_data[plateId]) {
+                                    for (const [missingSubplateId, missingWells] of Object.entries(allData.missing_data[plateId])) {
+                                        if (missingWells.includes(wellPos)) {
+                                            cellProperties.className = 'missing-cell';
+                                            return cellProperties;
+                                        }
+                                    }
+                                }
+                                return cellProperties;
+                            }
+                        });
+
+                        handsontableInstances.push({ instance: abHotInstance, plateId: plateId, subplateId: '' });
+                    }
+                } else {
+                    console.log("no Antibody data here");
+                }
+
                 // Initialize DataTable with custom Excel button
                 dataTable = $('#example').DataTable({
                     scrollX: true,
-                    scrollY: 'calc(100vh - 80px)',
+                    scrollY: 'calc(100vh - 300px)',
                     dom: 'Bfrtip',
                     buttons: [
-                        'copy', 
                         {
                             extend: 'excel',
-                            text: 'Excel',
+                            text: 'WF3_data',
+                            action: function(e, dt, button, config) {
+                                // 把WF3_gene_assembly_data数据（json格式）转成csv 直接输出
+                                const csvData = jsonToCsv(WF3_gene_assembly_data);
+                                const blob = new Blob([csvData], { type: 'text/csv' });
+                                const url = URL.createObjectURL(blob);
+
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = WF3_PRJ_name + '_Gene_Assembly_data.csv';
+                                document.body.appendChild(a);
+                                a.click();
+
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }
+                        }, 
+                        {
+                            extend: 'excel',
+                            text: 'MWF5_data',
+                            action: function(e, dt, button, config) {
+                                const csvData = jsonToCsv(WF5_gene_assembly_data);
+
+                                const blob = new Blob([csvData], { type: 'text/csv' });
+                                const url = URL.createObjectURL(blob);
+
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = WF5_PRJ_name + '_Gene_Assembly_data.csv';
+                                document.body.appendChild(a);
+                                a.click();
+
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }
+                        }, 
+                        {
+                            extend: 'excel',
+                            text: 'Dialout_data',
                             action: function ( e, dt, button, config ) {
                                 const updatedData = collectAllData();
                                 const mergedData = mergeData(updatedData, dfMerge);
@@ -684,7 +822,7 @@
 
                                 const a = document.createElement('a');
                                 a.href = url;
-                                a.download = 'MTP_dialout.csv';
+                                a.download = WF3_PRJ_name + '_dialout_layout.csv';
                                 document.body.appendChild(a);
                                 a.click();
 
@@ -692,7 +830,6 @@
                                 URL.revokeObjectURL(url);
                             }
                         },
-                        'print'
                     ],
                     paging: false
                 });
@@ -708,7 +845,6 @@
                 // Hide loading message if there is an error
                 document.getElementById('loadingButton').style.display =  'none';
             });
-
         }, 5000);
     });
 </script>

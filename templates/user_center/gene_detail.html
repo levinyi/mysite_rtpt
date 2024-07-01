@@ -154,7 +154,6 @@
     </div>
 </div>
 
-
 <div class="container-fluid" style="padding-left:50px;">
     <!-- Breadcrumb -->
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
@@ -172,43 +171,40 @@
         <div class="row">
             <h2>Editing Gene Sequences</h2>
         </div>
+    </div>
         <div class="row">
             <div class="col-md-4">
                 <p>Total Genes: {{ gene_list.count }}</p>
             </div>
             <!-- Progress Bar -->
-            <div class="col-md-4 mb-3 progress-stacked">
+            <div class="col-md-4 progress-stacked">
                 {% with total_genes=gene_list.count %}
-                {% with forbidden_genes=gene_list|filter_status:"forbidden" %}
-                {% with allowed_genes=total_genes|minus_gene:forbidden_genes %}
-                <!-- Forbidden Progress -->
-                <div class="progress" role="progressbar" aria-label="Forbidden" aria-valuenow="{{ forbidden_genes }}" aria-valuemin="0" 
-                aria-valuemax="{{ total_genes }}" style="width: {{ forbidden_genes|percentage_of:total_genes|floatformat:0 }}%"
-                data-bs-toggle="tooltip"  data-bs-placement="top" title="Failed: {{ forbidden_genes }}">
-                    <div class="progress-bar bg-danger">{{ forbidden_genes }}</div>
-                </div>
-                <!-- Allowed Progress -->
-                <div class="progress" role="progressbar" aria-label="Allowed" aria-valuenow="{{ allowed_genes }}" aria-valuemin="0" 
-                aria-valuemax="{{ total_genes }}" style="width: {{ allowed_genes|percentage_of:total_genes|floatformat:0 }}%"
-                data-bs-toggle="tooltip"  data-bs-placement="top" title="Success: {{ allowed_genes }}">
-                    <div class="progress-bar bg-success">{{ allowed_genes }}</div>
-                </div>
-                {% endwith %}
-                {% endwith %}
+                    {% with forbidden_genes=gene_list|filter_status:"forbidden" %}
+                        {% with allowed_genes=total_genes|minus_gene:forbidden_genes %}
+                        <!-- Forbidden Progress -->
+                        <div class="progress" role="progressbar" aria-label="Forbidden" aria-valuenow="{{ forbidden_genes }}" aria-valuemin="0" aria-valuemax="100" style="width: {{ forbidden_genes|percentage_of:total_genes|floatformat:0 }}%"
+                            data-bs-toggle="tooltip"  data-bs-placement="top" title="Failed: {{ forbidden_genes }}">
+                            <div class="progress-bar bg-danger">{{ forbidden_genes }}</div>
+                        </div>
+                        <!-- Allowed Progress -->
+                        <div class="progress" role="progressbar" aria-label="Allowed" aria-valuenow="{{ allowed_genes }}" aria-valuemin="0"  aria-valuemax="100" style="width: {{ allowed_genes|percentage_of:total_genes|floatformat:0 }}%"
+                            data-bs-toggle="tooltip"  data-bs-placement="top" title="Success: {{ allowed_genes }}">
+                            <div class="progress-bar bg-success">{{ allowed_genes }}</div>
+                        </div>
+                        {% endwith %}
+                    {% endwith %}
                 {% endwith %}
 
                 <!-- Adding a canvas for the scatter plot -->
                 <canvas id="gcContentChart"></canvas>
             </div>
-
             <!-- Bulk Optimization Button -->
-            <div class="col-md-4 text-end">
+            <div class="col-md-4 text-end mb-2">
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
                     <i class="bi bi-check2-all me-2"></i>Bulk Optimization
                 </button>
             </div>
         </div>
-    </div>
     <div class="row">
         {% for gene in gene_list %}
         <div class="accordion mb-3" id="accordion{{ forloop.counter }}">
