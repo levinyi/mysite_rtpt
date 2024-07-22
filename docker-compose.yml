@@ -8,7 +8,15 @@ services:
         limits:
           cpus: '1'
           memory: 500M
-    command: /bin/sh -c "python manage.py collectstatic --noinput && gunicorn mysite.wsgi:application --bind 0.0.0.0:8000"
+    command: >
+      sh -c "
+      while ! timeout 1 bash -c 'cat < /dev/null > /dev/tcp/db/3306'; do
+        echo 'Waiting for the MySQL Server';
+        sleep 3;
+      done;
+      echo 'MySQL Server is up - executing command';
+      python manage.py collectstatic --noinput && python manage.py migrate && python manage.py runserver 0.0.0.0:8000
+      "
     env_file:
       - .env
     volumes:

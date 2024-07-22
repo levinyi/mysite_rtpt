@@ -138,6 +138,17 @@ class DNARepeatsFinder:
             repeat['gc_content'] = self.calculate_gc_content(repeat['sequence'])
             repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
 
+        # 处理空结果，仍然返回相应的表头
+        if not repeats:
+            repeats = [{
+                'seqType': 'tandem_repeats',
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'length': '',
+                'gc_content': '',
+                'penalty_score': '',
+            }]
         return repeats
 
     # 2) Dispersed Repeats
@@ -183,6 +194,17 @@ class DNARepeatsFinder:
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
 
+        # 处理空结果，仍然返回相应的表头
+        if not repeats:
+            repeats = [{
+                'seqType': 'long_repeats',
+                'sequence': '',
+                'positions': '',
+                'count': '',
+                'gc_content': '',
+                'length': '',
+                'penalty_score': '',
+            }]
         return repeats
 
     # 3) Palindrome Repeats
@@ -246,6 +268,17 @@ class DNARepeatsFinder:
             else:
                 merged_palindromes.append(palindrome)
 
+        # 处理空结果，仍然返回相应的表头
+        if not merged_palindromes:
+            merged_palindromes = [{
+                'seqType': 'palindrome_repeats',
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'length': '',
+                'gc_content': '',
+                'penalty_score': '',
+            }]
         return merged_palindromes
 
     # 4) Inverted Repeats
@@ -286,9 +319,23 @@ class DNARepeatsFinder:
                                 'end2': j + l - 1,
                                 'length': l,
                                 'distance': distance,
-                                'penalty_score': self.calculate_local_gc_penalty_score(segment, distance),
+                                'penalty_score': self.calculate_inverted_repeats_penalty_score(len(segment), distance),
                             })
 
+        # 处理空结果，仍然返回相应的表头
+        if not inverted_repeats:
+            inverted_repeats = [{
+                'seqType': 'inverted_repeats',
+                'sequence': '',
+                'inverted_sequence': '',
+                'start1': '',
+                'end1': '',
+                'start2': '',
+                'end2': '',
+                'length': '',
+                'distance': '',
+                'penalty_score': '',
+            }]
         return inverted_repeats
 
     # 5) Homopolymers
@@ -312,6 +359,17 @@ class DNARepeatsFinder:
                         'penalty_score': self.calculate_homopolymer_penalty_score(length),
                     })
                 start = i
+        
+        # 处理空结果，仍然返回相应的表头
+        if not homopolymers:
+            homopolymers = [{
+                'seqType': 'homopolymers',
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'length': '',
+                'penalty_score': '',
+            }]
         return homopolymers
 
     # 6) W8S8 Motifs
@@ -342,7 +400,19 @@ class DNARepeatsFinder:
         W_motifs = find_motifs(W_pattern, 'W' + str(min_W_length))
         S_motifs = find_motifs(S_pattern, 'S' + str(min_S_length))
 
-        return W_motifs + S_motifs
+        motifs = W_motifs + S_motifs
+        # 处理空结果，仍然返回相应的表头
+        if not motifs:
+            motifs = [{
+                'seqType': 'W' + str(min_W_length) + 'S' + str(min_S_length) + '_motifs',
+                'motif_type': 'W' + str(min_W_length) + 'S' + str(min_S_length),
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'length': '',
+                'penalty_score': '',
+            }]
+        return motifs
 
     # 7) Local GC Content by Window
     def find_local_gc_content(self, index=None, window_size=30, min_GC_content=20, max_GC_content=80):
@@ -395,12 +465,22 @@ class DNARepeatsFinder:
                 gc_contents[-1]['penalty_score'] += gc_content['penalty_score']
             else:
                 gc_contents.append(gc_content)
-        # print(gc_contents)
         # recalculate the GC content of the merged windows, and calculate the penalty score
         for gc_content in gc_contents:
             gc_content['seqType'] = 'local_gc'
             gc_content['length'] = len(gc_content['sequence'])
             gc_content['gc_content'] = self.calculate_gc_content(gc_content['sequence'])
+
+        if not gc_contents:
+            gc_contents = [{
+                'seqType': 'local_gc',
+                'length': '',
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'gc_content': '',
+                'penalty_score': '',
+            }]
         return gc_contents
 
     def get_lcc(self, index=None):
