@@ -21,3 +21,4 @@ script_tool/temp/
 *.csv
 *.txt
 *.pkl
+*.npy

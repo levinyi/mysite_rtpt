@@ -88,9 +88,18 @@ class DNARepeatsFinder:
     def calculate_WS_motifs_penalty_score(self, length, min_len=8):
         return round((length - min_len + 1) / 2 , 1)
     
-    def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=20, max_GC_threshold=80):
-        return round(abs(min_GC_threshold - gc_content+1) / 10 if gc_content < min_GC_threshold else abs(gc_content - max_GC_threshold+1) / 10, 1)
-    
+    # def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=20, max_GC_threshold=80):
+    #     return round(abs(min_GC_threshold - gc_content+1) / 10 if gc_content < min_GC_threshold else abs(gc_content - max_GC_threshold+1) / 10, 1)
+    def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=None, max_GC_threshold=None):
+        if min_GC_threshold is not None and gc_content < min_GC_threshold:
+            penalty_score = round(abs(min_GC_threshold - gc_content + 1) / 10, 1)
+        elif max_GC_threshold is not None and gc_content > max_GC_threshold:
+            penalty_score = round(abs(gc_content - max_GC_threshold + 1) / 10, 1)
+        else:
+            # 表示不在范围内
+            penalty_score = 0
+        return penalty_score
+
     # 1) Tandem Repeats
     def find_tandem_repeats(self, index=None, min_unit=3, min_copies=3):
         s, sa, lcp = self._get_sequence_data(index)
@@ -405,7 +414,7 @@ class DNARepeatsFinder:
         if not motifs:
             motifs = [{
                 'seqType': 'W' + str(min_W_length) + 'S' + str(min_S_length) + '_motifs',
-                'motif_type': 'W' + str(min_W_length) + 'S' + str(min_S_length),
+                'motif_type': '',
                 'sequence': '',
                 'start': '',
                 'end': '',
@@ -453,8 +462,6 @@ class DNARepeatsFinder:
         # do not merge windows with different regions.
         gc_contents = []
         for gc_content in gc_contents_temp:
-            # print(gc_content)
-            # print(gc_contents[-1]['end'] if gc_contents else 0, gc_content['start'] - 1)
             if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
                 # 扩展上一个窗口
                 old_end = gc_contents[-1]['end']
@@ -482,21 +489,129 @@ class DNARepeatsFinder:
                 'penalty_score': '',
             }]
         return gc_contents
+    
+    def find_high_gc_content(self, index=None, window_size=30, max_GC_content=80):
+        s, sa, lcp = self._get_sequence_data(index)
+
+        n = len(s)
+        if n < window_size:
+            gc_content = self.calculate_gc_content(s)
+            if gc_content > max_GC_content:
+                return [{
+                    'seqType': 'highGC',
+                    'length': n,
+                    'sequence': s,
+                    'start': 0,
+                    'end': n - 1,
+                    'gc_content': gc_content,
+                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content),
+                }]
+            return []
+
+        high_gc_contents_temp = []
+
+        for i in range(n - window_size + 1):
+            window = s[i:i + window_size]
+            gc_content = self.calculate_gc_content(window)
+            
+            if gc_content > max_GC_content:
+                high_gc_contents_temp.append({
+                    'sequence': window,
+                    'start': i,
+                    'end': i + window_size - 1,
+                    'gc_content': gc_content,
+                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content),
+                })
+
+        high_gc_contents = self.merge_gc_windows(high_gc_contents_temp, s, 'highGC', min_GC_content=None, max_GC_content=max_GC_content)
+
+        return high_gc_contents
+    
+    def find_low_gc_content(self, index=None, window_size=30, min_GC_content=20):
+        s, sa, lcp = self._get_sequence_data(index)
+
+        n = len(s)
+        if n < window_size:
+            gc_content = self.calculate_gc_content(s)
+            if gc_content < min_GC_content:
+                return [{
+                    'seqType': 'lowGC',
+                    'length': n,
+                    'sequence': s,
+                    'start': 0,
+                    'end': n - 1,
+                    'gc_content': gc_content,
+                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), min_GC_content, min_GC_content),
+                }]
+            return []
+
+        low_gc_contents_temp = []
+
+        for i in range(n - window_size + 1):
+            window = s[i:i + window_size]
+            gc_content = self.calculate_gc_content(window)
+            
+            if gc_content < min_GC_content:
+                low_gc_contents_temp.append({
+                    'sequence': window,
+                    'start': i,
+                    'end': i + window_size - 1,
+                    'gc_content': gc_content,
+                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), min_GC_content, min_GC_content),
+                })
+
+        low_gc_contents = self.merge_gc_windows(low_gc_contents_temp, s, 'lowGC', min_GC_content=min_GC_content, max_GC_content=None)
+
+        return low_gc_contents
+
+    def merge_gc_windows(self, gc_contents_temp, sequence, gc_type, min_GC_content=None, max_GC_content=None):
+        gc_contents = []
+        for gc_content in gc_contents_temp:
+            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
+                old_end = gc_contents[-1]['end']
+                new_end = max(old_end, gc_content['end'])
+                gc_contents[-1]['end'] = new_end
+                gc_contents[-1]['sequence'] = sequence[gc_contents[-1]['start']:new_end + 1]
+                gc_contents[-1]['penalty_score'] += gc_content['penalty_score']
+            else:
+                gc_contents.append(gc_content)
+
+        for gc_content in gc_contents:
+            gc_content['seqType'] = gc_type
+            gc_content['length'] = len(gc_content['sequence'])
+            gc_content['gc_content'] = self.calculate_gc_content(gc_content['sequence'])
+            if gc_type == 'lowGC':
+                gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(float(gc_content['gc_content']), min_GC_content, max_GC_content)
+            elif gc_type == 'highGC':
+                gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(float(gc_content['gc_content']), min_GC_content, max_GC_content)
+
+        if not gc_contents:
+            gc_contents = [{
+                'seqType': gc_type,
+                'length': '',
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'gc_content': '',
+                'penalty_score': '',
+            }]
+        return gc_contents
 
     def get_lcc(self, index=None):
         s, sa, lcp = self._get_sequence_data(index)
         n = len(s)
         lcc = 0
         dna_seq = Seq(s)
-        protein_seq = dna_seq.translate()
+        # protein_seq = dna_seq.translate()
 
         dna_complexity = lcc_simp(dna_seq)
-        protein_complexity = lcc_simp(protein_seq)
+        # protein_complexity = lcc_simp(protein_seq)
 
-        return {
-            'dna_complexity': dna_complexity,
-            'protein_complexity': protein_complexity,
-        }
+        return [{
+            'seqType': 'LCC',
+            'penalty_score': dna_complexity,
+            # 'protein_complexity': protein_complexity,
+        }]
         
 # sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtAAGATAAAGCGCTGCGTAGCATGTATCGTGTGCTGAAACCAGGTGGTCGTCTGCTGGTGCTGGAATTTAGCAAACCGATTATTGAACCGCTGAGCAAAGCGTATGATGCGTATAGCTTTCATGTCCTGCCGCGTATTGGTAGCCTGGTGGCGAACGATGCGGATAGCTATCGTTATCTGGCGGAAAGCATTCGTATGCATCCGGATCAGGATACCCTGAAAGCGATGATGCAGGATGCGGGCTTTGAAAGCGTGGACTACTATAACCTGACAGCTGGCGTTGTCGCCCTGCACCGCGGCTATAAGTTCGGGTCTGGTGGCAGCCATCATCATCATCATCATCATCATTGAGATCCGGCTGCTAACGATGGGTTGAGGATGGTTacccggaaccacatggagattacttgttgtaggagggaggacactatggaaatcaatacacacgcaacaagcatggagacacacatcaacggTAGCTGATCCTTGTCGCATGGTCGACGATTGATGCAcccaccatcgccaacTCGGGAATTCGGATTGGA"
 # sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtCAGTCACTATTCTTGATGGCAAGCAATATTCTGGCAACATTTGACATAAAGAAGAAGATTGCTGCTGATGGTACTATTCTGGAACCTTCTATTGAGTGGACTGGATCAATGGCCATGTGAAAGCTTGGTACCGCGGCTAGCTAAGATCCGCTCTGATGGGTTGAGGATGGTTaacacccacgagcggatcggcatcaactttagccccgaatgtattgagagcatcaatactagggactgcacaatcaactggcatgaaaacaacgctagggatcatatgtccgaagcaggactcgaggccagcaatgctaccagggccctcatcagcactatttgggctagcatgtgccatagcactcggtgtaagtggattacacattgcgagagaaccgccatcaacttcgcctgcaccagcatcaacacccacgaggacatcagcacccggatcaccatcaacttcacccacgagatcaatTTGCAACGTACCTGGACTTGGTCGACGATTGATGCAaacaaccggtgtgAATCGTTGCCATCTTGCC"
