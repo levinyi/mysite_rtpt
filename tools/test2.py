@@ -2,61 +2,126 @@ import re
 from Bio.Seq import Seq
 from Bio.SeqUtils.lcc import lcc_simp
 
-
 class DNARepeatsFinder:
     def __init__(self, data_set=None, sequence=None):
         '''
-        够接受单个序列或者数据集
+        可以接受单个序列或者数据集
         '''
+        self.data_set = data_set
+        self.sequence = sequence
+
         if data_set is not None:
-            self.data_set = data_set
             self.suffix_arrays = {}
             self.lcps_arrays = {}
 
-            # 为每个序列构建后缀数组和LCP数组,预先计算每条序列的后缀数组和LCP数组
+            # 为每个序列构建后缀数组和LCP数组
             for index, row in data_set.iterrows():
                 seq = row['sequence']
-                self.suffix_arrays[index] = self.build_suffix_array(seq)
-                self.lcps_arrays[index] = self.find_lcp(seq, self.suffix_arrays[index])
+                self.suffix_arrays[index], self.lcps_arrays[index] = self.build_suffix_array(seq)
         elif sequence is not None:
-            self.s = sequence
-            self.sa = self.build_suffix_array(sequence)
-            self.lcp = self.find_lcp(sequence, self.sa)
+            self.suffix_array, self.lcp_array = self.build_suffix_array(sequence)
 
     @staticmethod
     def build_suffix_array(s):
         """Build suffix array of s in O(n log n)"""
         n = len(s)
-        suffixes = sorted((s[i:], i) for i in range(n))
-        sa = [suffix[1] for suffix in suffixes]
-        return sa
-
-    @staticmethod
-    def find_lcp(s, sa):
-        """Find the longest common prefix (LCP) array for `s` using the suffix array `sa`."""
-        n = len(s)
-        rank = [0] * n
-        lcp = [0] * n
-
+        sa = []
+        rk = []
+        char_to_int = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
         for i in range(n):
-            rank[sa[i]] = i
+            rk.append(char_to_int[s[i]])  # 初始化排名，基于首字母
+            sa.append(i)  # 初始化后缀数组
 
-        h = 0
+        length = 0  # 当前排序长度
+        sig = 4  # 字符集大小，初始为4
+
+        while True:
+            p = []
+            for i in range(n - length, n):
+                p.append(i)
+            for i in range(n):
+                if sa[i] >= length:
+                    p.append(sa[i] - length)
+
+            cnt = [0] * sig
+            for i in range(n):
+                cnt[rk[i]] += 1
+            for i in range(1, sig):
+                cnt[i] += cnt[i - 1]
+            for i in range(n - 1, -1, -1):
+                cnt[rk[p[i]]] -= 1
+                sa[cnt[rk[p[i]]]] = p[i]
+
+            def equal(i, j, length):
+                if rk[i] != rk[j]:
+                    return False
+                if i + length >= n and j + length >= n:
+                    return True
+                if i + length < n and j + length < n:
+                    return rk[i + length] == rk[j + length]
+                return False
+
+            sig = -1
+            tmp = [None] * n
+            for i in range(n):
+                if i == 0 or not equal(sa[i], sa[i - 1], length):
+                    sig += 1
+                tmp[sa[i]] = sig
+            rk = tmp
+            sig += 1
+            if sig == n:
+                break
+            length = length << 1 if length > 0 else 1
+
+        # 计算height数组
+        k = 0
+        height = [0] * n
         for i in range(n):
-            if rank[i] > 0:
-                j = sa[rank[i] - 1]
-                while (i + h < n) and (j + h < n) and (s[i + h] == s[j + h]):
-                    h += 1
-                lcp[rank[i]] = h
-                if h > 0:
-                    h -= 1
-        return lcp
+            if rk[i] > 0:
+                j = sa[rk[i] - 1]
+                while i + k < n and j + k < n and s[i + k] == s[j + k]:
+                    k += 1
+                height[rk[i]] = k
+                if k > 0:
+                    k -= 1  # 保证下一次的公共前缀至少是k-1
+        return sa, height
     
+    def find_most_frequent_longest_repeated_substring(self, s):
+        sa, height = self.build_suffix_array(s)
+        n = len(s)
+        
+        # 初始化
+        longest_len = 0
+        substr_counts = {}
+        max_count = 0
+        result_substring = ""
+        
+        # 遍历 height 数组
+        for i in range(1, n):
+            lcp_length = height[i]
+            if lcp_length > longest_len:
+                longest_len = lcp_length
+                substr = s[sa[i]:sa[i] + lcp_length]
+                substr_counts = {substr: 1}
+                max_count = 1
+                result_substring = substr
+            elif lcp_length == longest_len and lcp_length > 0:
+                substr = s[sa[i]:sa[i] + lcp_length]
+                if substr in substr_counts:
+                    substr_counts[substr] += 1
+                else:
+                    substr_counts[substr] = 1
+                if substr_counts[substr] > max_count:
+                    max_count = substr_counts[substr]
+                    result_substring = substr
+        
+        return result_substring, max_count
+
     def _get_sequence_data(self, index=None):
         if index is not None:
             return self.data_set.loc[index, 'sequence'], self.suffix_arrays[index], self.lcps_arrays[index]
-        return self.s, self.sa, self.lcp
-    
+        return self.sequence, self.suffix_array, self.lcp_array
+
     def is_homopolymer(self, unit):
         '''Check if a given DNA sequence is a homopolymer (consisting of only one type of base).'''
         return len(set(unit)) == 1
@@ -71,7 +136,7 @@ class DNARepeatsFinder:
         return round(gc_content, 2)
 
     def calculate_homopolymer_penalty_score(self, length):
-        return length *10 if length > 10 else length
+        return length * 10 if length > 10 else length
     
     def calculate_tandem_repeats_penalty_score(self, length):
         return round((length - 15) / 2 if length > 15 else 0, 1)
@@ -83,10 +148,10 @@ class DNARepeatsFinder:
         return round((length - 15) / 2 if length > 15 else 0, 1)
     
     def calculate_inverted_repeats_penalty_score(self, length, max_distance):
-        return round((length - 10) - (max_distance-20), 1)
+        return round((length - 10) - (max_distance - 20), 1)
     
     def calculate_WS_motifs_penalty_score(self, length, min_len=8):
-        return round((length - min_len + 1) / 2 , 1)
+        return round((length - min_len + 1) / 2, 1)
     
     def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=None, max_GC_threshold=None):
         if min_GC_threshold is not None and gc_content < min_GC_threshold:
@@ -130,7 +195,6 @@ class DNARepeatsFinder:
         # 合并重复序列
         repeats = []
         for repeat in repeats_temp:
-            print(repeat)
             if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
                 old_end = repeats[-1]['end']
                 new_end = max(old_end, repeat['end'])
@@ -161,10 +225,7 @@ class DNARepeatsFinder:
     # 2) Dispersed Repeats
     def find_dispersed_repeats(self, index=None, min_len=16):
         s, sa, lcp = self._get_sequence_data(index)
-        print(s)
-        print(sa)
-        print(lcp)
-        
+
         repeats = []
         n = len(s)
         potential_repeats = {}
@@ -179,7 +240,6 @@ class DNARepeatsFinder:
                     potential_repeats[seq] = []
                 potential_repeats[seq].append(start_index)
         
-        print("potential_repeats: ", potential_repeats)
         # 按序列长度排序，处理潜在重复
         sorted_repeats = sorted(potential_repeats.items(), key=lambda x: -len(x[0]))
         merged_repeats = {}
@@ -196,19 +256,19 @@ class DNARepeatsFinder:
                 distances = [matches[j] - matches[j - 1] for j in range(1, len(matches))]
                 if all(d >= min_len for d in distances):
                     repeats.append({
-                        'seqType': 'long_repeats',
+                        'seqType': 'dispersed_repeats',
                         'sequence': seq,
                         'positions': matches,
                         'count': len(matches),
                         'gc_content': self.calculate_gc_content(seq),
-                        'length':len(seq),
+                        'length': len(seq),
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
 
         # 处理空结果，仍然返回相应的表头
         if not repeats:
             repeats = [{
-                'seqType': 'long_repeats',
+                'seqType': 'dispersed_repeats',
                 'sequence': '',
                 'positions': '',
                 'count': '',
@@ -395,7 +455,6 @@ class DNARepeatsFinder:
             for match in re.finditer(pattern, s):
                 start, end = match.span()
                 matched_sequence = s[start:end]
-                matched_sequence2 = match.group(0)
                 if not self.is_homopolymer(matched_sequence):
                     motifs.append({
                         'seqType': motif_type + '_motifs',
@@ -460,21 +519,18 @@ class DNARepeatsFinder:
                     'penalty_score': self.calculate_local_gc_penalty_score(gc_content, min_GC_content, max_GC_content),
                 })
 
-        # Merge overlapping windows according to the continuous sequence, 
-        # do not merge windows with different regions.
+        # 合并重叠窗口
         gc_contents = []
         for gc_content in gc_contents_temp:
-            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
-                # 扩展上一个窗口
+            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:
                 old_end = gc_contents[-1]['end']
                 new_end = max(old_end, gc_content['end'])
                 gc_contents[-1]['end'] = new_end
                 gc_contents[-1]['sequence'] = s[gc_contents[-1]['start']:new_end + 1]
-                # penalty score 要叠加
                 gc_contents[-1]['penalty_score'] += gc_content['penalty_score']
             else:
                 gc_contents.append(gc_content)
-        # recalculate the GC content of the merged windows, and calculate the penalty score
+
         for gc_content in gc_contents:
             gc_content['seqType'] = 'local_gc'
             gc_content['length'] = len(gc_content['sequence'])
@@ -569,7 +625,7 @@ class DNARepeatsFinder:
     def merge_gc_windows(self, gc_contents_temp, sequence, gc_type, min_GC_content=None, max_GC_content=None):
         gc_contents = []
         for gc_content in gc_contents_temp:
-            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
+            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:
                 old_end = gc_contents[-1]['end']
                 new_end = max(old_end, gc_content['end'])
                 gc_contents[-1]['end'] = new_end
@@ -615,9 +671,14 @@ class DNARepeatsFinder:
             # 'protein_complexity': protein_complexity,
         }]
         
-# sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtAAGATAAAGCGCTGCGTAGCATGTATCGTGTGCTGAAACCAGGTGGTCGTCTGCTGGTGCTGGAATTTAGCAAACCGATTATTGAACCGCTGAGCAAAGCGTATGATGCGTATAGCTTTCATGTCCTGCCGCGTATTGGTAGCCTGGTGGCGAACGATGCGGATAGCTATCGTTATCTGGCGGAAAGCATTCGTATGCATCCGGATCAGGATACCCTGAAAGCGATGATGCAGGATGCGGGCTTTGAAAGCGTGGACTACTATAACCTGACAGCTGGCGTTGTCGCCCTGCACCGCGGCTATAAGTTCGGGTCTGGTGGCAGCCATCATCATCATCATCATCATCATTGAGATCCGGCTGCTAACGATGGGTTGAGGATGGTTacccggaaccacatggagattacttgttgtaggagggaggacactatggaaatcaatacacacgcaacaagcatggagacacacatcaacggTAGCTGATCCTTGTCGCATGGTCGACGATTGATGCAcccaccatcgccaacTCGGGAATTCGGATTGGA"
-# sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtCAGTCACTATTCTTGATGGCAAGCAATATTCTGGCAACATTTGACATAAAGAAGAAGATTGCTGCTGATGGTACTATTCTGGAACCTTCTATTGAGTGGACTGGATCAATGGCCATGTGAAAGCTTGGTACCGCGGCTAGCTAAGATCCGCTCTGATGGGTTGAGGATGGTTaacacccacgagcggatcggcatcaactttagccccgaatgtattgagagcatcaatactagggactgcacaatcaactggcatgaaaacaacgctagggatcatatgtccgaagcaggactcgaggccagcaatgctaccagggccctcatcagcactatttgggctagcatgtgccatagcactcggtgtaagtggattacacattgcgagagaaccgccatcaacttcgcctgcaccagcatcaacacccacgaggacatcagcacccggatcaccatcaacttcacccacgagatcaatTTGCAACGTACCTGGACTTGGTCGACGATTGATGCAaacaaccggtgtgAATCGTTGCCATCTTGCC"
-sequence = "TGCTGTCTTGTCCAACGTaGTCTCtAACTGTGTTCAGAAGGGCCAGAAATGCCAAGGACTCAGGGGAGGGACCGGGTCATTGGGGTCAGGTTACTCCGGGTCATTGGGGTCAGGTGTCACCGGGTCATTGGGGTCAGGCTCTATGTTTGCTTTGATGTGTATCCTATGTCCAGTATGAAATAAAAACTGCCTCCTTCCACATTGAGAGACTTGGTCGACGATTGATGCAgagattacctcctgccatcggatctttacatttcgcgcatccagctaAACATGGACTCCTTGCGT"
-sequence = sequence.upper()
-finder = DNARepeatsFinder(sequence=sequence)
-print(finder.find_dispersed_repeats())
+def main():
+    sequence = "ACCGGGTCATTGGGGTCAGGTTACTCCGGGTCATTGGGGTCAGGTGTCACCGGGTCATTGGGGTCAGGCTCTATGTT"
+    sequence = sequence.upper()
+    finder = DNARepeatsFinder(sequence=sequence)
+    result_substring, count = finder.find_most_frequent_longest_repeated_substring(sequence)
+    print("Most Frequent Longest Repeated Substring:", result_substring)
+    print("Count:", count)
+    print(finder.find_dispersed_repeats())
+
+if __name__ == "__main__":
+    main()

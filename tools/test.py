@@ -81,7 +81,7 @@ def analyze_sequences(gene_table):
             'LongRepeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
             # 'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
             # # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
-            'Homopolymers': finder_dataset.find_homopolymers(index=index, min_len=11),
+            'Homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
             # 'W8S8_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=8, min_S_length=8),
             'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
             # 'W16S16_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=16, min_S_length=16),
