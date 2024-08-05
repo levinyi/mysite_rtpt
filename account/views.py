@@ -9,8 +9,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from notice.models import Notice
-from notice.views import send_email_with_link, send_sms_with_code
-from .forms import RegistrationForm, UserProfileForm, ForgotPwForm, PhoneCodeForm
+from notice.views import send_email_with_link
+from .forms import RegistrationForm, UserProfileForm, ForgotPwForm
 from .models import UserProfile
 from django.contrib.auth.views import PasswordChangeView, PasswordResetConfirmView
 from django.shortcuts import render
@@ -64,10 +64,10 @@ def custom_login_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         """
-        处理用户的登录请求的额外逻辑，如判断邮箱和手机号验证状态。
+        处理用户的登录请求的额外逻辑，如判断邮箱验证状态。
         从POST数据中获取用户名和密码，然后验证这些信息。
-        如果验证通过，它会检查用户的邮箱和手机号是否已经验证。
-        根据邮箱和手机号的验证状态，用户可能会被重定向到不同的页面。
+        如果验证通过，它会检查用户的邮箱是否已经验证。
+        根据邮箱验证状态，用户可能会被重定向到不同的页面。
         """
         # 调用原始的登录视图，获取登录表单的验证结果
         response = view_func(request, *args, **kwargs)
@@ -76,32 +76,15 @@ def custom_login_required(view_func):
             up = UserProfile.objects.get(user__username=request.POST['username'])
             u = up.user
             if not up.is_verify:
-                # 邮箱和手机号都没有，提醒绑定其中一个，或其它，目前是会直接登陆进去
-                if not u.email and not up.phone:
-                    return response
-                # 填了邮箱，没手机号
-                elif u.email and not up.phone:
+                if u.email:
                     target_url = reverse('account:email_not_verify')
                     params = {'username': u.username, 'email': u.email}
                     target_url_with_params = f'{target_url}?{urlencode(params)}'
                     return HttpResponseRedirect(target_url_with_params)
-                # 填了手机号，没邮箱
-                elif not u.email and up.phone:
-                    target_url = reverse('account:phone_not_verify') 
-                    params = {'phone': up.phone, 'code': '', 'username':u.username}
-                    # 将参数编码并添加到 URL
-                    target_url_with_params = f'{target_url}?{urlencode(params)}'
-                    # 使用 HttpResponseRedirect 跳转到目标 URL
-                    return HttpResponseRedirect(target_url_with_params)
-                # 两者都填了，选一个进行验证
                 else:
-                    # Todo:完善选择其一进行验证页面
-                    target_url = reverse('account:email_not_verify') 
-                    params = {'username': u.username, 'email': u.email}
-                    target_url_with_params = f'{target_url}?{urlencode(params)}'
-                    return HttpResponseRedirect(target_url_with_params)
+                    # 邮箱未填写，直接登录
+                    return response
         return response
-
     return _wrapped_view
 
 
@@ -114,33 +97,30 @@ def resend_login_verify(request, username, verify_type):
     如果验证类型是手机，会发送一个包含验证码的短信给用户。
 
     参数:
-    request -- Django的HttpRequest对象，包含了这个请求的所有信息。
+    request -- Django 的 HttpRequest 对象，包含了这个请求的所有信息。
     username -- 需要验证的用户的用户名。
-    verify_type -- 验证类型，可以是'email'或'phone'。
+    verify_type -- 验证类型，可以是 'email' 或 'phone'。
 
     返回:
-    如果验证类型是邮箱，返回一个重定向到登录页面的HttpResponseRedirect对象。
-    如果验证类型是手机，返回一个包含发送状态的JsonResponse对象。
-    如果验证类型不是'email'或'phone'，抛出一个Http404异常。
+    如果验证类型是邮箱，返回一个包含发送状态的 JsonResponse 对象。
+    如果验证类型是手机，返回一个包含发送状态的 JsonResponse 对象。
+    如果验证类型不是 'email' 或 'phone'，抛出一个 Http404 异常。
     """
-    print(request, username, verify_type)
     if verify_type is None:
         raise Http404('Not Found.')
 
     ty = verify_type.lower()
     up = UserProfile.objects.get(user__username=username)
     if ty == 'email':
-        send_email_with_link(up.user, purpose='signup', subject='Register rootpath confirm.')
-        return HttpResponseRedirect(reverse('account:user_login'))
+        if send_email_with_link(up.user, purpose='signup', subject='Register rootpath confirm.'):
+            return JsonResponse(data={'status': 'success', 'message': 'Verification email has been resent. Please check your inbox.'})
+        else:
+            return JsonResponse(data={'status': 'error', 'message': 'Failed to send verification email.'})
     elif ty == 'phone':
         if send_sms_with_code(up.user, purpose='signup'):
-            return JsonResponse(data={
-                'status': 'success'
-            })
+            return JsonResponse(data={'status': 'success', 'message': 'Verification code has been sent to your phone.'})
         else:
-            return JsonResponse(data={
-                'status': 'error'
-            })
+            return JsonResponse(data={'status': 'error', 'message': 'Failed to send verification code.'})
 
     raise Http404('Not Found.')
 
@@ -149,45 +129,6 @@ def email_not_verify(request):
     return render(request, "account/email_not_verify.html", context={
         'username': request.GET.get('username', default='null'),
         'email': request.GET.get('email', default='null')
-    })
-
-
-def phone_not_verify(request):
-    """
-    处理手机未验证的用户请求。
-
-    对于POST请求，验证提交的验证码并根据验证结果进行相应处理。
-    对于非POST请求，渲染验证码输入页面。
-
-    参数:
-    request -- Django的HttpRequest对象。
-
-    返回:
-    一个HttpResponse对象，渲染了一个页面，显示用户的用户名和手机。
-    """
-    if request.POST:
-        form = PhoneCodeForm(request.POST)
-    else:
-        form = PhoneCodeForm({
-            'phone': request.GET.get('phone',default='null'),
-            'username': request.GET.get('username',default='null'),
-        })
-    if request.method == "POST":
-        if 'phone' not in request.POST or 'code' not in request.POST:
-            return
-
-        status, notice = Notice.verify_code(phone=form.data.get('phone'), code=form.data.get('code'))
-        if status:
-            UserProfile.objects.filter(user=notice.user).update(is_verify=True)
-            return redirect('account:user_login')
-        else:
-            return render(request, "account/phone_not_verify.html",context={
-                'form': form,
-                'hidden_failed': False
-            })
-    return render(request, "account/phone_not_verify.html", context={
-        'form':form,
-        'hidden_failed':True
     })
 
 
@@ -202,7 +143,6 @@ def forgot_passwd(request):
     HttpResponse对象，根据请求类型和验证结果渲染相应页面。
     """
     if request.method == 'POST':
-        print(request.POST)
         if 'email' in request.POST and 'username' in request.POST:
             u = User.objects.get(email=request.POST['email'], username=request.POST['username'])
             if u:
@@ -221,17 +161,17 @@ def verify(request, uidb64, token):
     验证用户的链接。
 
     参数:
-    request -- Django的HttpRequest对象。
-    uidb64 -- 用户的id，经过base64编码。
-    token -- 用户的token。
+    request -- Django 的 HttpRequest 对象。
+    uidb64 -- 用户的 id，经过 base64 编码。
+    token -- 用户的 token。
 
     返回:
-    HttpResponseRedirect对象，根据验证结果重定向到相应页面。
+    HttpResponseRedirect 对象，根据验证结果重定向到相应页面。
     """
     # 根据解密后的 user_id 和 verify_code 获取对应的 Notice 记录
     status, notice = Notice.verify_link(uidb64, token)
     if not status:
-        raise Http404('The link has expired.')
+        return render(request, 'account/invalid_link.html', context={'message': 'The link has expired or is invalid.'})
 
     if notice.purpose == 'signup':
         user_profile = get_object_or_404(UserProfile, user=notice.user.id)
@@ -276,7 +216,6 @@ def avatar_edit(request):
     if request.method == 'POST':
         userid = request.POST.get('userid')
         imagePath = request.POST.get('imagePath')
-        print(f"userid:{userid}, imagePath:{imagePath}")
         UserProfile.objects.filter(user_id=userid).update(photo=imagePath)
         return HttpResponse('success')
     else:
@@ -288,6 +227,7 @@ def register(request):
     if request.method == 'POST':
         user_form = RegistrationForm(request.POST)
         userprofile_form = UserProfileForm(request.POST)
+
         # if user_form.is_valid() and userprofile_form.is_valid(): 若添加userprofile_form.is_valid会导致无法验证通过
         if user_form.is_valid():
             new_user = user_form.save(commit=False)

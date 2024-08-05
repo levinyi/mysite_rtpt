@@ -32,5 +32,6 @@ urlpatterns = [
     path('tools/', include('tools.urls', namespace='tools')),
     path('super_manage/', include('super_manage.urls', namespace='super_manage')),
     path('data_process/request_genes', data_process.views.request_genes, name='request_genes'),
-    path('data_process/upload_genes', data_process.views.upload_genes, name='upload_genes')
+    path('data_process/upload_genes', data_process.views.upload_genes, name='upload_genes'),
+    path('notice/', include('notice.urls', namespace='notice')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

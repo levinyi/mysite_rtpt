@@ -3,7 +3,7 @@ from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 
 # Register your models here.
-from .models import Product, Addon, ExpressionScale, ExpressionHost,PurificationMethod, Vector, GeneSynEnzymeCutSite, Species
+from .models import Vector, GeneSynEnzymeCutSite, Species
 
 class VectorResource(resources.ModelResource):
     class Meta:
@@ -32,11 +32,6 @@ class SpeciesAdmin(ImportExportModelAdmin):
     search_fields = ('id', 'species_name',)
     resource_class = SpeciesResource
 
-admin.site.register(Product)
-admin.site.register(Addon)
-admin.site.register(ExpressionHost)
-admin.site.register(PurificationMethod)
-admin.site.register(ExpressionScale)
 
 admin.site.register(Vector, VectorAdmin)
 admin.site.register(GeneSynEnzymeCutSite, GeneSynEnzymeCutSiteAdmin)

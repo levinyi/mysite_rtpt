@@ -54,13 +54,18 @@
                                 </div>
                             </div>
                         </div>
-                        </li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'user_center:dashboard' %}">User Center</a></li>
                         <li><a class="dropdown-item" href="{% url 'account:my_information' %}">Profile</a></li>
                         <li><a class="dropdown-item" href="#">Account</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'account:user_logout' %}">Logout</a></li>
+                        <li>
+                            <form id="logout-form" method="POST" action="{% url 'account:user_logout' %}" style="display: none;">
+                                {% csrf_token %}
+                                <button type="submit">Logout</button>
+                            </form>
+                            <a class="dropdown-item" href="#" onclick="document.getElementById('logout-form').submit();">Logout</a>
+                        </li>
                     </ul>
                 </div>
                 {% else %}
@@ -69,7 +74,6 @@
                 <a href="{% url 'account:user_register' %}" role="button" class="btn btn-warning">Sign-up</a>
                 {% endif %}
             </div>
-
         </div>
     </div>
 </nav>

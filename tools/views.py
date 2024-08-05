@@ -74,7 +74,6 @@ def expanded_rows_to_gene_table(df, gene_table):
         expanded_results.append(result_dict)
 
     expanded_df = pd.DataFrame(expanded_results)
-    print("expanded_df", expanded_df)
 
     gene_table = gene_table.merge(expanded_df, on='gene_id', how='left')
 

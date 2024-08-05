@@ -6,17 +6,40 @@
     <div class="col-md-6 offset-md-3 my-5">
         <div class="card text-center shadow-lg">
             <div class="card-header bg-primary text-white">
-                <h2><strong>Email Verification Needed</strong><h2>
+                <h2><strong>Email Verification Needed</strong></h2>
             </div>
             <div class="card-body">
                 <h5 class="card-title">Hello, <strong>{{ username }}</strong>!</h5>
-                <p class="card-text">We have sent a link to <span class="text-primary">{{ email }}</span>. 
+                <p class="card-text">We have sent a link to <span class="text-primary">{{ email }}</span>.</p>
                 <p class="card-text">Please click on the verification link to proceed. We'll get you all set up!</p>
                 <p class="card-text">If you haven't received the email, you can resend it.</p>
-                <a href="{% url 'account:resend_login_verify' username 'email' %}" class="btn btn-success btn-xs">Resend Confirmation Email <i class="bi bi-arrow-right-circle-fill"></i></a>
+                <button id="resend-email-btn" class="btn btn-success btn-xs">Resend Confirmation Email <i class="bi bi-arrow-right-circle-fill"></i></button>
+                <div id="message-box" class="alert d-none mt-3"></div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.getElementById('resend-email-btn').addEventListener('click', function() {
+        const username = '{{ username }}';
+        fetch(`{% url 'account:resend_login_verify' username 'email' %}`)
+            .then(response => response.json())
+            .then(data => {
+                const messageBox = document.getElementById('message-box');
+                if (data.status === 'success') {
+                    messageBox.classList.remove('d-none', 'alert-danger');
+                    messageBox.classList.add('alert-success');
+                } else {
+                    messageBox.classList.remove('d-none', 'alert-success');
+                    messageBox.classList.add('alert-danger');
+                }
+                messageBox.textContent = data.message;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    });
+</script>
 
 {% endblock %}

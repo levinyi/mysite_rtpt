@@ -24,7 +24,7 @@ urlpatterns = [
     path('bulk_view_gene_detail/', views.bulk_view_gene_detail, name='bulk_view_gene_detail'),
     path('checkout/', views.checkout, name='checkout'),
     path('submit_notification/', views.submit_notification, name='submit_notification'),
-    # path('get_quotation/<?>', views.get_quotation, name='get_quotation'),
+
     # order
     path('manage_order/', views.manage_order, name='manage_order'),
     path('view_order_detail/<int:order_id>/', views.view_order_detail, name='view_order_detail'),
@@ -41,10 +41,5 @@ urlpatterns = [
     path('validation_save/<int:id>/', views.validation_save, name='validation_save'),
     path('vector_download/<int:vector_id>/<str:file_type>/', views.vector_download, name='vector_download'),
 
-    # path('vector_add_file/', views.vector_add_file, name='vector_add_file'),
-    # path('vector_add_table/', views.vector_add_table, name='vector_add_table'),
-    # path('vector_detail/<int:vector_id>/', views.vector_detail, name='vector_detail'),
-    # path('vector_edit/<int:vector_id>/', views.vector_edit, name='vector_edit'),
-    # path('vector_validation/<int:vector_id>/', views.vector_validation, name='vector_validation'),
     path('test/', views.test, name='test'),
 ]
