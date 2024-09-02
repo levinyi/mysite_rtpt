@@ -126,7 +126,6 @@ class DNARepeatsFinder:
                     })
         # 根据start位置对repeats_temp进行排序
         repeats_temp.sort(key=lambda x: x['start'])
-
         # 合并重复序列
         repeats = []
         for repeat in repeats_temp:
@@ -159,11 +158,35 @@ class DNARepeatsFinder:
         return repeats
 
     # 2) Dispersed Repeats
+    def merge_potential_repeats(self, potential_repeats):
+        # 按照序列的起始位置排序
+        sorted_repeats = sorted(potential_repeats.items(), key=lambda x: x[1][0])
+        merged_repeats = {}
+
+        for seq, positions in sorted_repeats:
+            merged = False
+            for merged_seq in list(merged_repeats.keys()):
+                merged_positions = merged_repeats[merged_seq]
+
+                # 检查是否应该合并：如果序列的起始位置接近并且序列有重叠或接近
+                if abs(positions[0] - merged_positions[-1]) <= len(seq):
+                    # 合并序列：选择更长的序列保留，并合并位置
+                    if len(seq) > len(merged_seq):
+                        merged_repeats[seq] = merged_positions + positions
+                        del merged_repeats[merged_seq]  # 删除旧的短序列
+                    else:
+                        merged_repeats[merged_seq].extend(positions)
+                    merged_repeats[seq if len(seq) > len(merged_seq) else merged_seq] = sorted(set(merged_repeats[seq if len(seq) > len(merged_seq) else merged_seq]))  # 去重并排序
+                    merged = True
+                    break
+
+            if not merged:
+                merged_repeats[seq] = positions
+
+        return merged_repeats
+
     def find_dispersed_repeats(self, index=None, min_len=16):
         s, sa, lcp = self._get_sequence_data(index)
-        print(s)
-        print(sa)
-        print(lcp)
         
         repeats = []
         n = len(s)
@@ -179,29 +202,22 @@ class DNARepeatsFinder:
                     potential_repeats[seq] = []
                 potential_repeats[seq].append(start_index)
         
-        print("potential_repeats: ", potential_repeats)
-        # 按序列长度排序，处理潜在重复
-        sorted_repeats = sorted(potential_repeats.items(), key=lambda x: -len(x[0]))
-        merged_repeats = {}
-
-        for seq, positions in sorted_repeats:
-            if not any(seq in long_seq for long_seq in merged_repeats):
-                merged_repeats[seq] = positions
-
+        merged_repeats = self.merge_potential_repeats(potential_repeats)
+        # print("merged_repeats", merged_repeats)
         # 转换为最终输出格式
         for seq, positions in merged_repeats.items():
-            escaped_seq = re.escape(seq)
-            matches = [m.start() for m in re.finditer(escaped_seq, s)]
-            if len(matches) >= 2:
+            # 根据序列去重新找到起始位置和结束位置
+            matches = [match.start() for match in re.finditer(re.escape(seq), s)]
+            if len(matches) >= 2:  # 至少要有两个以上的重复位置才算分散重复
                 distances = [matches[j] - matches[j - 1] for j in range(1, len(matches))]
                 if all(d >= min_len for d in distances):
                     repeats.append({
                         'seqType': 'long_repeats',
                         'sequence': seq,
-                        'positions': matches,
-                        'count': len(matches),
+                        'start': matches,
+                        'end': [match + len(seq) - 1 for match in matches],
                         'gc_content': self.calculate_gc_content(seq),
-                        'length':len(seq),
+                        'length': len(seq),
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
 
@@ -210,8 +226,8 @@ class DNARepeatsFinder:
             repeats = [{
                 'seqType': 'long_repeats',
                 'sequence': '',
-                'positions': '',
-                'count': '',
+                'start': '',
+                'end': '',
                 'gc_content': '',
                 'length': '',
                 'penalty_score': '',
@@ -598,7 +614,55 @@ class DNARepeatsFinder:
                 'penalty_score': '',
             }]
         return gc_contents
-    # 8) lcc
+
+    # 8) Dinucleotide Repeats
+    def find_dinucleotide_repeats(self, index=None, threshold=10):
+        s, sa, lcp = self._get_sequence_data(index)
+        n = len(s)
+        repeats = []
+
+        i = 0
+        while i < n - 1:
+            dinucleotide = s[i:i+2]
+            if len(dinucleotide) < 2:
+                break
+            
+            repeat_length = 2
+            j = i + 2
+            while j < n and s[j:j+2] == dinucleotide:
+                repeat_length += 2
+                j += 2
+            
+            if repeat_length >= threshold:
+                sequence = dinucleotide * (repeat_length // 2)
+                # 判断是否为homopolymer
+                if dinucleotide[0] != dinucleotide[1]:
+                    repeats.append({
+                        'seqType': 'dinucleotide_repeats',
+                        'sequence': sequence,
+                        'start': i,
+                        'end': i + repeat_length - 1,
+                        'length': repeat_length,
+                        'gc_content': self.calculate_gc_content(sequence),
+                        'penalty_score': repeat_length // 2
+                    })
+            
+            i += repeat_length  # 跳过已检测到的重复序列
+
+        # 处理空结果，仍然返回相应的表头
+        if not repeats:
+            repeats = [{
+                'seqType': 'dinucleotide_repeats',
+                'sequence': '',
+                'start': '',
+                'end': '',
+                'length': '',
+                'gc_content': '',
+                'penalty_score': '',
+            }]
+        return repeats
+
+    # 9) lcc
     def get_lcc(self, index=None):
         s, sa, lcp = self._get_sequence_data(index)
         n = len(s)
@@ -621,6 +685,14 @@ class DNARepeatsFinder:
 # sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtAAGATAAAGCGCTGCGTAGCATGTATCGTGTGCTGAAACCAGGTGGTCGTCTGCTGGTGCTGGAATTTAGCAAACCGATTATTGAACCGCTGAGCAAAGCGTATGATGCGTATAGCTTTCATGTCCTGCCGCGTATTGGTAGCCTGGTGGCGAACGATGCGGATAGCTATCGTTATCTGGCGGAAAGCATTCGTATGCATCCGGATCAGGATACCCTGAAAGCGATGATGCAGGATGCGGGCTTTGAAAGCGTGGACTACTATAACCTGACAGCTGGCGTTGTCGCCCTGCACCGCGGCTATAAGTTCGGGTCTGGTGGCAGCCATCATCATCATCATCATCATCATTGAGATCCGGCTGCTAACGATGGGTTGAGGATGGTTacccggaaccacatggagattacttgttgtaggagggaggacactatggaaatcaatacacacgcaacaagcatggagacacacatcaacggTAGCTGATCCTTGTCGCATGGTCGACGATTGATGCAcccaccatcgccaacTCGGGAATTCGGATTGGA"
 # sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtCAGTCACTATTCTTGATGGCAAGCAATATTCTGGCAACATTTGACATAAAGAAGAAGATTGCTGCTGATGGTACTATTCTGGAACCTTCTATTGAGTGGACTGGATCAATGGCCATGTGAAAGCTTGGTACCGCGGCTAGCTAAGATCCGCTCTGATGGGTTGAGGATGGTTaacacccacgagcggatcggcatcaactttagccccgaatgtattgagagcatcaatactagggactgcacaatcaactggcatgaaaacaacgctagggatcatatgtccgaagcaggactcgaggccagcaatgctaccagggccctcatcagcactatttgggctagcatgtgccatagcactcggtgtaagtggattacacattgcgagagaaccgccatcaacttcgcctgcaccagcatcaacacccacgaggacatcagcacccggatcaccatcaacttcacccacgagatcaatTTGCAACGTACCTGGACTTGGTCGACGATTGATGCAaacaaccggtgtgAATCGTTGCCATCTTGCC"
 # sequence = "TGCTGTCTTGTCCAACGTaGTCTCtAACTGTGTTCAGAAGGGCCAGAAATGCCAAGGACTCAGGGGAGGGACCGGGTCATTGGGGTCAGGTTACTCCGGGTCATTGGGGTCAGGTGTCACCGGGTCATTGGGGTCAGGCTCTATGTTTGCTTTGATGTGTATCCTATGTCCAGTATGAAATAAAAACTGCCTCCTTCCACATTGAGAGACTTGGTCGACGATTGATGCAgagattacctcctgccatcggatctttacatttcgcgcatccagctaAACATGGACTCCTTGCGT"
+# sequence = "ACGTACGTACGTACGTACGTACGTACACACACACACACACACGTGTGTGTGT"
+# sequence = "CTCTAGTTAGGCTTCCGGGATAACCGATTGCGGAGACAGCTTCTTGGCGGACGTGCACAGATAACTTCGTATAATGTACATTATACGAAGTTATTCTTTGAAAAGATAATGTATGATTATGCTTTCACTCATATTTATACAGAAACTTGATGTTTTCTTTCGAGTATATACAAGGTGATTACATGTACGTTTGAAGTACAACTCTAGATTTTGTAGTGCCCTCTTGGGCTAGCGGTAAAGGTGCGCATTTTTTCACACCCTACAATGTTCTGTTCAAAAGATTTTGGTCAAACGCTGTAGAAGTGAAAGTTGGTGCGCATGTTTCGGCGTTCGAAACTTCTCCGCAGTGAAAGATAAATGATCCCAACCGTTGTGACCTTCCAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAAGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCACGAGTTTGTAACACTCTGCAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAAGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCACAAAAGGTTTAGAATTTCCAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCTTTTGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCAAGAAGGGCTTGGTTTCGAAAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAAGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCAAATGTCCTCCCCTTGGTGGGGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAATTTATTTTTTGTCACTATTGTTATGTAAAATGCCACCTCTGACAGTATGGAACGCAAACTTCTGTCTAGTGGATAACAGAATTTTTCTATGGCCAATTTAATAACTTCGTATAATGTACATTATACGAAGTTATAGTTAGTTTGTTTAAACAACAAACTTTTTTCATTTCTTTTGTTTCCCCTTCTCTTCTTTTAGTTAGTTTGTTTAAACAACAAACTATAGTATTGTCGTTTGGGTGGCTTCATTTAGACGGTACTGCATCTTAAATAATATGAATG"
 # sequence = sequence.upper()
 # finder = DNARepeatsFinder(sequence=sequence)
+# # print(finder.find_dinucleotide_repeats())
 # print(finder.find_dispersed_repeats())
+
+
+
+
+

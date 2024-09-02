@@ -56,27 +56,32 @@
                                     <!-- Display other information as list -->
                                     <ul>
                                         {% if g.tandem_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">Check Tandem Repeats: {{ g.tandem_repeats_sequence }},score: {{g.tandem_repeats_penalty_score}}</li>
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">Check Tandem Repeats: {{ g.tandem_repeats_sequence }},score: {{ g.tandem_repeats_penalty_score}}</li>
                                         {% endif %}
                                         {% if g.inverted_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.inverted_repeats_sequence }}">Check Inverted Repeats: {{ g.inverted_repeats_sequence }}, score: {{g.inverted_repeats_penalty_score}}</li>
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.inverted_repeats_sequence }}">Check Inverted Repeats: {{ g.inverted_repeats_sequence }}, score: {{ g.inverted_repeats_penalty_score}}</li>
                                         {% endif %}
-                                        {% if g.W8S8_motifs_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.W8S8_motifs_sequence }}">Check W8S8 motif: {{ g.W8S8_motifs_sequence }}, score: {{g.W8S8_motifs_penalty_score}}</li>
+                                        {% if g.W12S12Motifs_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.W12S12Motifs_sequence }}">Check W8S8 motif: {{ g.W12S12Motifs_sequence }}, score: {{ g.W12S12Motifs_penalty_score }}</li>
                                         {% endif %}
                                         {% if g.homopolymers_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.homopolymers_sequence }}">Check Homopolymers: {{ g.homopolymers_sequence }}, score: {{g.homopolymers_penalty_score}}</li>
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.homopolymers_sequence }}">Check Homopolymers: {{ g.homopolymers_sequence }}, score: {{ g.homopolymers_penalty_score }}</li>
                                         {% endif %}
-                                        {% if g.long_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.long_repeats_sequence }}">Check Long Repeats: {{ g.long_repeats_sequence }}, score: {{g.long_repeats_penalty_score}}</li>
+                                        {% if g.LongRepeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.long_repeats_sequence }}">Check Long Repeats: {{ g.LongRepeats_sequence }}, score: {{ g.LongRepeats_penalty_score}}</li>
                                         {% endif %}
                                         {% if g.local_gc_content_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.local_gc_content_sequence }}">Check Local GC content: {{ g.local_gc_content_sequence }}, score: {{g.local_gc_content_penalty_score}}</li>
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.local_gc_content_sequence }}">Check Local GC content: {{ g.local_gc_content_sequence }}, score: {{ g.local_gc_content_penalty_score}}</li>
                                         {% endif %}
                                         {% if g.palindromes_sequence %}
                                         <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.palindromes_sequence }}">Check Palindromes: {{ g.palindromes_sequence }}, score: {{g.palindromes_penalty_score}}</li>
                                         {% endif %}
-
+                                        {% if g.lowGC_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.lowGC_sequence }}"> Check LowGC: {{ g.lowGC_sequence }}, score: {{ g.lowGC_penalty_score }}</li>
+                                        {% endif %}
+                                        {% if g.highGC_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.highGC_sequence }}"> Check HighGC: {{ g.highGC_sequence }}, score: {{ g.highGC_penalty_score }}</li>
+                                        {% endif %}
                                     </ul>
                                 </div>
                             </div>

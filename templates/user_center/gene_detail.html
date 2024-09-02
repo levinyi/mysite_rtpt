@@ -101,7 +101,7 @@
                 <table id="gene-table-datatable" class="display" style="width:100%">
                     <thead>
                         <tr>
-                            <th></th>
+                            <th></th> <!-- For Select Checkboxes -->
                             <th>#</th>
                             <th>GeneName</th>
                             <th>Vector</th>
@@ -112,12 +112,12 @@
                     </thead>
                     <tbody>
                     {% for gene in gene_list %}
-                        <tr>
-                            <th></th>
-                            <th>{{ forloop.counter }}</th>
-                            <th>{{ gene.gene_name }}</th>
-                            <th>{{ gene.vector.vector_id }}</th>
-                            <th>
+                        <tr data-gene-id="{{ gene.id }}"> <!-- Use data attribute to store gene ID -->
+                            <td></td> <!-- DataTables will render checkboxes here -->
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ gene.gene_name }}</td>
+                            <td>{{ gene.vector.vector_id }}</td>
+                            <td>
                                 {% if gene.status == 'forbidden' %}
                                     <span class="badge bg-danger">Forbidden</span>
                                 {% elif gene.status == 'validated' %}
@@ -125,16 +125,16 @@
                                 {% else %}
                                     <span class="badge bg-info">Saved</span>
                                 {% endif %}
-                            </th>
-                            <th>{{ gene.original_seq|length }}</th>
-                            <th>{{ gene.original_gc_content|floatformat }}</th>
+                            </td>
+                            <td>{{ gene.original_seq|length }}</td>
+                            <td>{{ gene.original_gc_content|floatformat }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
                 </table>
 
-                <!-- Some description here -->
-                <form id="bulkOptimizationForm" action="{% url 'user_center:bulk_optimization' %}" method="post">
+                <!-- Form for submitting selected genes -->
+                <form id="bulkOptimizationForm" action="{% url 'user_center:bulk_optimization_submit' %}" method="post">
                     {% csrf_token %}
                     <div class="mb-3">
                         <label for="speciesSelect" class="form-label">Choose a species for All Selected genes.</label>
@@ -145,15 +145,33 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Submit</button>
                     <input type="hidden" id="selectedGenes" name="selected_genes">
-                    <input type="hidden" id="filteredGenes" name="filtered_genes">
+                    <button type="submit" class="btn btn-primary">Submit</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Bootstrap Toasts for warnings centered -->
+<div class="position-fixed top-50 start-50 translate-middle toast-container" style="z-index: 1055;">
+    <div id="geneToast" class="toast align-items-center text-bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                Please select at least one gene to optimize.
+            </div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="speciesToast" class="toast align-items-center text-bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                Please select a species.
+            </div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
 <div class="container-fluid" style="padding-left:50px;">
     <!-- Breadcrumb -->
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
@@ -211,7 +229,15 @@
             <!-- First Row -->
             <div class="card accordion-item">
                 <div class="accordion-header" id="heading{{ forloop.counter }}">
-                    <button class="accordion-button text-white  {% if gene.status == 'forbidden' %}bg-danger{% else %}bg-success{% endif %}" type="button" 
+                    <button class="accordion-button text-white  
+                        {% if gene.status == 'forbidden' %}
+                            bg-danger
+                        {% elif gene.penalty_score > 50 %}
+                            bg-warning
+                        {% else %}
+                            bg-success
+                        {% endif %}" 
+                    type="button" 
                     data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
                         <div class="col-4 text-start">
                             {{ forloop.counter }}. Item Name: {{ gene.gene_name }} 
@@ -219,22 +245,25 @@
                         <div class="col-4">
                             Found Forbidden Sequence: {{ gene.contained_forbidden_list }}
                         </div>
-                        {% comment %} <div class="col-4 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <10; yellow:10<score<30; red:score>30"> {% endcomment %}
-                        <div class="col-4 text-end">
-                            Total Penalty Score: NOT APPLY{{ gene.total_penalty_score }}
+                        <div class="col-4 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <10; yellow:10<score<30; red:score>30">
+                            {% if gene.penalty_score %}
+                                Total Penalty Score: {{ gene.penalty_score }}
+                            {% else %}
+                                Total Penalty Score: NOT APPLY
+                            {% endif %}
                         </div>
                     </button>
                 </div>
                 <div id="collapse{{ forloop.counter }}" class="accordion-collapse" aria-labelledby="heading{{ forloop.counter }}" 
-                data-bs-parent="#accordion{{ forloop.counter }}">
+                    data-bs-parent="#accordion{{ forloop.counter }}">
                     <div class="card-body">
-                        <!-- Second Row -->
+                        <!-- Sequence box -->
                         <div class="row">
                             <!-- First Column Original sequences -->
                             <div class="col-md-5 col-12">
                                 <p class="monospace-text">Original sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" 
                                     title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. 
-                                    This only provides a view for insertion site, which is not counted for charging"></i> : Overall GC content {{ gene.original_gc_content|floatformat }}%</p>
+                                    This only provides a view for insertion site, which is not counted for charging"></i> : Length {{gene.original_seq|length}} bp. Overall GC content {{ gene.original_gc_content|floatformat }}%</p>
                                 <!-- sequences content here -->
                                 <div class="card">
                                     <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate">
@@ -249,7 +278,7 @@
                             <div class="col-md-5 col-12">
                                 <p class="monospace-text">Edited sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" 
                                     title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. 
-                                    This only provides a view for insertion site, which is not counted for charging"></i> : Overall GC content {{ gene.modified_gc_content|floatformat }}%</p>
+                                    This only provides a view for insertion site, which is not counted for charging"></i> : Length {{gene.saved_seq|length}} bp. Overall GC content {{ gene.modified_gc_content|floatformat }}%</p>
                                 <div class="card">
                                     <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate second_col_trun" contenteditable="false" id="edited-sequence-trun">
                                         {{ gene.saved_seq|highlight_sequence:gene.modified_highlights|safe }}</div>
@@ -295,6 +324,42 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- 罚分 box -->
+                        <div class="row mt-2">
+                            <div class="col-md-10 col-12">
+                                <div class="card">
+                                    <ul>
+                                        {% if gene.analysis_results.tandem_repeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.tandem_repeats_positions }}">Check Tandem Repeats: {{ gene.analysis_results.tandem_repeats_sequence }},score: {{ gene.analysis_results.tandem_repeats_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.inverted_repeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.inverted_repeats_sequence }}">Check Inverted Repeats: {{ gene.analysis_results.inverted_repeats_sequence }}, score: {{ gene.analysis_results.inverted_repeats_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.W12S12Motifs_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.W12S12Motifs_sequence }}">Check W8S8 motif: {{ gene.analysis_results.W12S12Motifs_sequence }}, score: {{ gene.analysis_results.W12S12Motifs_penalty_score }}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.homopolymers_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.homopolymers_sequence }}">Check Homopolymers: {{ gene.analysis_results.homopolymers_sequence }}, score: {{ gene.analysis_results.homopolymers_penalty_score }}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.LongRepeats_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.long_repeats_sequence }}">Check Long Repeats: {{ gene.analysis_results.LongRepeats_sequence }}, score: {{ gene.analysis_results.LongRepeats_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.local_gc_content_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.local_gc_content_sequence }}">Check Local GC content: {{ gene.analysis_results.local_gc_content_sequence }}, score: {{ gene.analysis_results.local_gc_content_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.palindromes_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.palindromes_sequence }}">Check Palindromes: {{ gene.analysis_results.palindromes_sequence }}, score: {{gene.analysis_results.palindromes_penalty_score}}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.lowGC_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.lowGC_sequence }}"> Check LowGC: {{ gene.analysis_results.lowGC_sequence }}, score: {{ gene.analysis_results.lowGC_penalty_score }}</li>
+                                        {% endif %}
+                                        {% if gene.analysis_results.highGC_sequence %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.highGC_sequence }}"> Check HighGC: {{ gene.analysis_results.highGC_sequence }}, score: {{ gene.analysis_results.highGC_penalty_score }}</li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -315,13 +380,15 @@
 <script src="{% static 'species/amino_acid_data.js' %}"></script>
 <script src="{% static 'species/species_data.js' %}"></script>
 <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.flash.min.js"></script>
-    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.flash.min.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
+
+<!-- JavaScript to handle DataTables, form submission, and validation -->
 <script>
-    $(document).ready( function () {
+    $(document).ready(function() {
         var selectAllState = false;
 
         // Custom selectAll button
@@ -338,8 +405,9 @@
                 selectAllState = !selectAllState;
             }
         };
+
         var table = $('#gene-table-datatable').DataTable({
-            dom: 'Bfrtip',  // 添加按钮
+            dom: 'Bfrtip',
             buttons: [
                 {
                     extend: 'selectAll',
@@ -351,25 +419,41 @@
             columnDefs: [{
                 orderable: false,
                 className: 'select-checkbox',
-                targets:   0
+                targets: 0
             }],
             order: [[ 1, 'asc' ]],
         });
 
-        // Handle click on checkbox to set state of "Select all" control
-        $('#gene-table-datatable tbody').on('change', 'input[type="checkbox"]', function () {
-            var selectedRows = table.rows({ selected: true }).count();
-            var rowCount = table.rows({ 'search': 'applied' }).count();
-            var button = table.button(0); // First button (selectAll button)
-            if (selectedRows === rowCount) {
-                button.text('Deselect All');
-                selectAllState = true;
-            } else {
-                button.text('Select All');
-                selectAllState = false;
+        // Form submission handling
+        $('#bulkOptimizationForm').on('submit', function(event) {
+            event.preventDefault(); // Prevent the default form submission
+
+            // Get selected genes IDs
+            var selectedGenes = table.rows({ selected: true }).nodes().to$().map(function() {
+                return $(this).data('gene-id');
+            }).get();
+
+            // Validate if any gene is selected
+            if (selectedGenes.length === 0) {
+                var geneToast = new bootstrap.Toast(document.getElementById('geneToast'));
+                geneToast.show();
+                return;
             }
+
+            // Validate species selection
+            if ($('#speciesSelect').val() === "") {
+                var speciesToast = new bootstrap.Toast(document.getElementById('speciesToast'));
+                speciesToast.show();
+                return;
+            }
+
+            // Set the hidden input value
+            $('#selectedGenes').val(selectedGenes.join(','));
+
+            // Submit the form
+            this.submit();
         });
-    } );
+    });
 </script>
 
 <script>

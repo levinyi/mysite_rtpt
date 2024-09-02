@@ -18,7 +18,7 @@ class GeneInfo(models.Model):
 
     forbid_seq = models.CharField(verbose_name="ForbiddenSeqs", max_length=255, null=True, blank=True)
 
-    gc_content = models.FloatField(null=True, blank=True)
+    # gc_content = models.FloatField(null=True, blank=True)
     forbidden_check_list = models.CharField(max_length=255, null=True, blank=True)
     contained_forbidden_list = models.CharField(max_length=255, null=True, blank=True)
 
@@ -30,6 +30,10 @@ class GeneInfo(models.Model):
     modified_highlights = models.JSONField(null=True, blank=True)
     original_gc_content = models.FloatField(null=True, blank=True)
     modified_gc_content = models.FloatField(null=True, blank=True)
+
+    # new fields
+    analysis_results = models.JSONField(verbose_name="SequenceAnalyzer", null=True, blank=True)
+    penalty_score = models.FloatField(verbose_name="penalty_score", null=True, blank=True)
 
     def __str__(self):
         return self.gene_name
@@ -60,3 +64,16 @@ class Cart(models.Model):
 
     def __str__(self):
         return f"{self.user}'s shopping cart"
+
+
+class GeneOptimization(models.Model):
+    gene = models.ForeignKey(GeneInfo, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    vector = models.ForeignKey(Vector, on_delete=models.CASCADE)
+    species = models.ForeignKey(Species, on_delete=models.CASCADE)
+    status = models.CharField(max_length=255, default='pending')
+    start_time = models.DateTimeField(verbose_name="start_time", auto_now_add=True, blank=True, null=True)
+    end_time = models.DateField(verbose_name='end_time', blank=True, null=True)
+
+    def __str__(self):
+        return f"Optimization for {self.gene.gene_name}"

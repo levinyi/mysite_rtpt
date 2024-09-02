@@ -79,6 +79,171 @@ def expanded_rows_to_gene_table(df, gene_table):
 
     return gene_table
 
+def expanded_rows_to_gene_table(df, gene_table):
+    expanded_results = []
+    all_columns = set()
+    gene_analysis_types = []
+
+    # 首先收集所有可能的列名
+    for _, row in df.iterrows():
+        for analysis_type, results_list in row.items():
+            if analysis_type not in gene_analysis_types:
+                gene_analysis_types.append(analysis_type)
+            if results_list:
+                for result in results_list:
+                    for key, value in result.items():
+                        column_name = f'{analysis_type}_{key}'
+                        all_columns.add(column_name)
+
+    # 按照检测类型和键的字母顺序排序列名
+    gene_analysis_types = list(set(gene_analysis_types))  # 去除重复项
+    sorted_columns = ['gene_id'] + sorted(all_columns, key=lambda x: (gene_analysis_types.index(x.split('_')[0]), x.split('_')[1]))
+
+    # 初始化每个 result_dict，并确保所有可能的列名都在字典中
+    for gene_id, row in df.iterrows():
+        result_dict = {col: '' for col in sorted_columns}
+        result_dict['gene_id'] = gene_id
+        
+        for analysis_type, results_list in row.items():
+            if results_list:
+                for result in results_list:
+                    for key, value in result.items():
+                        column_name = f'{analysis_type}_{key}'
+                        if 'penalty_score' in key:
+                            if value == '':
+                                continue  # 跳过空值
+                            if result_dict[column_name] != '':
+                                try:
+                                    result_dict[column_name] += float(value)
+                                except ValueError:
+                                    print(f'Error: {value} is not a valid float')
+                            else:
+                                try:
+                                    result_dict[column_name] = float(value)
+                                except ValueError:
+                                    print(f'Error: {value} is not a valid float')
+                        elif 'seqType' in key:
+                            if value == '':
+                                continue
+                            result_dict[column_name] = value
+                        else:
+                            if result_dict[column_name] != '':
+                                result_dict[column_name] += f';{value}'
+                            else:
+                                result_dict[column_name] = str(value)
+            else:
+                continue
+            
+        expanded_results.append(result_dict)
+
+    expanded_df = pd.DataFrame(expanded_results)
+    # 将所有带有penalty_score的列，求和赋值给total_penalty_score列
+    penalty_columns = [col for col in expanded_df.columns if 'penalty_score' in col]
+    expanded_df[penalty_columns] = expanded_df[penalty_columns].apply(pd.to_numeric, errors='coerce')
+    expanded_df['total_penalty_score'] = expanded_df[penalty_columns].fillna(0).sum(axis=1).round(0).astype(int)
+
+    gene_table = gene_table.merge(expanded_df, on='gene_id', how='left')
+
+    return gene_table
+
+def convert_gene_table_to_RepeatsFinder_Format(gene_table):
+    def expanded_rows_to_gene_table(df, gene_table):
+        expanded_results = []
+        all_columns = set()
+        gene_analysis_types = []
+
+        # 首先收集所有可能的列名
+        for _, row in df.iterrows():
+            for analysis_type, results_list in row.items():
+                if analysis_type not in gene_analysis_types:
+                    gene_analysis_types.append(analysis_type)
+                if results_list:
+                    for result in results_list:
+                        for key, value in result.items():
+                            column_name = f'{analysis_type}_{key}'
+                            all_columns.add(column_name)
+
+        # 按照检测类型和键的字母顺序排序列名
+        gene_analysis_types = list(set(gene_analysis_types))  # 去除重复项
+        sorted_columns = ['gene_id'] + sorted(all_columns, key=lambda x: (gene_analysis_types.index(x.split('_')[0]), x.split('_')[1]))
+
+        # 初始化每个 result_dict，并确保所有可能的列名都在字典中
+        for gene_id, row in df.iterrows():
+            result_dict = {col: '' for col in sorted_columns}
+            result_dict['gene_id'] = gene_id
+            
+            for analysis_type, results_list in row.items():
+                if results_list:
+                    for result in results_list:
+                        for key, value in result.items():
+                            column_name = f'{analysis_type}_{key}'
+                            if 'penalty_score' in key:
+                                if value == '':
+                                    continue  # 跳过空值
+                                if result_dict[column_name] != '':
+                                    try:
+                                        result_dict[column_name] += float(value)
+                                    except ValueError:
+                                        print(f'Error: {value} is not a valid float')
+                                else:
+                                    try:
+                                        result_dict[column_name] = float(value)
+                                    except ValueError:
+                                        print(f'Error: {value} is not a valid float')
+                            elif 'seqType' in key:
+                                if value == '':
+                                    continue
+                                result_dict[column_name] = value
+                            else:
+                                if result_dict[column_name] != '':
+                                    result_dict[column_name] += f';{value}'
+                                else:
+                                    result_dict[column_name] = str(value)
+                else:
+                    continue
+                
+            expanded_results.append(result_dict)
+
+        expanded_df = pd.DataFrame(expanded_results)
+        # 将所有带有penalty_score的列，求和赋值给total_penalty_score列
+        penalty_columns = [col for col in expanded_df.columns if 'penalty_score' in col]
+        expanded_df[penalty_columns] = expanded_df[penalty_columns].apply(pd.to_numeric, errors='coerce')
+        expanded_df['total_penalty_score'] = expanded_df[penalty_columns].fillna(0).sum(axis=1).round(0).astype(int)
+
+        gene_table = gene_table.merge(expanded_df, on='gene_id', how='left')
+
+        return gene_table
+    # Remove rows with None
+    finder_dataset = DNARepeatsFinder(data_set=gene_table)
+
+    results = {}
+    for index, row in gene_table.iterrows():
+        gene_id = row['gene_id']
+        results[gene_id] = {
+            # 'tandem_repeats': finder_dataset.find_tandem_repeats(index=index, min_unit=3, min_copies=3),
+            'LongRepeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
+            # 'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
+            # # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
+            'Homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
+            # 'W8S8_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=8, min_S_length=8),
+            'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
+            # 'W16S16_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=16, min_S_length=16),
+            # 'W20S20_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=20, min_S_length=20),
+            # 'localGCcontent': finder_dataset.find_local_gc_content(index=index, window_size=30, min_GC_content=20, max_GC_content=80),
+            # 在适当的位置调用
+            'highGC': finder_dataset.find_high_gc_content(index=index, window_size=30, max_GC_content=80),
+            'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=30, min_GC_content=20),
+            'LCC': finder_dataset.get_lcc(index=index),
+            'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=10),
+        }
+    # print("results", results)
+    #将结果列表转换为DataFrame， 处理长度不一致问题
+    df = pd.DataFrame(results).T
+    
+    gene_table = expanded_rows_to_gene_table(df, gene_table)
+
+    return gene_table
+
 
 def process_fasta_file(fasta_file):
     gene_table = pd.DataFrame(columns=['gene_id', 'sequence'])
@@ -128,6 +293,7 @@ def SequenceAnalyzer(request):
         gene_table['total_penalty_score'] = gene_table.apply(lambda row: row.filter(like='penalty_score').sum(), axis=1)
 
         request.session['gene_table'] = gene_table.to_dict(orient='records')
+        print("gene table to dict:\n", gene_table.to_dict(orient='records'))
         return JsonResponse({'status': 'success', 'redirect_url': '/tools/sequence_analysis_detail/'})    
     return render(request, 'tools/SequenceAnalyzer.html')
 
@@ -285,9 +451,9 @@ def plate_view(request):
             # for layout
             df['FullSeqREAL_Credit_Copy'] = df['FullSeqREAL_Credit']
             df = df.assign(FullSeqREAL_Credit=df['FullSeqREAL_Credit'].str.split(';')).explode('FullSeqREAL_Credit').reset_index(drop=True)
-            df['Subplate'] = 'R' + (df.groupby(['PRJIN_PLT_ID', 'PRJIN_WellPos']).cumcount() + 1).astype(str)
+            # df['Subplate'] = 'R' + (df.groupby(['PRJIN_PLT_ID', 'PRJIN_WellPos']).cumcount() + 1).astype(str)
             df = df[['MWF5_Mfg_ID', 'PRJIN_PLT_ID', 'PRJIN_WellPos', 'FullSeqREAL_Credit', 
-                     'GeneID', 'FullSeqREAL_Credit_Copy', 'Subplate']]
+                     'GeneID', 'FullSeqREAL_Credit_Copy']]
             return df, gene_assembly_df, project_name
         except FileNotFoundError:
             raise BadRequest(f"File not found: {file}")
@@ -349,8 +515,10 @@ def plate_view(request):
             df = df.rename(columns={
                 'Plate': 'WF3_Plate',
                 'GeneName': 'WF3_Synthon_GeneName',
-                'WellPos': 'WF3_WellPos'
+                'WellPos': 'WF3_WellPos',
+                'FullSeqREAL_Credit': 'WF3_FullSeqREAL_Credit'
             })
+            df = df.sort_values(by=['WF3_Synthon_GeneName'])
             df['WF3_PLT_ID'] = df['WF3_Plate'].apply(lambda x: x.replace('Plate', 'WF3p30_Plate0'))
             df['WF3_Mfg_ID'] = '[' + df['PRJID'] + '][G' + df['IntraPRJSN'].astype(str).str.zfill(4) + ']'
             
@@ -393,6 +561,7 @@ def plate_view(request):
             
             # 生成 Assembly_Well_ID 列
             df['GG1_Well_ID'] = None
+            df = df.sort_values(by=['WF3_Mfg_ID'])
             for plate, group in df.groupby('GG1_Plate_ID'):
                 num_wells = len(group)
                 well_ids = generate_well_ids(num_wells)
@@ -410,7 +579,7 @@ def plate_view(request):
                     "WF3_gZip1_WellPos", "RE_PCR_forMTP_Forward_Primer", "GG1_Plate_ID", "GG1_Well_ID"]]
             
             df = df[['WF3_Mfg_ID', 'WF3_gZip1_WellPos', "WF3_Synthon_GeneName", 'Dialout_PrimerName_For', 'Dialout_PrimerName_Rev', 
-                     'Dialout_PrimerWellPos_For', 'Dialout_PrimerWellPos_Rev', 'WF3_PLT_ID', 'WF3_WellPos']]
+                     'Dialout_PrimerWellPos_For', 'Dialout_PrimerWellPos_Rev', 'WF3_PLT_ID', 'WF3_WellPos','WF3_FullSeqREAL_Credit']]
             # 这个Gene_Assembly_df 要返回前端去下载
             return df, Gene_Assembly_df, project_name
         except FileNotFoundError:
@@ -428,6 +597,12 @@ def plate_view(request):
         df5, WF5_Gene_Assembly_df, WF5_PRJ_name = process_5p30_file(file1)
         df3, WF3_Gene_Assembly_df, WF3_PRJ_name = process_3p30_file(file2)
         df_merge = pd.merge(df3, df5, left_on='WF3_Mfg_ID', right_on="FullSeqREAL_Credit", how='outer')
+        df_merge = df_merge.sort_values(by=['WF3_Synthon_GeneName'])
+        # print(df_merge)
+        # print(df_merge.columns)
+        # print(df_merge[['PRJIN_PLT_ID', 'PRJIN_WellPos']])
+        df_merge['Subplate'] = 'R' + (df_merge.groupby(['PRJIN_PLT_ID', 'PRJIN_WellPos']).cumcount() + 1).astype(str)
+        # print(df_merge)
     elif file3:
         df_merge = pd.read_csv(file3, sep='\t')
 
@@ -533,7 +708,7 @@ def plate_view(request):
             well_index += 2
 
     # 最后再重新处理一下df_merge，将不需要的列删除
-    _columns = ["WF3_Mfg_ID", "WF3_gZip1_WellPos", "GeneID", "WF3_Synthon_GeneName", "MWF5_Mfg_ID", 
+    _columns = ["WF3_Mfg_ID", "WF3_gZip1_WellPos", "WF3_FullSeqREAL_Credit", "GeneID", "WF3_Synthon_GeneName", "MWF5_Mfg_ID", 
                 "PRJIN_PLT_ID", "PRJIN_WellPos", "Dialout_PLT_ID", "Dialout_WellPos", 
                 "Dialout_PrimerName_For", "Dialout_PrimerName_Rev", "Dialout_PrimerWellPos_For", 
                 "Dialout_PrimerWellPos_Rev", "Complete_final_gene", "Rank1.reads.errFree", 

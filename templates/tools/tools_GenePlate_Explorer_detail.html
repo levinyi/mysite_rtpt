@@ -200,8 +200,8 @@
                 }
 
                 function mergeData(updatedData, dfMerge) {
-                    // console.log("updatedData", updatedData)
-                    // console.log("dfMerge", dfMerge)
+                    console.log("updatedData", updatedData)
+                    console.log("dfMerge", dfMerge)
                     const updatedDataMap = updatedData.reduce((acc, row) => {
                         const key = row.GeneID;
                         acc[key] = row;
@@ -213,7 +213,7 @@
                         const newRow = updatedDataMap[key] ? { ...row, ...updatedDataMap[key] } : row;
                         return renameColumns(newRow);
                     });
-                    // console.log("mergedData", mergedData)
+                    console.log("mergedData", mergedData)
                     return mergedData;
                 }
 

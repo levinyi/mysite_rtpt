@@ -7,7 +7,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('order_create/', views.order_create, name='order_create'),
     # gene
-    path('gene_detail_old/', views.gene_detail_old, name='gene_detail_old'),
+    # path('gene_detail_old/', views.gene_detail_old, name='gene_detail_old'),
     path('gene_detail/', views.gene_detail, name='gene_detail'),
     path('gene_data_api/', views.gene_data_api, name='gene_data_api'),
     path('save_species/', views.save_species, name='save_species'),
@@ -15,7 +15,9 @@ urlpatterns = [
     path('protein_edit/<int:gene_id>/', views.protein_edit, name='protein_edit'),
     path('gene_delete/', views.gene_delete, name='gene_delete'),
     path('gene_validation/', views.gene_validation, name='gene_validation'),
-    path('bulk_optimization/', views.bulk_optimization, name='bulk_optimization'),
+    path('bulk_optimization_submit/', views.bulk_optimization_submit, name='bulk_optimization_submit'),
+    path('bulk_optimization_display/', views.bulk_optimization_display, name='bulk_optimization_display'),
+
     # shopping cart
     path('view_cart/', views.view_cart, name='view_cart'),
     path('cart_genbank_download/<int:gene_id>/', views.cart_genbank_download, name='cart_genbank_download'),

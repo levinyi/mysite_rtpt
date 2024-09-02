@@ -4,9 +4,10 @@ from django.http import JsonResponse, Http404
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
+import pandas as pd
 
 from notice.views import send_email
-from user_center.models import GeneInfo
+from user_center.models import GeneOptimization
 from decouple import config
 
 TOKEN = config('TOKEN')
@@ -24,31 +25,28 @@ def request_genes(request):
     def get_str_len(ss):
         return len(ss) if ss else 0
 
-    if request.GET.get('token', default=None) is None or not check(request.GET['token']):
-        raise Http404('Page Not Found!')
+    # if request.GET.get('token', default=None) is None or not check(request.GET['token']):
+    #     raise Http404('Page Not Found!')
 
-    genes = GeneInfo.objects.filter(status='optimizing')
+    genes = GeneOptimization.objects.filter(status='pending')
+    print(genes)
     result_data = {}
 
+    # 处理成dataframe
     for gene in genes.all():
-        v = gene.vector
-        if gene.user.id not in result_data:
-            result_data[gene.user.id] = []
-        length = \
-            get_str_len(gene.i5nc) + get_str_len(v.NC5) + get_str_len(gene.original_seq) * 3 + \
-            get_str_len(gene.i3nc) + get_str_len(v.NC3)
-
-        result_data[gene.user.id].append({
-            'GeneName': gene.gene_name,
-            'Seq5NC': v.NC5 + gene.i5nc,
-            'SeqAA': gene.original_seq,
-            'Seq3NC': v.NC3 + gene.i3nc,
-            'VectorID': v.vector_id,
-            'Species': gene.species.species_name if gene.species else None,
-            'ForbiddenSeqs': gene.forbid_seq,
-            'length': length
-        })
-    # print(result_data)
+        result_data[gene.id] = {
+            'GeneID': gene.id,
+            'GeneName': gene.gene.gene_name,
+            'VectorID': gene.vector.vector_id,
+            'VectorName': gene.vector.vector_name,
+            'SpeciesName': gene.species.species_name,
+            'GeneSeq': gene.gene.saved_seq,
+            'Vector5NC': gene.vector.NC5,
+            'Vector3NC': gene.vector.NC3,
+        }
+    print(result_data)
+    result_data_df = pd.DataFrame(result_data).T
+    print(result_data_df)
     return JsonResponse(result_data, json_dumps_params={'ensure_ascii': False})
 
 
@@ -58,7 +56,7 @@ def upload_genes(request):
     if request.headers.get('token', default=None) is None or not check(request.headers['token']):
         raise Http404('Page Not Found!')
     data_list = json.loads(request.body.decode('utf-8'))
-    obj = GeneInfo.objects
+    obj = GeneOptimization.objects
     for key, value in data_list.items():
         user_id = int(value['user_id'])
         datas = value['datas']

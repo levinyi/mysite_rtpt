@@ -15,14 +15,14 @@ def main(data, index):
 
     # 提取特征和标签
     X = data[['highGC_penalty_score', 'lowGC_penalty_score', 'W12S12Motifs_penalty_score', 
-            'LongRepeats_penalty_score', 'Homopolymers_penalty_score', 
+            'LongRepeats_penalty_score', 'Homopolymers_penalty_score', 'doubleNT_penalty_score',
             'LCC_penalty_score',
             ]]
     y = data['MTP_Results']
 
     # 移除前5列全为空的行
     X = X.dropna(subset=['highGC_penalty_score', 'lowGC_penalty_score', 'W12S12Motifs_penalty_score', 
-                        'LongRepeats_penalty_score', 'Homopolymers_penalty_score'], how='all')
+                        'LongRepeats_penalty_score', 'Homopolymers_penalty_score','doubleNT_penalty_score'], how='all')
     y = y.loc[X.index]
 
     # 标准化特征
@@ -46,9 +46,25 @@ def main(data, index):
         'min_samples_split': [2, 5, 10],
         'min_samples_leaf': [1, 2, 4]
     }
+    # 随机森林超参数调优
+    # rf_param_dist = {
+    #     'n_estimators': [200, 500],  # 增加树的数量来提高模型的稳定性
+    #     'max_depth': [None, 30, 50],  # 增加树的深度来允许更复杂的模型
+    #     'min_samples_split': [2, 5],  # 减少分裂节点所需的最小样本数
+    #     'min_samples_leaf': [1, 2],  # 减少叶节点所需的最小样本数
+    #     'max_features': [None, 'sqrt', 'log2']  # 调整每棵树的最大特征数量
+    # }
 
     # 使用 RandomizedSearchCV 来在给定的超参数范围内随机搜索最佳的超参数组合，然后用这些超参数训练一个 RandomForestClassifier。
-    rf_random_search = RandomizedSearchCV(RandomForestClassifier(random_state=RANDOM_SEED), rf_param_dist, n_iter=20, cv=3, scoring='accuracy', random_state=RANDOM_SEED)
+    rf_random_search = RandomizedSearchCV(
+        RandomForestClassifier(random_state=RANDOM_SEED),
+        rf_param_dist,
+        n_iter=20,
+        cv=3,
+        scoring='accuracy',
+        random_state=RANDOM_SEED,
+        n_jobs=-1  # 并行处理，提高搜索速度
+    )
     '''
         具体解释如下：
         RandomForestClassifier：这是基础模型。它是一个随机森林分类器。
@@ -70,7 +86,6 @@ def main(data, index):
     # 保存模型和标准化器和权重
     best_rf_weights = best_rf_model.feature_importances_
     joblib.dump(best_rf_model, f'best_rf_model_{index}.pkl')
-    # joblib.dump(scaler, f'scaler_{index}.pkl')
     np.save(f'best_rf_weights_{index}.npy', best_rf_weights)
 
     # 计算混淆矩阵和其他指标
@@ -93,11 +108,20 @@ def main(data, index):
 if __name__ == '__main__':
     # file_path = sys.argv[1]
     # 读取数据
+    # old data
+    # file_path_list = [
+    #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.11samples.txt',
+    #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.longSequence.samples.txt',
+    #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.20.mixed.samples.txt',
+    # ]
+
+    # new data
     file_path_list = [
-        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.11samples.txt',
-        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.longSequence.samples.txt',
-        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.20.mixed.samples.txt',
+        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.11samples.20240819.txt',
+        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.longSequence.samples.20240819.txt',
+        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.20.mixed.samples.20240819.txt',
     ]
-    for index, file_path in enumerate(file_path_list, start=4):
+    # 逐个处理数据, 新模型从7开始保存，
+    for index, file_path in enumerate(file_path_list, start=7):
         data = pd.read_csv(file_path, sep="\t", low_memory=False)
         main(data, index)
