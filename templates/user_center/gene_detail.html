@@ -50,6 +50,16 @@
     }
     .danger { background-color: red; }
     .warning { background-color: yellow; }
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    .col-md-3 {
+        display: flex;
+    }
+    .card {
+        flex: 1;
+    }
 </style>
 {% endblock %}
 {% block content %}
@@ -61,7 +71,7 @@
     </div>
 </div>
 
-<!-- Offcanvas -->
+<!-- Warning Offcanvas -->
 <div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="offcanvasWithBothOptions" aria-labelledby="offcanvasWithBothOptionsLabel">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="offcanvasWithBothOptionsLabel">Prohibition and Risk</h5>
@@ -172,6 +182,8 @@
         </div>
     </div>
 </div>
+
+<!-- Main Page -->
 <div class="container-fluid" style="padding-left:50px;">
     <!-- Breadcrumb -->
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
@@ -183,47 +195,52 @@
             </ol>
         </div>
     </nav>
-
     <!-- Gene Information -->
-    <div class="row mt-3">
-        <div class="row">
-            <h2>Editing Gene Sequences</h2>
+    <div class="card mt-3">
+        <div class="container">
+
+        <div class="row mt-4">
+            <!-- Total Genes Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ gene_list.count }} Total Genes</h5>
+                        <canvas id="geneClassificationChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- GC Content Distribution Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">GC Content Distribution</h5>
+                        <canvas id="gcContentChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Gene Length Distribution Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Gene Length Distribution</h5>
+                        <canvas id="geneLengthChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Sequence Complexity Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Sequence Penalty</h5>
+                        <canvas id="sequenceComplexityChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
-        <div class="row">
-            <div class="col-md-4">
-                <p>Total Genes: {{ gene_list.count }}</p>
-            </div>
-            <!-- Progress Bar -->
-            <div class="col-md-4 progress-stacked">
-                {% with total_genes=gene_list.count %}
-                    {% with forbidden_genes=gene_list|filter_status:"forbidden" %}
-                        {% with allowed_genes=total_genes|minus_gene:forbidden_genes %}
-                        <!-- Forbidden Progress -->
-                        <div class="progress" role="progressbar" aria-label="Forbidden" aria-valuenow="{{ forbidden_genes }}" aria-valuemin="0" aria-valuemax="100" style="width: {{ forbidden_genes|percentage_of:total_genes|floatformat:0 }}%"
-                            data-bs-toggle="tooltip"  data-bs-placement="top" title="Failed: {{ forbidden_genes }}">
-                            <div class="progress-bar bg-danger">{{ forbidden_genes }}</div>
-                        </div>
-                        <!-- Allowed Progress -->
-                        <div class="progress" role="progressbar" aria-label="Allowed" aria-valuenow="{{ allowed_genes }}" aria-valuemin="0"  aria-valuemax="100" style="width: {{ allowed_genes|percentage_of:total_genes|floatformat:0 }}%"
-                            data-bs-toggle="tooltip"  data-bs-placement="top" title="Success: {{ allowed_genes }}">
-                            <div class="progress-bar bg-success">{{ allowed_genes }}</div>
-                        </div>
-                        {% endwith %}
-                    {% endwith %}
-                {% endwith %}
-
-                <!-- Adding a canvas for the scatter plot -->
-                <canvas id="gcContentChart"></canvas>
-            </div>
-            <!-- Bulk Optimization Button -->
-            <div class="col-md-4 text-end mb-2">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
-                    <i class="bi bi-check2-all me-2"></i>Bulk Optimization
-                </button>
-            </div>
-        </div>
-    <div class="row">
+    <!-- Gene List -->
+    <div class="row mt-3">
         {% for gene in gene_list %}
         <div class="accordion mb-3" id="accordion{{ forloop.counter }}">
             <!-- First Row -->
@@ -372,6 +389,9 @@
     <div class="col text-center">
         <a href="{% url 'user_center:order_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add more Genes</a>
         <a href="{% url 'user_center:view_cart' %}" class="btn btn-primary"><i class="bi bi-cart3"></i> Go to Shopping Cart</a>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
+            <i class="bi bi-check2-all me-2"></i>Bulk Optimization
+        </button>
     </div>
 </div>
 {% endblock %}
@@ -385,8 +405,6 @@
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.flash.min.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
-
-<!-- JavaScript to handle DataTables, form submission, and validation -->
 <script>
     $(document).ready(function() {
         var selectAllState = false;
@@ -455,7 +473,6 @@
         });
     });
 </script>
-
 <script>
     function getTagTextByHTML(html) {
         var tagged_seq = '';
@@ -726,92 +743,279 @@
     });
 </script>
 <script>
-// for save button
-$(document).ready(function() {
-    $('.canSave').on('click', function(e, event) {
-        const url = $(this).data('url');
-        const tmp = e.target.closest('.col-md-2')
-        const tmp2 = e.target.closest('.mb-5')
+    // for save button
+    $(document).ready(function() {
+        $('.canSave').on('click', function(e, event) {
+            const url = $(this).data('url');
+            const tmp = e.target.closest('.col-md-2')
+            const tmp2 = e.target.closest('.mb-5')
 
-        const editedSequenceDiv = tmp.previousElementSibling.querySelector("#edited-sequence");
-        const toggleButton = tmp.querySelector(".toggle-btn");
-        const frameshiftSelector = tmp.querySelector("#frameshiftSelector");
-        const editButtons = e.target.closest('.edit-buttons')
-        const savedButton = tmp2.querySelector('.saved-button')
-        const first_col_trun = tmp2.querySelector('.first_col_trun')
-        const first_col_full = tmp2.querySelector('.first_col_full')
-        const second_col_trun = tmp2.querySelector('.second_col_trun')
-        const second_col_full = tmp2.querySelector('.second_col_full')
-        // 获取editedSequenceDiv的内容和geneName
-        const sequenceContent = editedSequenceDiv.innerText;
-        
-        // 构建要发送的数据
-        $.ajax({
-            url: url,
-            type: 'POST',
-            headers: {'X-CSRFToken': '{{ csrf_token }}'},
-            data:JSON.stringify({
-                sequence: sequenceContent,
-            }),
-            success: function(response) {
-                if(response.status === 'success') {
-                    // alert(response.message); // 或其他方式显示成功消息
-                    alert('Save success!');
-                    editedSequenceDiv.innerHTML = response.new_seq;
-                    editButtons.style.display = "none";
-                    savedButton.style.display = "";
-                    first_col_full.style.display = "none";
-                    first_col_trun.style.display = "";
-                    second_col_full.style.display = "none";
-                    second_col_trun.style.display = "";
-                } else {
-                    // console.log(response);
-                    alert(response.message); // 或其他方式显示错误消息
+            const editedSequenceDiv = tmp.previousElementSibling.querySelector("#edited-sequence");
+            const toggleButton = tmp.querySelector(".toggle-btn");
+            const frameshiftSelector = tmp.querySelector("#frameshiftSelector");
+            const editButtons = e.target.closest('.edit-buttons')
+            const savedButton = tmp2.querySelector('.saved-button')
+            const first_col_trun = tmp2.querySelector('.first_col_trun')
+            const first_col_full = tmp2.querySelector('.first_col_full')
+            const second_col_trun = tmp2.querySelector('.second_col_trun')
+            const second_col_full = tmp2.querySelector('.second_col_full')
+            // 获取editedSequenceDiv的内容和geneName
+            const sequenceContent = editedSequenceDiv.innerText;
+            
+            // 构建要发送的数据
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                data:JSON.stringify({
+                    sequence: sequenceContent,
+                }),
+                success: function(response) {
+                    if(response.status === 'success') {
+                        // alert(response.message); // 或其他方式显示成功消息
+                        alert('Save success!');
+                        editedSequenceDiv.innerHTML = response.new_seq;
+                        editButtons.style.display = "none";
+                        savedButton.style.display = "";
+                        first_col_full.style.display = "none";
+                        first_col_trun.style.display = "";
+                        second_col_full.style.display = "none";
+                        second_col_trun.style.display = "";
+                    } else {
+                        // console.log(response);
+                        alert(response.message); // 或其他方式显示错误消息
+                    }
+                },
+                error: function() {
+                    alert('请求失败'); // 或其他方式显示错误消息
                 }
-            },
-            error: function() {
-                alert('请求失败'); // 或其他方式显示错误消息
-            }
+            });
         });
     });
-});
-// for edit button
-$(document).ready(function() {
-    $('.editButton').on('click', function(e, event) {
-        const url = $(this).data('url');
+    // for edit button
+    $(document).ready(function() {
+        $('.editButton').on('click', function(e, event) {
+            const url = $(this).data('url');
 
-        const savedButton = e.target.closest('.saved-button')
-        const tmp = e.target.closest('.mb-5')
+            const savedButton = e.target.closest('.saved-button')
+            const tmp = e.target.closest('.mb-5')
 
-        const editButtons = tmp.querySelector('.edit-buttons')
-        const first_col_trun = tmp.querySelector('.first_col_trun')
-        const first_col_full = tmp.querySelector('.first_col_full')
-        const second_col_trun = tmp.querySelector('.second_col_trun')
-        const second_col_full = tmp.querySelector('.second_col_full')
-        $.ajax({
-            url: url,
-            type: 'POST',
-            headers: {'X-CSRFToken': '{{ csrf_token }}'},
-            success: function(response) {
-                if(response.status === 'success') {
-                    // alert(response.message); // 或其他方式显示成功消息
-                    editButtons.style.display = "";
-                    savedButton.style.display = "none";
-                    first_col_full.style.display = "";
-                    first_col_trun.style.display = "none";
-                    second_col_full.style.display = "";
-                    second_col_trun.style.display = "none";
-                } else {
-                    alert(response.message); // 或其他方式显示错误消息
+            const editButtons = tmp.querySelector('.edit-buttons')
+            const first_col_trun = tmp.querySelector('.first_col_trun')
+            const first_col_full = tmp.querySelector('.first_col_full')
+            const second_col_trun = tmp.querySelector('.second_col_trun')
+            const second_col_full = tmp.querySelector('.second_col_full')
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                success: function(response) {
+                    if(response.status === 'success') {
+                        // alert(response.message); // 或其他方式显示成功消息
+                        editButtons.style.display = "";
+                        savedButton.style.display = "none";
+                        first_col_full.style.display = "";
+                        first_col_trun.style.display = "none";
+                        second_col_full.style.display = "";
+                        second_col_trun.style.display = "none";
+                    } else {
+                        alert(response.message); // 或其他方式显示错误消息
+                    }
+                },
+                error: function() {
+                    alert('请求失败'); // 或其他方式显示错误消息
                 }
-            },
-            error: function() {
-                alert('请求失败'); // 或其他方式显示错误消息
-            }
+            });
         });
     });
-});
 </script>
+<script>
+    // 其他代码： 处理序列高亮显示等
+    document.querySelectorAll('.sequence-highlighter').forEach(function(item) {
+        item.addEventListener('mouseenter', function() {
+            // 提取序列部分，考虑到可能有分号分隔的多个序列
+            const fullText = this.textContent.trim();
+            const targetSequencePart = fullText.split(':')[1].split(',')[0].trim();  // 提取序列部分
+            const targetSequences = targetSequencePart.split(';');  // 处理可能的多序列情况
+            const targetId = this.getAttribute('data-target');
+            const targetElement = document.querySelector(targetId);
 
+            console.log('Target Sequences:', targetSequences);  // 打印目标序列
+            console.log('Target ID:', targetId);  // 打印目标元素的ID
+
+            if (targetElement) {
+                let highlightedText = targetElement.innerHTML; // 使用 innerHTML 保留原始 HTML 格式
+
+                targetSequences.forEach(sequence => {
+                    // 转义序列中的特殊字符
+                    const regex = new RegExp(sequence.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
+                    highlightedText = highlightedText.replace(regex, 
+                        `<span class="bg-warning text-dark">${sequence}</span>`);  // 替换文本以高亮显示
+                });
+
+                targetElement.innerHTML = highlightedText;  // 更新HTML内容
+            }
+        });
+
+        item.addEventListener('mouseleave', function() {
+            const targetId = this.getAttribute('data-target');
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                targetElement.innerHTML = targetElement.textContent; // 恢复原始文本内容
+            }
+        });
+    });
+</script>
+<!-- Chart.js scripts -->
+<script>
+    const genesList = [
+            {% for gene in gene_list %}
+                {
+                    gene_classification: "{{ gene.status|default:'unknown' }}",
+                    saved_seq: "{{ gene.saved_seq|escapejs }}",
+                    modified_gc_content: {{ gene.modified_gc_content }},
+                    penalty_score: {{ gene.penalty_score|default:"0" }}
+                }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+    
+    const geneClassification = genesList.map(gene => gene.gene_classification||'unknown');
+    const geneLength = genesList.map(gene => gene.saved_seq.length);
+    const gcContent = genesList.map(gene => gene.modified_gc_content);
+    const geneComplexity = genesList.map(gene => gene.penalty_score);
+
+    // 统计每种分类的数量
+    const classificationCounts = geneClassification.reduce((acc, classification) => {
+        acc[classification] = (acc[classification] || 0) + 1;
+        return acc;
+    }, {});
+
+    // 提取分类名称和对应的数量
+    const classificationLabels = Object.keys(classificationCounts);
+    const classificationData = Object.values(classificationCounts);
+    
+    const ctx1 = document.getElementById('geneClassificationChart').getContext('2d');
+    const geneClassificationChart = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+            labels: classificationLabels,
+            datasets: [{
+                data: classificationData,
+                backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d'],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+
+    const ctx2 = document.getElementById('gcContentChart').getContext('2d');
+    const gcContentScatterChart = new Chart(ctx2, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'GC Content',
+                data: genesList.map((gene, index) => ({ x: index + 1, y: gene.modified_gc_content })), // Format data for scatter plot
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(54, 162, 235, 1)',
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Gene Index'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'GC Content'
+                    }
+                }
+            }
+        }
+    });
+
+    const ctx3 = document.getElementById('geneLengthChart').getContext('2d');
+    const geneLengthChart = new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: genesList.map((gene, index) => `Gene ${index + 1}`),
+            datasets: [{
+                label: 'Length',
+                data: geneLength,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    beginAtZero: true
+                },
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Sequence Complexity Scatter Plot
+    const ctx4 = document.getElementById('sequenceComplexityChart').getContext('2d');
+    const sequenceComplexityChart = new Chart(ctx4, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Penalty Score',
+                data: genesList.map((gene, index) => ({ x: index, y: gene.penalty_score })),
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    title: {
+                        display: true,
+                        text: 'Gene Index'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Penalty Score'
+                    }
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}
 

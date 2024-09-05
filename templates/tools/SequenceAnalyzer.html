@@ -181,7 +181,9 @@
         const hotData = hot.getData();
         const fastaFile = document.getElementById('fastaFile').files[0];
         const formData = new FormData();
+        const uploadType = fastaFile ? 'file' : 'table';
 
+        formData.append('uploadType', uploadType); // 添加上传类型标志
         if (fastaFile) {
             formData.append('fastaFile', fastaFile);
         } else {

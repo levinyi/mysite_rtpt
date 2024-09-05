@@ -17,6 +17,7 @@
                 <!-- 导航项 -->
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'user_center:dashboard' %}">User Center</a></li>
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'user_center:order_create' %}">Create New Order</a></li>
+                <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'tools:tools_list' %}">Tools</a></li>
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'account:contact_us' %}">Contact Us</a></li>
                 {% if user.is_authenticated and is_secondary_admin %}
                     <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'super_manage:user_manage' %}">Admin</a></li>

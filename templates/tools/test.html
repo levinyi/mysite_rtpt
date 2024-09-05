@@ -1,42 +1,185 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Handsontable Custom Headers</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@8.4.0/dist/handsontable.full.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gene Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .custom-col-header {
-            background-color: #4CAF50 !important;
-            color: white !important;
+        .row {
+            display: flex;
+            flex-wrap: wrap;
         }
-        .custom-row-header {
-            background-color: #2196F3 !important;
-            color: white !important;
+        .col-md-3 {
+            display: flex;
+        }
+        .card {
+            flex: 1;
         }
     </style>
 </head>
 <body>
-    <div id="example1" class="handsontable"></div>
+    <div class="container my-5">
+        <div class="row">
+            <!-- Total Genes Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Genes</h5>
+                        <p class="card-text display-4">1234</p>
+                        <canvas id="geneClassificationChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- GC Content Distribution Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">GC Content Distribution</h5>
+                        <canvas id="gcContentChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Gene Length Distribution Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Gene Length Distribution</h5>
+                        <canvas id="geneLengthChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Sequence Complexity Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Sequence Complexity</h5>
+                        <canvas id="sequenceComplexityChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/handsontable@8.4.0/dist/handsontable.full.min.js"></script>
+    <!-- Bootstrap and Chart.js scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const container = document.getElementById('example1');
-            const hot = new Handsontable(container, {
-                data: Handsontable.helper.createSpreadsheetData(16, 24),
-                colHeaders: true,
-                rowHeaders: true,
-                width: '100%',
-                height: 'auto',
-                rowHeights: 25,
-                colWidths: 50,
-                afterGetColHeader: function (col, TH) {
-                    TH.classList.add('custom-col-header');
-                },
-                afterGetRowHeader: function (row, TH) {
-                    TH.classList.add('custom-row-header');
-                },
-                licenseKey: 'non-commercial-and-evaluation'
-            });
+        // Example data and chart setup
+        const ctx1 = document.getElementById('geneClassificationChart').getContext('2d');
+        const geneClassificationChart = new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+                labels: ['Type 1', 'Type 2', 'Type 3'],
+                datasets: [{
+                    data: [300, 200, 150],
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                }
+            }
+        });
+
+        const ctx2 = document.getElementById('gcContentChart').getContext('2d');
+        const gcContentChart = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: ['Gene 1', 'Gene 2', 'Gene 3', 'Gene 4'],
+                datasets: [{
+                    label: 'GC Content',
+                    data: [55, 60, 45, 70],
+                    backgroundColor: '#36A2EB'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        const ctx3 = document.getElementById('geneLengthChart').getContext('2d');
+        const geneLengthChart = new Chart(ctx3, {
+            type: 'line',
+            data: {
+                labels: ['Gene 1', 'Gene 2', 'Gene 3', 'Gene 4'],
+                datasets: [{
+                    label: 'Length',
+                    data: [2000, 1500, 1800, 2100],
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Sequence Complexity Scatter Plot
+        const ctx4 = document.getElementById('sequenceComplexityChart').getContext('2d');
+        const sequenceComplexityChart = new Chart(ctx4, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Gene Complexity',
+                    data: [
+                        {x: 1, y: 65},
+                        {x: 2, y: 59},
+                        {x: 3, y: 80},
+                        {x: 4, y: 81},
+                        // Add more data points as needed
+                    ],
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Gene Index'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Complexity Score'
+                        }
+                    }
+                }
+            }
         });
     </script>
 </body>

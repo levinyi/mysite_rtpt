@@ -12,6 +12,8 @@ urlpatterns = [
     path('GenePlateExplorer/', views.GenePlateExplorer, name='GenePlateExplorer'),
     path('plate_view/', views.plate_view, name='plate_view'),
 
+    # 3 enzyme split site.
+    path('SplitEnzymeSite/', views.SplitEnzymeSite, name='SplitEnzymeSite'),
 
     # test
     path('test/', views.test, name='test'),

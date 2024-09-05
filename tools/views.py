@@ -1,4 +1,3 @@
-import base64
 import io, os, re
 import json
 from django.http import HttpResponse, JsonResponse
@@ -7,8 +6,11 @@ from django.shortcuts import redirect, render
 from .models import Tool
 from django.contrib.auth.decorators import login_required
 from tools.scripts.AnalysisSequence import DNARepeatsFinder
+from tools.scripts.split_enzyme_site import find_enzyme_sites
 import pandas as pd
 from Bio import SeqIO
+import zipfile
+from io import BytesIO
 
 
 def tools_list(request):
@@ -236,7 +238,6 @@ def convert_gene_table_to_RepeatsFinder_Format(gene_table):
             'LCC': finder_dataset.get_lcc(index=index),
             'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=10),
         }
-    # print("results", results)
     #将结果列表转换为DataFrame， 处理长度不一致问题
     df = pd.DataFrame(results).T
     
@@ -257,15 +258,26 @@ def process_fasta_file(fasta_file):
 @login_required
 def SequenceAnalyzer(request):
     if request.method == 'POST':
-        if 'fastaFile' in request.FILES:
+        upload_type = request.POST.get('uploadType')
+
+        if upload_type == 'file' and 'fastaFile' in request.FILES:
+             # 如果有文件上传，通过 request.FILES 读取
             fasta_file = request.FILES['fastaFile']
             gene_table = process_fasta_file(fasta_file)
-        else:
-            data = json.loads(request.body.decode('utf-8'))
-            gene_table = data.get("genetable")
-            if not gene_table:
+        elif upload_type == 'table':
+            # 尝试从表单字段中读取 JSON 数据
+            genetable_json = request.POST.get('genetable')
+            if not genetable_json:
                 return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
-            gene_table = pd.DataFrame(gene_table, columns=['gene_id', 'sequence']).dropna().reset_index(drop=True)
+            
+            try:
+                gene_table = json.loads(genetable_json)
+                gene_table = pd.DataFrame(gene_table, columns=['gene_id', 'sequence']).dropna().reset_index(drop=True)
+            except json.JSONDecodeError:
+                return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'})      
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Invalid upload type or missing data'})
+
 
         long_repeats_min_len = int(request.POST.get('longRepeatsMinLen', 16))
         homopolymers_min_len = int(request.POST.get('homopolymersMinLen', 7))
@@ -293,7 +305,6 @@ def SequenceAnalyzer(request):
         gene_table['total_penalty_score'] = gene_table.apply(lambda row: row.filter(like='penalty_score').sum(), axis=1)
 
         request.session['gene_table'] = gene_table.to_dict(orient='records')
-        print("gene table to dict:\n", gene_table.to_dict(orient='records'))
         return JsonResponse({'status': 'success', 'redirect_url': '/tools/sequence_analysis_detail/'})    
     return render(request, 'tools/SequenceAnalyzer.html')
 
@@ -516,7 +527,7 @@ def plate_view(request):
                 'Plate': 'WF3_Plate',
                 'GeneName': 'WF3_Synthon_GeneName',
                 'WellPos': 'WF3_WellPos',
-                'FullSeqREAL_Credit': 'WF3_FullSeqREAL_Credit'
+                'FullSeqREAL_Credit': 'WF3_FullSeqREAL_Credit',
             })
             df = df.sort_values(by=['WF3_Synthon_GeneName'])
             df['WF3_PLT_ID'] = df['WF3_Plate'].apply(lambda x: x.replace('Plate', 'WF3p30_Plate0'))
@@ -598,11 +609,7 @@ def plate_view(request):
         df3, WF3_Gene_Assembly_df, WF3_PRJ_name = process_3p30_file(file2)
         df_merge = pd.merge(df3, df5, left_on='WF3_Mfg_ID', right_on="FullSeqREAL_Credit", how='outer')
         df_merge = df_merge.sort_values(by=['WF3_Synthon_GeneName'])
-        # print(df_merge)
-        # print(df_merge.columns)
-        # print(df_merge[['PRJIN_PLT_ID', 'PRJIN_WellPos']])
         df_merge['Subplate'] = 'R' + (df_merge.groupby(['PRJIN_PLT_ID', 'PRJIN_WellPos']).cumcount() + 1).astype(str)
-        # print(df_merge)
     elif file3:
         df_merge = pd.read_csv(file3, sep='\t')
 
@@ -722,7 +729,6 @@ def plate_view(request):
         if col not in _columns:
             df_merge.drop(columns=[col], inplace=True)
     df_merge_json = df_merge.to_json(orient='records')
-
     # 保存数据到文件
     with open('media/temp/all_data.json', 'w') as f:
         json.dump(all_data, f, indent=4)
@@ -742,6 +748,115 @@ def plate_view(request):
         'WF3_PRJ_name': WF3_PRJ_name
     })
 
+@login_required
+def SplitEnzymeSite(request):
+    if request.method == 'GET':
+        return render(request, 'tools/tools_SplitEnzymeSite.html')
+    elif request.method == 'POST':
+        enzyme_site_table = request.POST.get('tableData')
+        sequence_file = request.FILES.get('file_name1')
+        sequence_type = request.POST.get('sequenceType')
+
+        # 处理循环序列
+        circular = sequence_type == 'circular'
+        # print("sequence_file: ", sequence_file, "enzyme_site_table: ", enzyme_site_table, "sequence_type: ", sequence_type, "circular: ", circular)
+
+        # 这是内置的酶切位点信息
+        enzymes_info = [
+            {'Enzyme': 'BamHI', 'Site_NT': 'GGATCC', 'Cutting_Site_Left(bp)': 1, 'Cutting_Site_Right(bp)': 5},
+            {'Enzyme': 'EcoRV', 'Site_NT': 'GATATC', 'Cutting_Site_Left(bp)': 3, 'Cutting_Site_Right(bp)': 3},
+            {'Enzyme': 'PstI', 'Site_NT': 'CTGCAG', 'Cutting_Site_Left(bp)': 5, 'Cutting_Site_Right(bp)': 1},
+            {'Enzyme': 'PvuII', 'Site_NT': 'CAGCTG', 'Cutting_Site_Left(bp)': 3, 'Cutting_Site_Right(bp)': 3}
+        ]
+
+        # 将表格数据转换为字典列表
+        enzyme_site_list = json.loads(enzyme_site_table)
+        
+        # 检查表格是否全为null，如果是则将enzyme_site_list设为空列表
+        if all(all(cell is None for cell in row) for row in enzyme_site_list):
+            enzyme_site_list = []  # 如果全部为null，则视为空表格
+        
+        if enzyme_site_list:
+            for row in enzyme_site_list:
+                if any(row):  # 如果这一行中有非空的值
+                    enzyme_info = {
+                        'Enzyme': row[0],
+                        'Site_NT': row[1],
+                        'Cutting_Site_Left(bp)': row[2],
+                        'Cutting_Site_Right(bp)': row[3]
+                    }
+                    enzymes_info.append(enzyme_info)
+        # print("enzyme_site_table (parsed): ", enzymes_info)
+        
+        # 读取文件
+        if sequence_file:
+            # 确保文件路径存在
+            if not os.path.exists('media/temp/'):
+                os.makedirs('media/temp/')
+
+            # 上传文件
+            file_path = upload_file(sequence_file, 'media/temp/')
+            if file_path.endswith('.xlsx'):
+                df = pd.read_excel(file_path)
+            elif file_path.endswith('.csv'):
+                df = pd.read_csv(file_path)  # 如果是逗号分隔的csv文件，去掉sep='\t'
+            else:
+                return JsonResponse({'status': 'error', 'message': 'Unsupported file format'})
+
+            # 用 find_enzyme_sites 处理数据
+            def process_row(row):
+                name = row['Name']
+                dna_sequence = row['Sequence']
+                enzyme_input = row['Enzyme'].split(';')  # 将多重酶分隔为列表
+
+                results = find_enzyme_sites(dna_sequence, enzymes_info, enzyme_input, circular=circular)
+                length_list = []
+                for enzyme, sites in results.items():
+                    for site in sites:
+                        sequence, length = site
+                        length_list.append(length)
+
+                return pd.Series({
+                    'Name': name,
+                    'Sequence': dna_sequence,
+                    'Enzyme': ';'.join(enzyme_input),  # 转回字符串
+                    'Results': json.dumps(results),  # 转成字符串存储
+                    'Cutting_Size': sorted(length_list, reverse=True)
+                })
+
+            processed_df = df.apply(process_row, axis=1)
+
+            # 在 pivot 之前保存一个拷贝
+            pivot_input_df = processed_df.copy()
+
+            # 使用 pivot，将 Name 和 Sequence 保留为列
+            pivot_df = processed_df.pivot(index='Name', columns='Enzyme', values='Cutting_Size').reset_index()
+            pivot_df.insert(1, 'Sequence', processed_df.drop_duplicates('Name')['Sequence'].values)
+
+
+            # 创建内存中的 Excel 文件并将两个 DataFrame 保存进去
+            buffer = BytesIO()
+            with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # 将第一个 DataFrame 保存到 Excel
+                pivot_excel_buffer = BytesIO()
+                with pd.ExcelWriter(pivot_excel_buffer, engine='xlsxwriter') as writer:
+                    pivot_df.to_excel(writer, index=False)
+                zf.writestr('pivot_results.xlsx', pivot_excel_buffer.getvalue())
+
+                # 将第二个 DataFrame 保存到 Excel
+                processed_excel_buffer = BytesIO()
+                with pd.ExcelWriter(processed_excel_buffer, engine='xlsxwriter') as writer:
+                    pivot_input_df.to_excel(writer, index=False)
+                zf.writestr('processed_results.xlsx', processed_excel_buffer.getvalue())
+
+            buffer.seek(0)
+
+            # 返回包含两个文件的 ZIP 文件作为下载响应
+            response = HttpResponse(buffer, content_type='application/zip')
+            response['Content-Disposition'] = 'attachment; filename="results.zip"'
+            return response
+
+        return JsonResponse({'status': 'error', 'message': 'No file uploaded'})
 
 def test(request):
     return render(request, 'tools/test.html')

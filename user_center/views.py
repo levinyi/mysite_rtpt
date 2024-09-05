@@ -106,9 +106,6 @@ def order_create_old(request):
                 saved_seq = tagged_seq
                 status = seq_status
 
-                # 新增 penalty score的计算
-                # penalty_score = calculate_penalty_score(original_seq, user_forbidden_seq, vector)
-
             # 创建或更新GeneInfo对象
             this_gene = GeneInfo.objects.create(
                 user=request.user,
@@ -196,7 +193,10 @@ def order_create(request):
             df['gene_id'] = df['GeneName']
             df['sequence'] = df['CombinedSeq']
             df = convert_gene_table_to_RepeatsFinder_Format(df)
-            print(df)
+
+            # 处理 DataFrame，确保每一行转换为字典而不是 JSON 字符串
+            df['analysis_results'] = df.apply(lambda row: penalty_column_to_dict(row), axis=1)
+
             # 检测序列中是否包含禁止序列，有则记录其起始和终止位置和序列,
             # 从酶切位点数据库中获取禁止序列，每个禁止序列都有一个适用范围，即起始和终止位置
             # 然后应用到每个基因序列中，如果基因序列中包含禁止序列，则记录其起始和终止位置
@@ -216,6 +216,12 @@ def order_create(request):
                 axis=1
             )
 
+            # 检查forbidden 修改status
+            df['status'] = df.apply(
+                lambda row: 'validated' if not row['forbidden_info'] else 'forbidden',
+                axis=1
+            )
+
             # 将 DataFrame 转换为 GeneInfo 对象
             gene_objects = [
                 GeneInfo(
@@ -224,7 +230,7 @@ def order_create(request):
                     original_seq=row['OriginalSeq'],
                     vector=vector,
                     species=row.get('species', None),
-                    status=row.get('status', ''),
+                    status=row.get('status', 'validated'),  # check if status is valid 
                     forbid_seq=row.get('forbidden_check_list', ''),
                     combined_seq=row['CombinedSeq'],
                     i5nc=row.get('i5nc', ''),
@@ -237,10 +243,11 @@ def order_create(request):
                     original_highlights=row.get('highlights_positions', []),
                     modified_highlights=row.get('highlights_positions', []),
                     penalty_score=row.get('total_penalty_score', None),
+                    analysis_results=row['analysis_results'],
                 )
                 for _, row in df.iterrows()
             ]
-            print("len(gene_objects)", len(gene_objects))
+            # print("len(gene_objects)", len(gene_objects))
             # Capture the current timestamp
             current_timestamp = timezone.now()
 
@@ -289,6 +296,12 @@ def order_create(request):
         customer_vectors = Vector.objects.filter(user=request.user, status="ReadyToUse")
         return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_names_json': species_names_json})
 
+def penalty_column_to_dict(row):
+    '''将 row 中的所有列直接转换为字典'''
+    row_dict = row.to_dict()
+    # 确保字典中的所有值都是 JSON 兼容的
+    row_dict_cleaned = {key: (value if pd.notna(value) else '') for key, value in row_dict.items()}
+    return row_dict_cleaned
 
 def process_highlights_positions(row):
     '''处理高亮位置'''

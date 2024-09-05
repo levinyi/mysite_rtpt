@@ -25,4 +25,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY . /app/
 
 # 安装项目所需的依赖
-RUN pip install -i https://mirrors.aliyun.com/pypi/simple/ --no-cache-dir -r requirements.txt
+RUN pip install -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt

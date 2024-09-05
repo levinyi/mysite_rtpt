@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% load static %}
+
+<!-- 引用tools的css文件 -->
+{% block head_css %}
+<link rel="stylesheet" href="{% static 'CSS/upload_form.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a class="text-decoration-none" href="{% url 'tools:tools_list' %}">Online Tools</a></li>
+            <li class="breadcrumb-item active" aria-current="page">SplitEnzymeSite</li>
+        </ol>
+    </nav>
+    <div class="card">
+        <div class="row card-body mt-3">
+            <div class="panel panel-default">
+                <div class="panel-heading text-center">
+                    <h3 class="panel-title">Split Sequence By Enzyme Site</h3>
+                </div>
+                <div class="panel-body">
+                <!-- 已知的酶切位点表格（5 rows X 4 columns) -->
+                <p class="mb-4">The following table shows the known enzyme cutting sites.</p>
+                <table class="table table-bordered border-primary">
+                    <thead>
+                        <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Enzyme</th>
+                        <th scope="col">Site_NT</th>
+                        <th scope="col">Cutting_Site_Left(bp)</th>
+                        <th scope="col">Cutting_Site_Right(bp)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                        <th scope="row">1</th>
+                        <td>BamHI</td>
+                        <td>GGATCC</td>
+                        <td>1</td>
+                        <td>5</td>
+                        </tr>
+                        <tr>
+                        <th scope="row">2</th>
+                        <td>EcoRV</td>
+                        <td>GATATC</td>
+                        <td>3</td>
+                        <td>3</td>
+                        </tr>
+                        <tr>
+                        <th scope="row">3</th>
+                        <td>PstI</td>
+                        <td>CTGCAG</td>
+                        <td>5</td>
+                        <td>1</td>
+                        </tr>
+                        <tr>
+                        <th scope="row">4</th>
+                        <td>PvuII</td>
+                        <td>CAGCTG</td>
+                        <td>3</td>
+                        <td>3</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="mb-4">Your Input Sequence file <strong>MUST</strong> contain the following columns:</p>
+                <!-- example table: (3 rows X 3 columns) -->
+                <table class="table table-bordered border-primary">
+                    <thead>
+                        <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Sequence</th>
+                        <th scope="col">Enzyme</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                        <td>Gene1</td>
+                        <td>ATGCGTACG...TACGCTAGC</td>
+                        <td>BamHI</td>
+                        </tr>
+                        <tr>
+                        <td>Gene2</td>
+                        <td>ATGCGTACG...TACGCTAGC</td>
+                        <td>EcoRV;PvuII</td>
+                        </tr>
+                        <tr>
+                        <td>Gene3</td>
+                        <td>ATGCGTACG...TACGCTAGC</td>
+                        <td>PstI</td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <!-- Form Option 1 -->
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <!-- if you want to add your enzyme site -->
+                    <p class="mb-4">If you want to add your enzyme site, please fill in the following table.</p>
+                    <div id="excelTable" class="mt-3">
+                        <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
+                    </div>
+                    <form id="uploadForm" class="form-group pt-3" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <!-- 参数：线性或环状的 Radios -->
+                        <div class="mb-4">
+                            <input class="form-check-input" type="radio" name="sequence_type" id="circular" value="circular" checked>
+                            <label class="form-check-label" for="circular">Default Circular</label>
+                            <input class="form-check-input" type="radio" name="sequence_type" id="linear" value="linear">
+                            <label class="form-check-label" for="linear">Linear</label>
+                        </div>
+                        <!-- 上传文件 -->
+                        <div class="mb-4">
+                            <label for="formFile1" class="form-label">Upload Your Sequence File, Example here.</label>
+                            <input class="form-control" required="required" type="file" id="formFile1" name="file_name1">
+                        </div>
+                        <div class="col-xs-7 mb-3">
+                            <button type="button" id="submitBtn" class="btn btn-primary">Submit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+{% block javascript %}
+<script>
+    const container = document.querySelector('#excelTable');
+    const hot = new Handsontable(container, {
+        colHeaders: ['Enzyme', 'Site_NT', 'Cutting_Site_Left(bp)', 'Cutting_Site_Right(bp)'],
+        rowHeaders: true,
+        colWidths: [200, 200, 200, 200],
+        columns: [
+            { data: 'Enzyme', type: 'text' },
+            { data: 'Site_NT', type: 'text' },
+            { data: 'Cutting_Site_Left(bp)', type: 'numeric' },
+            { data: 'Cutting_Site_Right(bp)', type: 'numeric' }
+        ],
+        // 修改表格的默认展示行数
+        minRows: 2,
+        height: 'auto',
+        width: 'auto',
+        licenseKey: 'non-commercial-and-evaluation',
+    });
+
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        hot.alter('insert_row_below');
+    });
+    
+    document.getElementById('submitBtn').addEventListener('click', function () {
+        submitForm();
+    });
+
+    function submitForm() {
+        const hotData = hot.getData();
+        const sequenceType = document.querySelector('input[name="sequence_type"]:checked').value;
+        const fileInput = document.getElementById('formFile1');
+        const fastaFile = fileInput.files[0]; // 获取上传的文件
+        const formData = new FormData();
+
+        formData.append('tableData', JSON.stringify(hotData)); // 添加表格数据到表单
+        if (fastaFile) {
+            formData.append('file_name1', fastaFile); // 添加文件数据到表单
+            formData.append('sequenceType', sequenceType); // 添加序列类型到表单
+        }
+
+        // 使用 XMLHttpRequest 发送 POST 请求以处理文件下载
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '{% url "tools:SplitEnzymeSite" %}', true);
+        xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+
+        xhr.responseType = 'blob'; // 重要：设置响应类型为 blob，便于处理二进制文件（如 ZIP）
+
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                const blob = xhr.response;
+                const downloadUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = 'results.zip'; // 更新为 ZIP 文件的下载名称
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                URL.revokeObjectURL(downloadUrl); // 释放内存
+            } else {
+                alert('Data submission failed');
+            }
+        };
+
+        xhr.onerror = function () {
+            alert('An error occurred while submitting the data');
+        };
+
+        xhr.send(formData);
+    }
+</script>
+{% endblock %}

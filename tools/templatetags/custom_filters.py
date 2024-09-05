@@ -1,6 +1,8 @@
 import re
 from django import template
 import os
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 
 register = template.Library()
 
