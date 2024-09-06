@@ -685,7 +685,10 @@ def view_cart(request):
     shopping_cart = cart.genes.all()
 
     grouped_shopping_cart = []
-    for key, group in itertools.groupby(shopping_cart, key=lambda x: x.create_date.date()):
+    for key, group in itertools.groupby(
+        shopping_cart, 
+        key=lambda x: timezone.localtime(x.create_date).strftime('%Y-%m-%d %H:%M')
+        ):
         grouped_shopping_cart.append({
             'date': key,
             'genes': list(group)

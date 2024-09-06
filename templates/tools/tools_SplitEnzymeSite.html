@@ -7,6 +7,24 @@
 {% endblock %}
 
 {% block content %}
+<!-- Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="statusModalLabel">Processing Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modalStatusMessage">
+        Please wait while your file is being processed...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="container">
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -156,6 +174,7 @@
     
     document.getElementById('submitBtn').addEventListener('click', function () {
         submitForm();
+        showModalStatus('Processing... Please wait.');
     });
 
     function submitForm() {
@@ -191,16 +210,37 @@
                 a.remove();
 
                 URL.revokeObjectURL(downloadUrl); // 释放内存
+                showModalStatus('File is ready! Download starting...');
             } else {
-                alert('Data submission failed');
+                showModalStatus('Data submission failed. Please try again.', true);
             }
         };
 
         xhr.onerror = function () {
-            alert('An error occurred while submitting the data');
+            showModalStatus('An error occurred while submitting the data.', true);
         };
 
         xhr.send(formData);
     }
+
+    function showModalStatus(message, isError = false) {
+        const modalMessage = document.getElementById('modalStatusMessage');
+        modalMessage.textContent = message;
+        if (isError) {
+            modalMessage.classList.add('text-danger');
+        } else {
+            modalMessage.classList.remove('text-danger');
+        }
+
+        // 显示 Modal
+        const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+        statusModal.show();
+        // 添加监听事件：Modal 关闭时刷新页面
+        const modalElement = document.getElementById('statusModal');
+        modalElement.addEventListener('hidden.bs.modal', function () {
+            location.reload(); // 刷新页面
+        });
+    }
+
 </script>
 {% endblock %}
