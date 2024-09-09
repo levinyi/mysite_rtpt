@@ -8,6 +8,26 @@
     .main-content {
         margin-bottom: 100px; /* 调整这个值以确保底部有足够的空间 */
     }
+    /* 下面四个是关于报价单的样式， 在modal中 */
+    .table-header {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    .table-title {
+        font-size: 24px;
+        text-align: center;
+        font-weight: bold;
+        padding: 20px 0;
+    }
+    .col-seq {
+        width: 5%;  /* 第一列：序号，设置为5% */
+    }
+    .col-item {
+        width: 20%; /* 第二列：项目，设置为25% */
+    }
+    .col-dis {
+        width: 7%; /* 第八列：折扣率，设置为10% */
+    }
 </style>
 {% endblock %}
 
@@ -47,7 +67,7 @@
             </div>
         </div>
         <!-- Table -->
-        <table class="table table-striped table-hover" style="text-align:center">
+        <table class="table table-striped table-hover" style="text-align:center" id="shopping-cart-table">
             <thead>
                 <tr>
                     <th scope="col"><input type="checkbox" id="selectAllTop" name="gene_id" value="all"></th>
@@ -190,89 +210,194 @@
     </div>
 </div>
 
-<!-- Modal -->
+
+<!-- Modal for price detail -->
 <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="detailsModalLabel">Quotation Comparison</h5>
+                <h5 class="modal-title" id="detailsModalLabel">Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="row text-center">
-                    <!-- Card 1 -->
-                    <div class="col-md-4 mb-4">
-                        <div class="card pricing-card">
-                            <div class="card-header">
-                                RootPath
-                            </div>
-                            <div class="card-body">
-                                <h2 class="card-title">¥598</h2>
-                                <p class="card-text">$0.23/bp</p>
-                                <ul class="list-unstyled">
-                                    <li>Free Shipping Fee</li>
-                                    <li>turation : 4-5 Week</li>
-                                    <li>Free NGS Validation</li>
-                                    <li>Free Sanger Validation</li>
-                                    <li>Free Sanger Validation</li>
-                                    {% comment %} <li>标准全球节点（选配） <span class="badge bg-danger">新品</span></li> {% endcomment %}
-                                </ul>
-                                <a href="#" class="btn btn-primary">Submit</a>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Card 2 -->
-                    <div class="col-md-4 mb-4">
-                        <div class="card pricing-card">
-                            <div class="card-header">
-                                Quintara Inc.
-                            </div>
-                            <div class="card-body">
-                                <h2 class="card-title">¥1280</h2>
-                                <p class="card-text">$0.24/bp</p>
-                                <ul class="list-unstyled">
-                                    <li>Free Shipping Fee</li>
-                                    <li>turation : 4-5 Week</li>
-                                    <li>Free NGS Validation</li>
-                                    <li>Free Sanger Validation</li>
-                                    <li>Free Sanger Validation</li>
-                                </ul>
-                                <a href="#" class="btn btn-primary" onclick="showToast()">Submit</a>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Card 3 -->
-                    <div class="col-md-4 mb-4">
-                        <div class="card pricing-card">
-                            <div class="card-header">
-                                Others
-                            </div>
-                            <div class="card-body">
-                                <h2 class="card-title">¥2560</h2>
-                                <p class="card-text">0.38/bp</p>
-                                <ul class="list-unstyled">
-                                    <li>Free Shipping Fee</li>
-                                    <li>turation : 4-5 Week</li>
-                                    <li>Free NGS Validation</li>
-                                    <li>Free Sanger Validation</li>
-                                    <li>Free Sanger Validation</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
+                <table class="table table-bordered table-sm" id="price-detail-table">
+                    <!-- 标题行 -->
+                    <tr><td colspan="8" class="table-title">基因合成报价单</td></tr>
+                    <!-- 基因合成报价信息（<450 bp） -->
+                    <tr><td colspan="8" class="table-header table-active">基因合成报价信息（<450 bp）</td></tr>
+                    <tr class="table-header">
+                        <td class="text-center col-seq">序号</td>
+                        <td class="text-center col-item">项目</td>
+                        <td class="text-center">单位</td>
+                        <td class="text-center">数量</td>
+                        <td class="text-center">含税单价（元）</td>
+                        <td class="text-center">总价（元）</td>
+                        <td class="text-center">合计（元）</td>
+                        <td class="text-center">优惠后合计（元）</td>
+                        <td class="text-center col-dis">折扣率</td>
+                        <!-- <td class="text-center">折扣单价</td> -->
+                    </tr>
+                    <tr>
+                        <td rowspan="2" class="align-middle text-center">1</td>
+                        <td>基因合成（10个）</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true" id="length-group-450"></td>
+                        <td class="text-center">90</td>
+                        <td class="text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
+                        <!-- <td rowspan="2" class="align-middle text-center"></td> -->
+                    </tr>
+                    <tr>
+                        <td>载体克隆及NGS测序验证</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">50</td>
+                        <td class="text-center">0.00</td>
+                    </tr>
 
-                </div>
+                    <!-- 基因合成报价信息（450 - 3000 bp） -->
+                    <tr><td colspan="8" class="table-header table-active">基因合成报价信息（450 - 3000 bp）</td></tr>
+                    <tr>
+                        <td rowspan="2" class="align-middle text-center">2</td>
+                        <td>基因合成（10个）</td>
+                        <td class="text-center">bp</td>
+                        <td class="text-center" contenteditable="true" id="length-group-450-3000"></td>
+                        <td class="text-center">0.3</td>
+                        <td class="text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
+                        <!-- <td rowspan="2" class="align-middle text-center"></td> -->
+                    </tr>
+                    <tr>
+                        <td>载体克隆及NGS测序验证</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">150</td>
+                        <td class="text-center">0.00</td>
+                    </tr>
+
+                    <!-- 基因合成报价信息（3001 - 5000 bp） -->
+                    <tr><td colspan="8" class="table-header table-active">基因合成报价信息（3001 - 5000 bp）</td></tr>
+                    <tr>
+                        <td rowspan="2" class="align-middle text-center">3</td>
+                        <td>基因合成（10个）</td>
+                        <td class="text-center">bp</td>
+                        <td class="text-center" contenteditable="true" id="length-group-3001-5000"></td>
+                        <td class="text-center">0.35</td>
+                        <td class="text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
+                        <!-- <td rowspan="2" class="align-middle text-center"></td> -->
+                    </tr>
+                    <tr>
+                        <td>载体克隆及NGS测序验证</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">300</td>
+                        <td class="text-center">0.00</td>
+                    </tr>
+
+                    <!-- 基因合成报价信息（5001 - 10 kb） -->
+                    <tr><td colspan="8" class="table-header table-active">基因合成报价信息（5001 - 10 kb）</td></tr>
+                    <tr>
+                        <td rowspan="2" class="align-middle text-center">4</td>
+                        <td>基因合成（10个）</td>
+                        <td class="text-center">bp</td>
+                        <td class="text-center" contenteditable="true" id="length-group-5001"></td>
+                        <td class="text-center">0.6</td>
+                        <td class="text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center">0.00</td>
+                        <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
+                        <!-- <td rowspan="2" class="align-middle text-center"></td> -->
+                    </tr>
+                    <tr>
+                        <td>载体克隆及NGS测序验证</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">500</td>
+                        <td class="text-center">0.00</td>
+                    </tr>
+
+                    <!-- 其他费用 -->
+                    <tr><td colspan="8" class="table-header table-active">其他费用</td></tr>
+                    <tr>
+                        <td class="text-center">5</td>
+                        <td>载体构建</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">2000</td>
+                        <td class="text-center">0.00</td>
+                        <td colspan="2" class="text-center">/</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">6</td>
+                        <td>甘油菌</td>
+                        <td class="text-center">个</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">20</td>
+                        <td class="text-center">0.00</td>
+                        <td colspan="2" class="text-center">/</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">7</td>
+                        <td>干冰运输</td>
+                        <td class="text-center">趟</td>
+                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center">500</td>
+                        <td class="text-center">0.00</td>
+                        <td colspan="2" class="text-center">/</td>
+                    </tr>
+
+                    <!-- 总价-->
+                    <tr><td colspan="8" class="table-header table-active">总价</td></tr>
+                    <tr><td colspan="8" class="text-center">优惠前总价（元）：<del id="total-before-discount"></del></td></tr>
+                    <tr><td colspan="8" class="text-center table-active" style="background-color: #FF85FF;">优惠后总价（元）：<strong id="total-after-discount"></strong></td></tr>
+
+                    <!-- 交付信息 -->
+                    <tr><td colspan="8" class="table-header">交付信息</td></tr>
+                    <tr><td colspan="8">交付：提供的 2222 个基因片段，构建载体为 pUC19，交付形式：质粒溶液，交付容器：单管。<br> 周期：<strong>5-7周</strong></td></tr>
+
+                    <!-- 报价说明 -->
+                    <tr><td colspan="8" class="table-header">报价说明</td></tr>
+                    <tr>
+                        <td colspan="8">
+                            1. 订单生产以邮件确认为开始，视为产品生产开始日期。<br>
+                            2. 交付周期包含产品运输时间，不包含客户指定载体的改造时间；指定载体改造所需时间由改造内容而定。<br>
+                            3. 以上报价仅在有效期内有效。<br>
+                            4. 报价单如与最终签署的合同价格不一致，以合同金额为准。<br>
+                            5. 订单交付后，乙方仅保存少量质粒和菌液（如有），用于QC验证，不做他用；订单全部交付的2个月后，乙方将销毁该订单相关的序列信息、质粒及菌液（如有）。<br>
+                            6. 关于取消订单：<br>
+                            （i）若客户于邮件确认后1周内提出取消要求，须支付订单总价的20%；<br>
+                            （ii）若客户于邮件确认1周后至4周内提出取消要求，须支付订单总价的80%；<br>
+                            （iii）若客户于邮件确认4周后至整个订单已经完成时提出取消要求，须支付订单总价的100%。
+                        </td>
+                    </tr>
+
+                    <!-- 公司信息 -->
+                    <tr><td colspan="8" class="table-header">公司信息</td></tr>
+                    <tr>
+                        <td colspan="8">
+                            广州呈源生物免疫技术有限公司<br>
+                            地址：广东省广州市黄埔区神舟路18号F栋13楼<br>
+                            联系人：方磊<br>
+                            电话：13316120226<br>
+                            邮箱：<a href="mailto:order@rootpathgx.com">order@rootpathgx.com</a>
+                        </td>
+                    </tr>
+                </table>
             </div>
-            <div class="alert alert-warning" role="alert">
-                This page is under development. If you have any suggestions, you can submit them <a href="https://t114xle63y.feishu.cn/docx/Do0qdSPxho0TBWxwRFQcgTqOnue" class="text-decoration-none" target="_blank">here</a>.
-            </div>
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>
     </div>
 </div>
-
 <!-- Toast -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="workingToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
@@ -291,115 +416,218 @@
 
 {% block javascript %}
 <script>
-    // 为全选复选框添加点击事件, 页面有两个全选复选框，一个是在顶部，一个是在底部，两者状态应该同步
-    $(document).ready(function() {
-        // 更新总价格
-        function updateTotalPrice() {
-            var totalPrice = 0;
-            var totalLength = 0;
-            var pricePerLength = 0.30; // 设定每个长度单位的价格
+document.addEventListener('DOMContentLoaded', () => {
+    var lengthGroups = {
+        '<450': { count: 0, length: 0 },
+        '450-3000': { count: 0, length: 0 },
+        '3001-5000': { count: 0, length: 0 },
+        '>5001': { count: 0, length: 0 }
+    };
 
-            // Only consider checked and visible checkboxes for calculation
-            $('input.gene-checkbox:checked:visible').each(function() {
-                var length = parseInt($(this).data('length'));
-                totalLength += length;
-            });
+    var totalBeforeDiscount = 0;
+    var totalAfterDiscount = 0;
 
-            totalPrice = totalLength * pricePerLength; // 计算总价格
+    function calculatePricesAndLengths() {
+        // 初始化分类
+        lengthGroups = {
+            '<450': { count: 0, length: 0 },
+            '450-3000': { count: 0, length: 0 },
+            '3001-5000': { count: 0, length: 0 },
+            '>5001': { count: 0, length: 0 }
+        };
 
-            // 更新页面上显示的总长度和总价格
-            $('#total-price').text('Total: $' + totalPrice.toFixed(2));
-            $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
-            $('#total-length').text('Total ' + totalLength + ' bp');
+        // 处理选中的基因复选框
+        $('input.gene-checkbox:checked:visible').each(function() {
+            var length = $(this).data('length');
+            var group = length < 450 ? '<450' : length < 3001 ? '450-3000' : length < 5001 ? '3001-5000' : '>5001';
+            lengthGroups[group].count++;
+            lengthGroups[group].length += length;  
+        });
+
+        // 更新到表格中
+        document.querySelector('#length-group-450').textContent = lengthGroups['<450'].length;
+        document.querySelector('#length-group-450-3000').textContent = lengthGroups['450-3000'].length;
+        document.querySelector('#length-group-3001-5000').textContent = lengthGroups['3001-5000'].length;
+        document.querySelector('#length-group-5001').textContent = lengthGroups['>5001'].length;
+
+        // 返回当前的总长度
+        return lengthGroups['<450'].length + lengthGroups['450-3000'].length + lengthGroups['3001-5000'].length + lengthGroups['>5001'].length;
+    }
+
+    function updateFinalTotal() {
+        let geneTotal = 0;
+        let geneDiscountTotal = 0;
+
+        // 获取所有的表格行
+        const rows = document.querySelectorAll('#price-detail-table tr');
+
+        rows.forEach((row, index) => {
+            // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
+            if (index > 2 && row.querySelector('[rowspan="2"]')) {
+                const quantityCell1 = row.querySelector('td:nth-child(4)'); // 第一行数量单元格
+                const unitPriceCell1 = row.querySelector('td:nth-child(5)'); // 第一行单价单元格
+                const totalPriceCell1 = row.querySelector('td:nth-child(6)'); // 第一行总价单元格
+
+                const nextRow = row.nextElementSibling; // 获取第二行
+                const quantityCell2 = nextRow.querySelector('td:nth-child(3)'); // 第二行数量单元格
+                const unitPriceCell2 = nextRow.querySelector('td:nth-child(4)'); // 第二行单价单元格
+                const totalPriceCell2 = nextRow.querySelector('td:nth-child(5)'); // 第二行总价单元格
+
+                const totalCell = row.querySelector('td:nth-child(7)'); // 合计单元格
+                const discountTotalCell = row.querySelector('td:nth-child(8)'); // 优惠后合计单元格
+                const discountRateCell = row.querySelector('td:nth-child(9)'); // 折扣率单元格
+
+                const quantity1 = parseFloat(quantityCell1.textContent) || 0;
+                const unitPrice1 = parseFloat(unitPriceCell1.textContent) || 0;
+                const quantity2 = parseFloat(quantityCell2.textContent) || 0;
+                const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0;
+
+                const totalPrice1 = quantity1 * unitPrice1;
+                const totalPrice2 = quantity2 * unitPrice2;
+
+                // 更新单元格显示总价
+                totalPriceCell1.textContent = totalPrice1.toFixed(2);
+                totalPriceCell2.textContent = totalPrice2.toFixed(2);
+
+                // 计算合计
+                const total = totalPrice1 + totalPrice2;
+                totalCell.textContent = total.toFixed(2);
+
+                // 获取折扣率并计算优惠后总价
+                const discountRate = parseFloat(discountRateCell.textContent) || 1; // 默认折扣率为1
+                const discountTotal = total * discountRate;
+                discountTotalCell.textContent = discountTotal.toFixed(2);
+
+                // 将当前部分的总价和折扣总价累计
+                geneTotal += total;
+                geneDiscountTotal += discountTotal;
+            }
+        });
+
+        let otherTotal = 0;
+        const otherRows = [
+            { selector: '载体构建', index: 15 },
+            { selector: '甘油菌', index: 16 },
+            { selector: '干冰运输', index: 17 }
+        ];
+
+        otherRows.forEach(({ index }) => {
+            const row = rows[index];
+            const quantityCell = row.querySelector('td:nth-child(4)'); // 数量单元格
+            const unitPriceCell = row.querySelector('td:nth-child(5)'); // 单价单价单元格
+            const totalPriceCell = row.querySelector('td:nth-child(6)'); // 总价单元格
+
+            // 计算其他部分的总价
+            const quantity = parseFloat(quantityCell.textContent) || 0;
+            const unitPrice = parseFloat(unitPriceCell.textContent) || 0;
+            const totalPrice = quantity * unitPrice;
+            // 更新单元格显示总价    
+            totalPriceCell.textContent = totalPrice.toFixed(2);
+
+            // 累加到其他部分的总价
+            otherTotal += totalPrice;
+        });
+
+        totalBeforeDiscount = geneTotal + otherTotal;
+        totalAfterDiscount = geneDiscountTotal + otherTotal;
+
+        document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
+        document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
+    }
+
+    function updateTotalPrice() {
+        const totalLength = calculatePricesAndLengths(); // 先更新分类
+        updateFinalTotal(); // 再更新总价
+
+        const totalPrice = totalBeforeDiscount || 0;
+        console.log("totalPrice and totalLength", totalPrice, totalLength);
+
+        // 更新页面显示
+        $('#total-price').text('Total: $' + totalPrice.toFixed(2));
+        $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
+        $('#total-length').text('Total ' + totalLength + ' bp');
+    }
+
+    // 监听复选框状态变化，实时更新分类和总价
+    $('input.gene-checkbox').change(function() {
+        updateTotalPrice();
+    });
+
+    // 为可编辑的数量、单价、折扣率单元格添加事件监听器，更新总价
+    $('#price-detail-table').on('input', 'td', function() {
+        updateTotalPrice();
+    });
+
+    // 监听全选复选框
+    $('#selectAllTop, #selectAllBottom').click(function() {
+        const state = this.checked;
+        $('input[name="gene_id"]:not(.modal .gene-checkbox)').each(function() {
+            if (!this.disabled && $(this).closest('tr').css('display') !== 'none') {
+                this.checked = state;
+            }
+        });
+        $('#selectAllTop, #selectAllBottom').prop('checked', state);
+        updateTotalPrice();
+    });
+
+    // 监听日期复选框
+    $('.date-select-checkbox').on('click', function() {
+        const date = $(this).data('date');
+        const isChecked = this.checked;
+        $('.gene-checkbox[data-date="' + date + '"]:visible').each(function() {
+            if (!this.disabled) {
+                this.checked = isChecked;
+            }
+        });
+        updateTotalPrice();
+    });
+
+    // 监听状态筛选器的变化
+    $('#statusFilter').on('change', function() {
+        const selectedStatus = this.value;
+        $('tbody tr[data-status]').each(function() {
+            $(this).toggle(selectedStatus === 'all' || $(this).data('status') === selectedStatus);
+        });
+        updateTotalPrice();
+    });
+
+    // 提交按钮处理
+    $('#checkoutButton').on('click', function() {
+        const selectedGenes = $('input.gene-checkbox:checked').map(function() { return this.value; }).get();
+        const forbidden = $('input.gene-checkbox:checked').closest('tr[data-status="forbidden"]').length > 0;
+
+        if (selectedGenes.length === 0) {
+            alert('Please select at least one item!');
+            return;
         }
 
-        // 页面加载完成后，更新一次总价格
-        $('input.gene-checkbox').change(function() {
-            updateTotalPrice(); // Update totals when any gene checkbox changes state
-        });
+        if (forbidden) {
+            alert('Forbidden items cannot be submitted!');
+            return;
+        }
 
-        // 为全选复选框添加点击事件
-        $('#selectAllTop, #selectAllBottom').click(function() {
-            var state = this.checked;
-            $('input[name="gene_id"]:not(.modal .gene-checkbox)').each(function() {
-                if (!this.disabled && $(this).closest('tr').css('display') !== 'none') {
-                    this.checked = state;
-                }
-            });
-            
-            $('#selectAllTop, #selectAllBottom').prop('checked', state);
-            
-            // 更新总价格
-            updateTotalPrice();
-        });
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        selectedGenes.forEach(function(id) { formData.append('gene_ids', id); });
 
-        // 为日期复选框添加点击事件
-        // Date select checkboxes
-        $('.date-select-checkbox').on('click', function() {
-            var date = $(this).data('date');
-            var isChecked = this.checked;
-            $('.gene-checkbox[data-date="' + date + '"]:visible').each(function() {
-                if (!this.disabled) {
-                    this.checked = isChecked;
-                }
-            });
-            updateTotalPrice();
-        });
-
-
-        // 状态筛选器的 change 事件
-        $('#statusFilter').on('change', function() {
-            var selectedStatus = this.value;
-            $('tbody tr[data-status]').each(function() {
-                $(this).toggle(selectedStatus === 'all' || $(this).data('status') === selectedStatus);
-            });
-
-            updateTotalPrice(); // Recalculate when filter changes
-        });
-
-        // Handle checkout process
-        // Handle the checkout button click event directly without modal
-        $('#checkoutButton').on('click', function() {
-            var selectedGenes = $('input.gene-checkbox:checked').map(function() { return this.value; }).get();
-            //var forbidden = $('input.gene-checkbox:checked[data-status="forbidden"]').length > 0;
-            var forbidden = $('input.gene-checkbox:checked').closest('tr[data-status="forbidden"]').length > 0;
-
-            //console.log("gene-checkbox:forbidden length: ", $('input.gene-checkbox:checked[data-status="forbidden"]').length);
-            console.log("select genes:", selectedGenes);
-            console.log("select genes length :", selectedGenes.length);
-            console.log("forbidden: ", forbidden);
-
-            if (selectedGenes.length === 0) {
-                alert('Please select at least one item!');
-                return;
+        fetch('{% url "user_center:checkout" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Submit successfully!');
+                window.location.href = data.redirect_url;
+            } else {
+                alert(data.message);
             }
-
-            if (forbidden) {
-                alert('Forbidden items cannot be submitted!');
-                return;
-            }
-
-            var formData = new FormData();
-            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-            selectedGenes.forEach(function(id) { formData.append('gene_ids', id); });
-
-            fetch('{% url "user_center:checkout" %}', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    alert('Submit successfully!');
-                    window.location.href = data.redirect_url;
-                } else {
-                    alert(data.message);
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        });
+        })
+        .catch(error => console.error('Error:', error));
     });
+});
 </script>
+
 <script>
     // 删除单个基因
     function del_gene(the, gene_id) {

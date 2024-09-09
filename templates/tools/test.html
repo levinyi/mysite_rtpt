@@ -6,25 +6,9 @@
     <title>报价单</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        table {
-            width: 100%;
-            /* table-layout: fixed; */
-        }
-        td, th {
-            padding: 10px;
-            border: 1px solid #ddd;
-            text-align: left;
-            vertical-align: top;
-        }
         .table-header {
             background-color: #f8f9fa;
             font-weight: bold;
-        }
-        .text-center {
-            text-align: center;
-        }
-        .text-right {
-            text-align: right;
         }
         .table-title {
             font-size: 24px;
@@ -43,7 +27,7 @@
 </head>
 <body>
     <div class="container mt-5">
-        <table class="table table-bordered table-sm">
+        <table class="table table-bordered table-sm" id="price-detail-table">
             <!-- 标题行 -->
             <tr><td colspan="8" class="table-title">基因合成报价单</td></tr>
             <!-- 基因合成报价信息（<450 bp） -->
@@ -217,152 +201,153 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // 获取所有的表格行
-    const rows = document.querySelectorAll('table tr');
+        document.addEventListener('DOMContentLoaded', () => {
+            // 获取所有的表格行
+            // const rows = document.querySelectorAll('table tr');
+            const rows = document.querySelectorAll('#price-detail-table tr');
+            let totalBeforeDiscount = 0; // 用于存储优惠前的总价
+            let totalAfterDiscount = 0; // 用于存储优惠后的总价
 
-    let totalBeforeDiscount = 0; // 用于存储优惠前的总价
-    let totalAfterDiscount = 0; // 用于存储优惠后的总价
+            // 计算基因合成部分的总价和合计
+            rows.forEach((row, index) => {
+                // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
+                if (index > 2 && row.querySelector('[rowspan="2"]')) {
+                    // 获取这一组两行的相关单元格
+                    const quantityCell1 = row.querySelectorAll('td')[3]; // 第一行数量单元格
+                    const unitPriceCell1 = row.querySelectorAll('td')[4]; // 第一行单价单元格
+                    const totalPriceCell1 = row.querySelectorAll('td')[5]; // 第一行总价单元格
 
-    // 计算基因合成部分的总价和合计
-    rows.forEach((row, index) => {
-        // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
-        if (index > 2 && row.querySelector('[rowspan="2"]')) {
-            // 获取这一组两行的相关单元格
-            const quantityCell1 = row.querySelectorAll('td')[3]; // 第一行数量单元格
-            const unitPriceCell1 = row.querySelectorAll('td')[4]; // 第一行单价单元格
-            const totalPriceCell1 = row.querySelectorAll('td')[5]; // 第一行总价单元格
+                    const nextRow = row.nextElementSibling;
+                    
+                    if (!nextRow) {
+                        console.error(`无法找到第 ${index + 1} 行的下一行`);
+                        return;
+                    }
 
-            const nextRow = row.nextElementSibling;
-            
-            if (!nextRow) {
-                console.error(`无法找到第 ${index + 1} 行的下一行`);
-                return;
-            }
+                    const quantityCell2 = nextRow.querySelectorAll('td')[2]; // 第二行数量单元格
+                    const unitPriceCell2 = nextRow.querySelectorAll('td')[3]; // 第二行单价单元格
+                    const totalPriceCell2 = nextRow.querySelectorAll('td')[4]; // 第二行总价单元格
+                    //  console.log(quantityCell2, unitPriceCell2, totalPriceCell2)
 
-            const quantityCell2 = nextRow.querySelectorAll('td')[2]; // 第二行数量单元格
-            const unitPriceCell2 = nextRow.querySelectorAll('td')[3]; // 第二行单价单元格
-            const totalPriceCell2 = nextRow.querySelectorAll('td')[4]; // 第二行总价单元格
-            //  console.log(quantityCell2, unitPriceCell2, totalPriceCell2)
+                    const totalCell = row.querySelectorAll('td')[6]; // 合计单元格
+                    const discountTotalCell = row.querySelectorAll('td')[7]; // 优惠后合计单元格
+                    const discountRateCell = row.querySelectorAll('td')[8]; // 折扣率单元格
 
-            const totalCell = row.querySelectorAll('td')[6]; // 合计单元格
-            const discountTotalCell = row.querySelectorAll('td')[7]; // 优惠后合计单元格
-            const discountRateCell = row.querySelectorAll('td')[8]; // 折扣率单元格
+                    // 折扣单价这一行如果不需要就删掉
+                    // const discountUnitCell = row.querySelectorAll('td')[9]; // 折扣单价
+                    // console.log(totalCell, discountTotalCell, discountRateCell, discountUnitCell)
 
-            // 折扣单价这一行如果不需要就删掉
-            // const discountUnitCell = row.querySelectorAll('td')[9]; // 折扣单价
-            // console.log(totalCell, discountTotalCell, discountRateCell, discountUnitCell)
+                    // 检查单元格是否有效
+                    if (!quantityCell1 || !unitPriceCell1 || !totalPriceCell1 || !quantityCell2 || !unitPriceCell2 || !totalPriceCell2 || !totalCell || !discountTotalCell || !discountRateCell) {
+                        console.error("某个单元格未找到。检查 HTML 结构。");
+                        return;
+                    }
 
-            // 检查单元格是否有效
-            if (!quantityCell1 || !unitPriceCell1 || !totalPriceCell1 || !quantityCell2 || !unitPriceCell2 || !totalPriceCell2 || !totalCell || !discountTotalCell || !discountRateCell) {
-                console.error("某个单元格未找到。检查 HTML 结构。");
-                return;
-            }
+                    // 计算总价的函数
+                    const calculatePrices = () => {
+                        const quantity1 = parseFloat(quantityCell1.textContent) || 0; // 获取第一行数量
+                        const unitPrice1 = parseFloat(unitPriceCell1.textContent) || 0; // 获取第一行单价
+                        const totalPrice1 = quantity1 * unitPrice1; // 计算第一行总价
+                        totalPriceCell1.textContent = totalPrice1.toFixed(2); // 显示第一行总价
 
-            // 计算总价的函数
-            const calculatePrices = () => {
-                const quantity1 = parseFloat(quantityCell1.textContent) || 0; // 获取第一行数量
-                const unitPrice1 = parseFloat(unitPriceCell1.textContent) || 0; // 获取第一行单价
-                const totalPrice1 = quantity1 * unitPrice1; // 计算第一行总价
-                totalPriceCell1.textContent = totalPrice1.toFixed(2); // 显示第一行总价
+                        const quantity2 = parseFloat(quantityCell2.textContent) || 0; // 获取第二行数量
+                        const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0; // 获取第二行单价
+                        const totalPrice2 = quantity2 * unitPrice2; // 计算第二行总价
+                        totalPriceCell2.textContent = totalPrice2.toFixed(2); // 显示第二行总价
 
-                const quantity2 = parseFloat(quantityCell2.textContent) || 0; // 获取第二行数量
-                const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0; // 获取第二行单价
-                const totalPrice2 = quantity2 * unitPrice2; // 计算第二行总价
-                totalPriceCell2.textContent = totalPrice2.toFixed(2); // 显示第二行总价
+                        // 计算合计（两行的总价之和）
+                        const total = totalPrice1 + totalPrice2;
+                        totalCell.textContent = total.toFixed(2); // 显示合计
 
-                // 计算合计（两行的总价之和）
-                const total = totalPrice1 + totalPrice2;
-                totalCell.textContent = total.toFixed(2); // 显示合计
+                        // 获取折扣率并计算优惠后合计
+                        const discountRate = parseFloat(discountRateCell.textContent) || 1; // 获取折扣率，默认为1
+                        const discountTotal = total * discountRate;
+                        discountTotalCell.textContent = discountTotal.toFixed(2); // 显示优惠后合计
 
-                // 获取折扣率并计算优惠后合计
-                const discountRate = parseFloat(discountRateCell.textContent) || 1; // 获取折扣率，默认为1
-                const discountTotal = total * discountRate;
-                discountTotalCell.textContent = discountTotal.toFixed(2); // 显示优惠后合计
+                        // 这两行如果不需要就删掉
+                        // const discountUnit = discountTotal / (quantity1 + quantity2)
+                        // discountUnitCell.textContent = discountUnit.toFixed(2);
 
-                // 这两行如果不需要就删掉
-                // const discountUnit = discountTotal / (quantity1 + quantity2)
-                // discountUnitCell.textContent = discountUnit.toFixed(2);
+                        updateFinalTotal();
+                    };
 
-                updateFinalTotal();
+                    // 给每个数量单元格和折扣率单元格添加监听器
+                    if (quantityCell1) {
+                        quantityCell1.addEventListener('input', calculatePrices);
+                    } else {
+                        console.error("第一行数量单元格未找到");
+                    }
+
+                    if (quantityCell2) {
+                        quantityCell2.addEventListener('input', calculatePrices); // 监听第二行的输入
+                    } else {
+                        console.error("第二行数量单元格未找到");
+                    }
+
+                    if (discountRateCell) {
+                        discountRateCell.addEventListener('input', calculatePrices); // 监听折扣率输入
+                    } else {
+                        console.error("折扣率单元格未找到");
+                    }
+                }
+            });
+
+            // 计算其他费用的总价
+            const otherRows = [
+                { selector: '载体构建', index: 15 },  // 对应的行序号
+                { selector: '甘油菌', index: 16 },
+                { selector: '干冰运输', index: 17 }
+            ];
+
+            otherRows.forEach(({ index }) => {
+                const row = rows[index];
+                const quantityCell = row.querySelectorAll('td')[3]; // 获取数量单元格
+                const unitPriceCell = row.querySelectorAll('td')[4]; // 获取单价单元格
+                const totalPriceCell = row.querySelectorAll('td')[5]; // 获取总价单元格
+                // console.log(row, quantityCell, unitPriceCell, totalPriceCell)
+                const calculateOtherTotal = () => {
+                    const quantity = parseFloat(quantityCell.textContent) || 0;
+                    const unitPrice = parseFloat(unitPriceCell.textContent) || 0;
+                    const totalPrice = quantity * unitPrice;
+                    totalPriceCell.textContent = totalPrice.toFixed(2);
+
+                    updateFinalTotal();
+                };
+
+                quantityCell.addEventListener('input', calculateOtherTotal);
+            });
+
+            // 更新最终的总价，包括优惠前和优惠后的总价
+            const updateFinalTotal = () => {
+                let geneTotal = 0;
+                let geneDiscountTotal = 0;
+
+                rows.forEach((row, index) => {
+                    if (index > 2 && row.querySelector('[rowspan="2"]')) {
+                        const totalCell = row.querySelectorAll('td')[6]; // 获取合计单元格
+                        const discountTotalCell = row.querySelectorAll('td')[7]; // 获取优惠后合计单元格
+
+                        geneTotal += parseFloat(totalCell.textContent) || 0;
+                        geneDiscountTotal += parseFloat(discountTotalCell.textContent) || 0;
+                    }
+                });
+                console.log(geneTotal, geneDiscountTotal);
+                let otherTotal = 0;
+
+                otherRows.forEach(({ index }) => {
+                    const row = rows[index];
+                    const totalPriceCell = row.querySelectorAll('td')[5]; // 获取总价单元格,
+                    otherTotal += parseFloat(totalPriceCell.textContent) || 0;
+                });
+                // console.log(geneTotal, geneDiscountTotal, otherTotal);
+
+                totalBeforeDiscount = geneTotal + otherTotal;
+                totalAfterDiscount = geneDiscountTotal + otherTotal;
+
+                document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
+                document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
             };
-
-            // 给每个数量单元格和折扣率单元格添加监听器
-            if (quantityCell1) {
-                quantityCell1.addEventListener('input', calculatePrices);
-            } else {
-                console.error("第一行数量单元格未找到");
-            }
-
-            if (quantityCell2) {
-                quantityCell2.addEventListener('input', calculatePrices); // 监听第二行的输入
-            } else {
-                console.error("第二行数量单元格未找到");
-            }
-
-            if (discountRateCell) {
-                discountRateCell.addEventListener('input', calculatePrices); // 监听折扣率输入
-            } else {
-                console.error("折扣率单元格未找到");
-            }
-        }
-    });
-
-    // 计算其他费用的总价
-    const otherRows = [
-        { selector: '载体构建', index: 15 },  // 对应的行序号
-        { selector: '甘油菌', index: 16 },
-        { selector: '干冰运输', index: 17 }
-    ];
-
-    otherRows.forEach(({ index }) => {
-        const row = rows[index];
-        const quantityCell = row.querySelectorAll('td')[3]; // 获取数量单元格
-        const unitPriceCell = row.querySelectorAll('td')[4]; // 获取单价单元格
-        const totalPriceCell = row.querySelectorAll('td')[5]; // 获取总价单元格
-        // console.log(row, quantityCell, unitPriceCell, totalPriceCell)
-        const calculateOtherTotal = () => {
-            const quantity = parseFloat(quantityCell.textContent) || 0;
-            const unitPrice = parseFloat(unitPriceCell.textContent) || 0;
-            const totalPrice = quantity * unitPrice;
-            totalPriceCell.textContent = totalPrice.toFixed(2);
-
-            updateFinalTotal();
-        };
-
-        quantityCell.addEventListener('input', calculateOtherTotal);
-    });
-
-    // 更新最终的总价，包括优惠前和优惠后的总价
-    const updateFinalTotal = () => {
-        let geneTotal = 0;
-        let geneDiscountTotal = 0;
-
-        rows.forEach((row, index) => {
-            if (index > 2 && row.querySelector('[rowspan="2"]')) {
-                const totalCell = row.querySelectorAll('td')[6]; // 获取合计单元格
-                const discountTotalCell = row.querySelectorAll('td')[7]; // 获取优惠后合计单元格
-
-                geneTotal += parseFloat(totalCell.textContent) || 0;
-                geneDiscountTotal += parseFloat(discountTotalCell.textContent) || 0;
-            }
         });
-
-        let otherTotal = 0;
-
-        otherRows.forEach(({ index }) => {
-            const row = rows[index];
-            const totalPriceCell = row.querySelectorAll('td')[5]; // 获取总价单元格
-            otherTotal += parseFloat(totalPriceCell.textContent) || 0;
-        });
-
-        totalBeforeDiscount = geneTotal + otherTotal;
-        totalAfterDiscount = geneDiscountTotal + otherTotal;
-
-        document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
-        document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
-    };
-});
 
     </script>
     
