@@ -239,7 +239,7 @@
                     </tr>
                     <tr>
                         <td rowspan="2" class="align-middle text-center">1</td>
-                        <td>基因合成（10个）</td>
+                        <td>基因合成</td>
                         <td class="text-center">个</td>
                         <td class="text-center" contenteditable="true" id="length-group-450"></td>
                         <td class="text-center">90</td>
@@ -252,7 +252,7 @@
                     <tr>
                         <td>载体克隆及NGS测序验证</td>
                         <td class="text-center">个</td>
-                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center" contenteditable="true" id="count-group-450"></td>
                         <td class="text-center">50</td>
                         <td class="text-center">0.00</td>
                     </tr>
@@ -261,7 +261,7 @@
                     <tr><td colspan="8" class="table-header table-active">基因合成报价信息（450 - 3000 bp）</td></tr>
                     <tr>
                         <td rowspan="2" class="align-middle text-center">2</td>
-                        <td>基因合成（10个）</td>
+                        <td>基因合成</td>
                         <td class="text-center">bp</td>
                         <td class="text-center" contenteditable="true" id="length-group-450-3000"></td>
                         <td class="text-center">0.3</td>
@@ -274,7 +274,7 @@
                     <tr>
                         <td>载体克隆及NGS测序验证</td>
                         <td class="text-center">个</td>
-                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center" contenteditable="true" id="count-group-450-3000"></td>
                         <td class="text-center">150</td>
                         <td class="text-center">0.00</td>
                     </tr>
@@ -283,7 +283,7 @@
                     <tr><td colspan="8" class="table-header table-active">基因合成报价信息（3001 - 5000 bp）</td></tr>
                     <tr>
                         <td rowspan="2" class="align-middle text-center">3</td>
-                        <td>基因合成（10个）</td>
+                        <td>基因合成</td>
                         <td class="text-center">bp</td>
                         <td class="text-center" contenteditable="true" id="length-group-3001-5000"></td>
                         <td class="text-center">0.35</td>
@@ -296,7 +296,7 @@
                     <tr>
                         <td>载体克隆及NGS测序验证</td>
                         <td class="text-center">个</td>
-                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center" contenteditable="true" id="count-group-3001-5000"></td>
                         <td class="text-center">300</td>
                         <td class="text-center">0.00</td>
                     </tr>
@@ -305,7 +305,7 @@
                     <tr><td colspan="8" class="table-header table-active">基因合成报价信息（5001 - 10 kb）</td></tr>
                     <tr>
                         <td rowspan="2" class="align-middle text-center">4</td>
-                        <td>基因合成（10个）</td>
+                        <td>基因合成</td>
                         <td class="text-center">bp</td>
                         <td class="text-center" contenteditable="true" id="length-group-5001"></td>
                         <td class="text-center">0.6</td>
@@ -318,7 +318,7 @@
                     <tr>
                         <td>载体克隆及NGS测序验证</td>
                         <td class="text-center">个</td>
-                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center" contenteditable="true" id="count-group-5001"></td>
                         <td class="text-center">500</td>
                         <td class="text-center">0.00</td>
                     </tr>
@@ -338,7 +338,7 @@
                         <td class="text-center">6</td>
                         <td>甘油菌</td>
                         <td class="text-center">个</td>
-                        <td class="text-center" contenteditable="true"></td>
+                        <td class="text-center" contenteditable="true" id="total-count"></td>
                         <td class="text-center">20</td>
                         <td class="text-center">0.00</td>
                         <td colspan="2" class="text-center">/</td>
@@ -360,7 +360,7 @@
 
                     <!-- 交付信息 -->
                     <tr><td colspan="8" class="table-header">交付信息</td></tr>
-                    <tr><td colspan="8">交付：提供的 2222 个基因片段，构建载体为 pUC19，交付形式：质粒溶液，交付容器：单管。<br> 周期：<strong>5-7周</strong></td></tr>
+                    <tr><td colspan="8" contenteditable="true">交付：提供的  <span id="total-count-display"></span>个基因片段，构建载体为 {{ gene.vector }}，交付形式：质粒溶液，交付容器：单管。<br> 周期：<strong>5-7周</strong></td></tr>
 
                     <!-- 报价说明 -->
                     <tr><td colspan="8" class="table-header">报价说明</td></tr>
@@ -417,6 +417,36 @@
 {% block javascript %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const priceTable = {
+        '0-99': {
+            '<450': 135,
+            '450-3000': 0.3,
+            '3001-5000': 0.35,
+            '>5001': 0.6
+        },
+        '100-299': {
+            '<450': 112.5,
+            '450-3000': 0.25,
+            '3001-5000': 0.3,
+            '>5001': 0.5
+        },
+        '>300': {
+            '<450': 90,
+            '450-3000': 0.2,
+            '3001-5000': 0.25,
+            '>5001': 0.4
+        }
+    };
+    function getPriceGroup(totalCounts) {
+        if (totalCounts <= 99) {
+            return priceTable['0-99'];
+        } else if (totalCounts <= 299) {
+            return priceTable['100-299'];
+        } else {
+            return priceTable['>300'];
+        }
+    }
+
     var lengthGroups = {
         '<450': { count: 0, length: 0 },
         '450-3000': { count: 0, length: 0 },
@@ -444,23 +474,60 @@ document.addEventListener('DOMContentLoaded', () => {
             lengthGroups[group].length += length;  
         });
 
-        // 更新到表格中
-        document.querySelector('#length-group-450').textContent = lengthGroups['<450'].length;
-        document.querySelector('#length-group-450-3000').textContent = lengthGroups['450-3000'].length;
-        document.querySelector('#length-group-3001-5000').textContent = lengthGroups['3001-5000'].length;
-        document.querySelector('#length-group-5001').textContent = lengthGroups['>5001'].length;
+        // 更新表格，但只更新没有手动修改过的单元格
+        updateCellContent('#length-group-450', lengthGroups['<450'].count);
+        updateCellContent('#length-group-450-3000', lengthGroups['450-3000'].length);
+        updateCellContent('#length-group-3001-5000', lengthGroups['3001-5000'].length);
+        updateCellContent('#length-group-5001', lengthGroups['>5001'].length);
+        updateCellContent('#count-group-450', lengthGroups['<450'].count);
+        updateCellContent('#count-group-450-3000', lengthGroups['450-3000'].count);
+        updateCellContent('#count-group-3001-5000', lengthGroups['3001-5000'].count);
+        updateCellContent('#count-group-5001', lengthGroups['>5001'].count);
 
-        // 返回当前的总长度
-        return lengthGroups['<450'].length + lengthGroups['450-3000'].length + lengthGroups['3001-5000'].length + lengthGroups['>5001'].length;
+        // 返回当前的总长度 和总数量
+        totalLength = lengthGroups['<450'].length + lengthGroups['450-3000'].length + lengthGroups['3001-5000'].length + lengthGroups['>5001'].length;
+        totalCounts = lengthGroups['<450'].count + lengthGroups['450-3000'].count + lengthGroups['3001-5000'].count + lengthGroups['>5001'].count;
+        document.querySelector('#total-count').textContent = totalCounts;
+
+        return totalLength;
+    }
+
+    // 辅助函数：仅在单元格未被手动修改时更新内容
+    function updateCellContent(selector, value) {
+        const cell = document.querySelector(selector);
+        if (!cell.getAttribute('data-edited')) {  // 仅在未被手动编辑的情况下更新
+            cell.textContent = value;
+        }
+    }
+
+    // 设置监听器，用户手动编辑单元格后进行标记
+    function setupContentEditableListeners() {
+        document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
+            // 在聚焦时也标记单元格为可编辑，确保首次点击即可编辑
+            cell.addEventListener('focus', function() {
+                this.setAttribute('data-edited', 'true');  // 聚焦时立即标记
+            });
+
+            // 监听失去焦点时的事件，更新总价
+            cell.addEventListener('blur', function() {
+                updateTotalPrice();  // 手动编辑后重新计算总价
+            });
+        });
     }
 
     function updateFinalTotal() {
         let geneTotal = 0;
         let geneDiscountTotal = 0;
 
+        // 获取当前总的基因数量
+        const totalCounts = parseFloat(document.querySelector('#total-count').textContent) || 0;
+
+        // 获取适用的单价表
+        const priceGroup = getPriceGroup(totalCounts);
+        console.log(priceGroup);
+
         // 获取所有的表格行
         const rows = document.querySelectorAll('#price-detail-table tr');
-
         rows.forEach((row, index) => {
             // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
             if (index > 2 && row.querySelector('[rowspan="2"]')) {
@@ -478,9 +545,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const discountRateCell = row.querySelector('td:nth-child(9)'); // 折扣率单元格
 
                 const quantity1 = parseFloat(quantityCell1.textContent) || 0;
-                const unitPrice1 = parseFloat(unitPriceCell1.textContent) || 0;
+                const lengthCategory1 = lengthCategory(parseFloat(unitPriceCell2.textContent) || 0);  // 根据单价获取长度区间
+                const unitPrice1 = priceGroup[lengthCategory1] || 0;  // 根据数量获取单价
+
                 const quantity2 = parseFloat(quantityCell2.textContent) || 0;
                 const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0;
+
+                // 更新单价
+                unitPriceCell1.textContent = unitPrice1.toFixed(2);
 
                 const totalPrice1 = quantity1 * unitPrice1;
                 const totalPrice2 = quantity2 * unitPrice2;
@@ -534,9 +606,36 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
         document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
     }
+    // 辅助函数，用于确定长度区间
+    function lengthCategory(length) {
+        if (length == 50) {
+            return '<450';
+        } else if (length == 150) {
+            return '450-3000';
+        } else if (length == 300) {
+            return '3001-5000';
+        } else {
+            return '>5001';
+        }
+    }
 
     function updateTotalPrice() {
         const totalLength = calculatePricesAndLengths(); // 先更新分类
+        // 从可编辑的单元格中获取当前的值
+        const count450 = parseFloat(document.querySelector('#count-group-450').textContent) || 0;
+        const count450_3000 = parseFloat(document.querySelector('#count-group-450-3000').textContent) || 0;
+        const count3001_5000 = parseFloat(document.querySelector('#count-group-3001-5000').textContent) || 0;
+        const count5001 = parseFloat(document.querySelector('#count-group-5001').textContent) || 0;
+
+        // 计算总数
+        const totalCounts = count450 + count450_3000 + count3001_5000 + count5001;
+
+        // 更新页面上显示的总数
+        document.querySelector('#total-count').textContent = totalCounts;
+        // 更新"提供的基因片段数"
+        document.querySelector('#total-count-display').textContent = totalCounts;
+
+        // 更新其他总价等信息
         updateFinalTotal(); // 再更新总价
 
         const totalPrice = totalBeforeDiscount || 0;
@@ -547,6 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
         $('#total-length').text('Total ' + totalLength + ' bp');
     }
+
+    setupContentEditableListeners();  // 设置监听器
 
     // 监听复选框状态变化，实时更新分类和总价
     $('input.gene-checkbox').change(function() {
