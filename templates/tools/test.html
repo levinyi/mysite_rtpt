@@ -1,356 +1,581 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>报价单</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .table-header {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-        .table-title {
-            font-size: 24px;
-            text-align: center;
-            font-weight: bold;
-            padding: 20px 0;
-        }
-        /* 设置列宽度 */
-        .col-seq {
-            width: 5%;  /* 第一列：序号，设置为5% */
-        }
-        .col-item {
-            width: 20%; /* 第二列：项目，设置为25% */
-        }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% load custom_filters %}
+{% load static %}
+{% block title %}Shopping Cart{% endblock %}
+
+{% block content %}
     <div class="container mt-5">
-        <table class="table table-bordered table-sm" id="price-detail-table">
-            <!-- 标题行 -->
-            <tr><td colspan="8" class="table-title">基因合成报价单</td></tr>
-            <!-- 基因合成报价信息（<450 bp） -->
-            <tr><td colspan="8" class="table-header table-active">基因合成报价信息（<450 bp）</td></tr>
-            <tr class="table-header">
-                <td class="text-center" style="width: 10">序号</td>
-                <td class="text-center col-item">项目</td>
-                <td class="text-center">单位</td>
-                <td class="text-center">数量</td>
-                <td class="text-center">含税单价（元）</td>
-                <td class="text-center">总价（元）</td>
-                <td class="text-center">合计（元）</td>
-                <td class="text-center">优惠后合计（元）</td>
-                <td class="text-center">折扣率</td>
-                <!-- <td class="text-center">折扣单价</td> -->
-            </tr>
-            <tr>
-                <td rowspan="2" class="align-middle text-center">1</td>
-                <td>基因合成（10个）</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">90</td>
-                <td class="text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
-                <!-- <td rowspan="2" class="align-middle text-center"></td> -->
-            </tr>
-            <tr>
-                <td>载体克隆及NGS测序验证</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">50</td>
-                <td class="text-center">0.00</td>
-            </tr>
-
-            <!-- 基因合成报价信息（450 - 3000 bp） -->
-            <tr><td colspan="8" class="table-header table-active">基因合成报价信息（450 - 3000 bp）</td></tr>
-            <tr>
-                <td rowspan="2" class="align-middle text-center">2</td>
-                <td>基因合成（10个）</td>
-                <td class="text-center">bp</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">0.3</td>
-                <td class="text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
-                <!-- <td rowspan="2" class="align-middle text-center"></td> -->
-            </tr>
-            <tr>
-                <td>载体克隆及NGS测序验证</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">150</td>
-                <td class="text-center">0.00</td>
-            </tr>
-
-            <!-- 基因合成报价信息（3001 - 5000 bp） -->
-            <tr><td colspan="8" class="table-header table-active">基因合成报价信息（3001 - 5000 bp）</td></tr>
-            <tr>
-                <td rowspan="2" class="align-middle text-center">3</td>
-                <td>基因合成（10个）</td>
-                <td class="text-center">bp</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">0.35</td>
-                <td class="text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
-                <!-- <td rowspan="2" class="align-middle text-center"></td> -->
-            </tr>
-            <tr>
-                <td>载体克隆及NGS测序验证</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">300</td>
-                <td class="text-center">0.00</td>
-            </tr>
-
-            <!-- 基因合成报价信息（5001 - 10 kb） -->
-            <tr><td colspan="8" class="table-header table-active">基因合成报价信息（5001 - 10 kb）</td></tr>
-            <tr>
-                <td rowspan="2" class="align-middle text-center">4</td>
-                <td>基因合成（10个）</td>
-                <td class="text-center">bp</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">0.6</td>
-                <td class="text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center">0.00</td>
-                <td rowspan="2" class="align-middle text-center" contenteditable="true">1</td>
-                <!-- <td rowspan="2" class="align-middle text-center"></td> -->
-            </tr>
-            <tr>
-                <td>载体克隆及NGS测序验证</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">500</td>
-                <td class="text-center">0.00</td>
-            </tr>
-
-            <!-- 其他费用 -->
-            <tr><td colspan="8" class="table-header table-active">其他费用</td></tr>
-            <tr>
-                <td class="text-center">5</td>
-                <td>载体构建</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">2000</td>
-                <td class="text-center">0.00</td>
-                <td colspan="2" class="text-center">/</td>
-            </tr>
-            <tr>
-                <td class="text-center">6</td>
-                <td>甘油菌</td>
-                <td class="text-center">个</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">20</td>
-                <td class="text-center">0.00</td>
-                <td colspan="2" class="text-center">/</td>
-            </tr>
-            <tr>
-                <td class="text-center">7</td>
-                <td>干冰运输</td>
-                <td class="text-center">趟</td>
-                <td class="text-center" contenteditable="true"></td>
-                <td class="text-center">500</td>
-                <td class="text-center">0.00</td>
-                <td colspan="2" class="text-center">/</td>
-            </tr>
-
-            <!-- 总价-->
-            <tr><td colspan="8" class="table-header table-active">总价</td></tr>
-            <tr><td colspan="8" class="text-center">优惠前总价（元）：<del id="total-before-discount"></del></td></tr>
-            <tr><td colspan="8" class="text-center table-active" style="background-color: #FF85FF;">优惠后总价（元）：<strong id="total-after-discount"></strong></td></tr>
-
-            <!-- 交付信息 -->
-            <tr><td colspan="8" class="table-header">交付信息</td></tr>
-            <tr><td colspan="8">交付：提供的 2222 个基因片段，构建载体为 pUC19，交付形式：质粒溶液，交付容器：单管。<br> 周期：<strong>5-7周</strong></td></tr>
-
-            <!-- 报价说明 -->
-            <tr><td colspan="8" class="table-header">报价说明</td></tr>
-            <tr>
-                <td colspan="8">
-                    1. 订单生产以邮件确认为开始，视为产品生产开始日期。<br>
-                    2. 交付周期包含产品运输时间，不包含客户指定载体的改造时间；指定载体改造所需时间由改造内容而定。<br>
-                    3. 以上报价仅在有效期内有效。<br>
-                    4. 报价单如与最终签署的合同价格不一致，以合同金额为准。<br>
-                    5. 订单交付后，乙方仅保存少量质粒和菌液（如有），用于QC验证，不做他用；订单全部交付的2个月后，乙方将销毁该订单相关的序列信息、质粒及菌液（如有）。<br>
-                    6. 关于取消订单：<br>
-                    （i）若客户于邮件确认后1周内提出取消要求，须支付订单总价的20%；<br>
-                    （ii）若客户于邮件确认1周后至4周内提出取消要求，须支付订单总价的80%；<br>
-                    （iii）若客户于邮件确认4周后至整个订单已经完成时提出取消要求，须支付订单总价的100%。
-                </td>
-            </tr>
-
-            <!-- 公司信息 -->
-            <tr><td colspan="8" class="table-header">公司信息</td></tr>
-            <tr>
-                <td colspan="8">
-                    广州呈源生物免疫技术有限公司<br>
-                    地址：广东省广州市黄埔区神舟路18号F栋13楼<br>
-                    联系人：方磊<br>
-                    电话：13316120226<br>
-                    邮箱：<a href="mailto:order@rootpathgx.com">order@rootpathgx.com</a>
-                </td>
-            </tr>
-        </table>
+        <div class="row">
+            <table id="example" class="display" style="width:100%">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all"></th> <!-- checkbox -->
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Office</th>
+                        <th>Age</th>
+                        <th>Start date</th>
+                        <th>Salary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td> <!-- DataTables will render checkboxes here -->
+                        <td>Tiger Nixon</td>
+                        <td>System Architect</td>
+                        <td>Edinburgh</td>
+                        <td>61</td>
+                        <td>2011-04-25</td>
+                        <td>$320,800</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Garrett Winters</td>
+                        <td>Accountant</td>
+                        <td>Tokyo</td>
+                        <td>63</td>
+                        <td>2011-07-25</td>
+                        <td>$170,750</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Ashton Cox</td>
+                        <td>Junior Technical Author</td>
+                        <td>San Francisco</td>
+                        <td>66</td>
+                        <td>2009-01-12</td>
+                        <td>$86,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Cedric Kelly</td>
+                        <td>Senior Javascript Developer</td>
+                        <td>Edinburgh</td>
+                        <td>22</td>
+                        <td>2012-03-29</td>
+                        <td>$433,060</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Airi Satou</td>
+                        <td>Accountant</td>
+                        <td>Tokyo</td>
+                        <td>33</td>
+                        <td>2008-11-28</td>
+                        <td>$162,700</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Brielle Williamson</td>
+                        <td>Integration Specialist</td>
+                        <td>New York</td>
+                        <td>61</td>
+                        <td>2012-12-02</td>
+                        <td>$372,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Herrod Chandler</td>
+                        <td>Sales Assistant</td>
+                        <td>San Francisco</td>
+                        <td>59</td>
+                        <td>2012-08-06</td>
+                        <td>$137,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Rhona Davidson</td>
+                        <td>Integration Specialist</td>
+                        <td>Tokyo</td>
+                        <td>55</td>
+                        <td>2010-10-14</td>
+                        <td>$327,900</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Colleen Hurst</td>
+                        <td>Javascript Developer</td>
+                        <td>San Francisco</td>
+                        <td>39</td>
+                        <td>2009-09-15</td>
+                        <td>$205,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Sonya Frost</td>
+                        <td>Software Engineer</td>
+                        <td>Edinburgh</td>
+                        <td>23</td>
+                        <td>2008-12-13</td>
+                        <td>$103,600</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Jena Gaines</td>
+                        <td>Office Manager</td>
+                        <td>London</td>
+                        <td>30</td>
+                        <td>2008-12-19</td>
+                        <td>$90,560</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Quinn Flynn</td>
+                        <td>Support Lead</td>
+                        <td>Edinburgh</td>
+                        <td>22</td>
+                        <td>2013-03-03</td>
+                        <td>$342,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Charde Marshall</td>
+                        <td>Regional Director</td>
+                        <td>San Francisco</td>
+                        <td>36</td>
+                        <td>2008-10-16</td>
+                        <td>$470,600</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Haley Kennedy</td>
+                        <td>Senior Marketing Designer</td>
+                        <td>London</td>
+                        <td>43</td>
+                        <td>2012-12-18</td>
+                        <td>$313,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Tatyana Fitzpatrick</td>
+                        <td>Regional Director</td>
+                        <td>London</td>
+                        <td>19</td>
+                        <td>2010-03-17</td>
+                        <td>$385,750</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Michael Silva</td>
+                        <td>Marketing Designer</td>
+                        <td>London</td>
+                        <td>66</td>
+                        <td>2012-11-27</td>
+                        <td>$198,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Paul Byrd</td>
+                        <td>Chief Financial Officer (CFO)</td>
+                        <td>New York</td>
+                        <td>64</td>
+                        <td>2010-06-09</td>
+                        <td>$725,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Gloria Little</td>
+                        <td>Systems Administrator</td>
+                        <td>New York</td>
+                        <td>59</td>
+                        <td>2009-04-10</td>
+                        <td>$237,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Bradley Greer</td>
+                        <td>Software Engineer</td>
+                        <td>London</td>
+                        <td>41</td>
+                        <td>2012-10-13</td>
+                        <td>$132,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Dai Rios</td>
+                        <td>Personnel Lead</td>
+                        <td>Edinburgh</td>
+                        <td>35</td>
+                        <td>2012-09-26</td>
+                        <td>$217,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Jenette Caldwell</td>
+                        <td>Development Lead</td>
+                        <td>New York</td>
+                        <td>30</td>
+                        <td>2011-09-03</td>
+                        <td>$345,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Yuri Berry</td>
+                        <td>Chief Marketing Officer (CMO)</td>
+                        <td>New York</td>
+                        <td>40</td>
+                        <td>2009-06-25</td>
+                        <td>$675,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Caesar Vance</td>
+                        <td>Pre-Sales Support</td>
+                        <td>New York</td>
+                        <td>21</td>
+                        <td>2011-12-12</td>
+                        <td>$106,450</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Doris Wilder</td>
+                        <td>Sales Assistant</td>
+                        <td>Sydney</td>
+                        <td>23</td>
+                        <td>2010-09-20</td>
+                        <td>$85,600</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Angelica Ramos</td>
+                        <td>Chief Executive Officer (CEO)</td>
+                        <td>London</td>
+                        <td>47</td>
+                        <td>2009-10-09</td>
+                        <td>$1,200,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Gavin Joyce</td>
+                        <td>Developer</td>
+                        <td>Edinburgh</td>
+                        <td>42</td>
+                        <td>2010-12-22</td>
+                        <td>$92,575</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Jennifer Chang</td>
+                        <td>Regional Director</td>
+                        <td>Singapore</td>
+                        <td>28</td>
+                        <td>2010-11-14</td>
+                        <td>$357,650</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Brenden Wagner</td>
+                        <td>Software Engineer</td>
+                        <td>San Francisco</td>
+                        <td>28</td>
+                        <td>2011-06-07</td>
+                        <td>$206,850</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Fiona Green</td>
+                        <td>Chief Operating Officer (COO)</td>
+                        <td>San Francisco</td>
+                        <td>48</td>
+                        <td>2010-03-11</td>
+                        <td>$850,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Shou Itou</td>
+                        <td>Regional Marketing</td>
+                        <td>Tokyo</td>
+                        <td>20</td>
+                        <td>2011-08-14</td>
+                        <td>$163,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Michelle House</td>
+                        <td>Integration Specialist</td>
+                        <td>Sydney</td>
+                        <td>37</td>
+                        <td>2011-06-02</td>
+                        <td>$95,400</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Suki Burks</td>
+                        <td>Developer</td>
+                        <td>London</td>
+                        <td>53</td>
+                        <td>2009-10-22</td>
+                        <td>$114,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Prescott Bartlett</td>
+                        <td>Technical Author</td>
+                        <td>London</td>
+                        <td>27</td>
+                        <td>2011-05-07</td>
+                        <td>$145,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Gavin Cortez</td>
+                        <td>Team Leader</td>
+                        <td>San Francisco</td>
+                        <td>22</td>
+                        <td>2008-10-26</td>
+                        <td>$235,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Martena Mccray</td>
+                        <td>Post-Sales support</td>
+                        <td>Edinburgh</td>
+                        <td>46</td>
+                        <td>2011-03-09</td>
+                        <td>$324,050</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Unity Butler</td>
+                        <td>Marketing Designer</td>
+                        <td>San Francisco</td>
+                        <td>47</td>
+                        <td>2009-12-09</td>
+                        <td>$85,675</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Howard Hatfield</td>
+                        <td>Office Manager</td>
+                        <td>San Francisco</td>
+                        <td>51</td>
+                        <td>2008-12-16</td>
+                        <td>$164,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Hope Fuentes</td>
+                        <td>Secretary</td>
+                        <td>San Francisco</td>
+                        <td>41</td>
+                        <td>2010-02-12</td>
+                        <td>$109,850</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Vivian Harrell</td>
+                        <td>Financial Controller</td>
+                        <td>San Francisco</td>
+                        <td>62</td>
+                        <td>2009-02-14</td>
+                        <td>$452,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Timothy Mooney</td>
+                        <td>Office Manager</td>
+                        <td>London</td>
+                        <td>37</td>
+                        <td>2008-12-11</td>
+                        <td>$136,200</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Jackson Bradshaw</td>
+                        <td>Director</td>
+                        <td>New York</td>
+                        <td>65</td>
+                        <td>2008-09-26</td>
+                        <td>$645,750</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Olivia Liang</td>
+                        <td>Support Engineer</td>
+                        <td>Singapore</td>
+                        <td>64</td>
+                        <td>2011-02-03</td>
+                        <td>$234,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Bruno Nash</td>
+                        <td>Software Engineer</td>
+                        <td>London</td>
+                        <td>38</td>
+                        <td>2011-05-03</td>
+                        <td>$163,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Sakura Yamamoto</td>
+                        <td>Support Engineer</td>
+                        <td>Tokyo</td>
+                        <td>37</td>
+                        <td>2009-08-19</td>
+                        <td>$139,575</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Thor Walton</td>
+                        <td>Developer</td>
+                        <td>New York</td>
+                        <td>61</td>
+                        <td>2013-08-11</td>
+                        <td>$98,540</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Finn Camacho</td>
+                        <td>Support Engineer</td>
+                        <td>San Francisco</td>
+                        <td>47</td>
+                        <td>2009-07-07</td>
+                        <td>$87,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Serge Baldwin</td>
+                        <td>Data Coordinator</td>
+                        <td>Singapore</td>
+                        <td>64</td>
+                        <td>2012-04-09</td>
+                        <td>$138,575</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Zenaida Frank</td>
+                        <td>Software Engineer</td>
+                        <td>New York</td>
+                        <td>63</td>
+                        <td>2010-01-04</td>
+                        <td>$125,250</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Zorita Serrano</td>
+                        <td>Software Engineer</td>
+                        <td>San Francisco</td>
+                        <td>56</td>
+                        <td>2012-06-01</td>
+                        <td>$115,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Jennifer Acosta</td>
+                        <td>Junior Javascript Developer</td>
+                        <td>Edinburgh</td>
+                        <td>43</td>
+                        <td>2013-02-01</td>
+                        <td>$75,650</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Cara Stevens</td>
+                        <td>Sales Assistant</td>
+                        <td>New York</td>
+                        <td>46</td>
+                        <td>2011-12-06</td>
+                        <td>$145,600</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Hermione Butler</td>
+                        <td>Regional Director</td>
+                        <td>London</td>
+                        <td>47</td>
+                        <td>2011-03-21</td>
+                        <td>$356,250</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Lael Greer</td>
+                        <td>Systems Administrator</td>
+                        <td>London</td>
+                        <td>21</td>
+                        <td>2009-02-27</td>
+                        <td>$103,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Jonas Alexander</td>
+                        <td>Developer</td>
+                        <td>San Francisco</td>
+                        <td>30</td>
+                        <td>2010-07-14</td>
+                        <td>$86,500</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Shad Decker</td>
+                        <td>Regional Director</td>
+                        <td>Edinburgh</td>
+                        <td>51</td>
+                        <td>2008-11-13</td>
+                        <td>$183,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Michael Bruce</td>
+                        <td>Javascript Developer</td>
+                        <td>Singapore</td>
+                        <td>29</td>
+                        <td>2011-06-27</td>
+                        <td>$183,000</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" class="row-select"></td>
+                        <td>Donna Snider</td>
+                        <td>Customer Support</td>
+                        <td>New York</td>
+                        <td>27</td>
+                        <td>2011-01-25</td>
+                        <td>$112,000</td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th></th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Office</th>
+                        <th>Age</th>
+                        <th>Start date</th>
+                        <th>Salary</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
+{% endblock %}
+{% block javascript %}
+<script>
+    // 初始化 DataTables
+    const table = new DataTable('#example', {
+        info: false,  // 是否显示表格信息
+        ordering: true,  // 是否允许排序
+        paging: true,  // 是否分页
+        searching: false,  // 是否显示搜索框
+        select: {
+            style: 'multi+shift',  // 允许多选，并且支持 shift 键选择
+        },
+    });
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // 获取所有的表格行
-            // const rows = document.querySelectorAll('table tr');
-            const rows = document.querySelectorAll('#price-detail-table tr');
-            let totalBeforeDiscount = 0; // 用于存储优惠前的总价
-            let totalAfterDiscount = 0; // 用于存储优惠后的总价
-
-            // 计算基因合成部分的总价和合计
-            rows.forEach((row, index) => {
-                // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
-                if (index > 2 && row.querySelector('[rowspan="2"]')) {
-                    // 获取这一组两行的相关单元格
-                    const quantityCell1 = row.querySelectorAll('td')[3]; // 第一行数量单元格
-                    const unitPriceCell1 = row.querySelectorAll('td')[4]; // 第一行单价单元格
-                    const totalPriceCell1 = row.querySelectorAll('td')[5]; // 第一行总价单元格
-
-                    const nextRow = row.nextElementSibling;
-                    
-                    if (!nextRow) {
-                        console.error(`无法找到第 ${index + 1} 行的下一行`);
-                        return;
-                    }
-
-                    const quantityCell2 = nextRow.querySelectorAll('td')[2]; // 第二行数量单元格
-                    const unitPriceCell2 = nextRow.querySelectorAll('td')[3]; // 第二行单价单元格
-                    const totalPriceCell2 = nextRow.querySelectorAll('td')[4]; // 第二行总价单元格
-                    //  console.log(quantityCell2, unitPriceCell2, totalPriceCell2)
-
-                    const totalCell = row.querySelectorAll('td')[6]; // 合计单元格
-                    const discountTotalCell = row.querySelectorAll('td')[7]; // 优惠后合计单元格
-                    const discountRateCell = row.querySelectorAll('td')[8]; // 折扣率单元格
-
-                    // 折扣单价这一行如果不需要就删掉
-                    // const discountUnitCell = row.querySelectorAll('td')[9]; // 折扣单价
-                    // console.log(totalCell, discountTotalCell, discountRateCell, discountUnitCell)
-
-                    // 检查单元格是否有效
-                    if (!quantityCell1 || !unitPriceCell1 || !totalPriceCell1 || !quantityCell2 || !unitPriceCell2 || !totalPriceCell2 || !totalCell || !discountTotalCell || !discountRateCell) {
-                        console.error("某个单元格未找到。检查 HTML 结构。");
-                        return;
-                    }
-
-                    // 计算总价的函数
-                    const calculatePrices = () => {
-                        const quantity1 = parseFloat(quantityCell1.textContent) || 0; // 获取第一行数量
-                        const unitPrice1 = parseFloat(unitPriceCell1.textContent) || 0; // 获取第一行单价
-                        const totalPrice1 = quantity1 * unitPrice1; // 计算第一行总价
-                        totalPriceCell1.textContent = totalPrice1.toFixed(2); // 显示第一行总价
-
-                        const quantity2 = parseFloat(quantityCell2.textContent) || 0; // 获取第二行数量
-                        const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0; // 获取第二行单价
-                        const totalPrice2 = quantity2 * unitPrice2; // 计算第二行总价
-                        totalPriceCell2.textContent = totalPrice2.toFixed(2); // 显示第二行总价
-
-                        // 计算合计（两行的总价之和）
-                        const total = totalPrice1 + totalPrice2;
-                        totalCell.textContent = total.toFixed(2); // 显示合计
-
-                        // 获取折扣率并计算优惠后合计
-                        const discountRate = parseFloat(discountRateCell.textContent) || 1; // 获取折扣率，默认为1
-                        const discountTotal = total * discountRate;
-                        discountTotalCell.textContent = discountTotal.toFixed(2); // 显示优惠后合计
-
-                        // 这两行如果不需要就删掉
-                        // const discountUnit = discountTotal / (quantity1 + quantity2)
-                        // discountUnitCell.textContent = discountUnit.toFixed(2);
-
-                        updateFinalTotal();
-                    };
-
-                    // 给每个数量单元格和折扣率单元格添加监听器
-                    if (quantityCell1) {
-                        quantityCell1.addEventListener('input', calculatePrices);
-                    } else {
-                        console.error("第一行数量单元格未找到");
-                    }
-
-                    if (quantityCell2) {
-                        quantityCell2.addEventListener('input', calculatePrices); // 监听第二行的输入
-                    } else {
-                        console.error("第二行数量单元格未找到");
-                    }
-
-                    if (discountRateCell) {
-                        discountRateCell.addEventListener('input', calculatePrices); // 监听折扣率输入
-                    } else {
-                        console.error("折扣率单元格未找到");
-                    }
-                }
-            });
-
-            // 计算其他费用的总价
-            const otherRows = [
-                { selector: '载体构建', index: 15 },  // 对应的行序号
-                { selector: '甘油菌', index: 16 },
-                { selector: '干冰运输', index: 17 }
-            ];
-
-            otherRows.forEach(({ index }) => {
-                const row = rows[index];
-                const quantityCell = row.querySelectorAll('td')[3]; // 获取数量单元格
-                const unitPriceCell = row.querySelectorAll('td')[4]; // 获取单价单元格
-                const totalPriceCell = row.querySelectorAll('td')[5]; // 获取总价单元格
-                // console.log(row, quantityCell, unitPriceCell, totalPriceCell)
-                const calculateOtherTotal = () => {
-                    const quantity = parseFloat(quantityCell.textContent) || 0;
-                    const unitPrice = parseFloat(unitPriceCell.textContent) || 0;
-                    const totalPrice = quantity * unitPrice;
-                    totalPriceCell.textContent = totalPrice.toFixed(2);
-
-                    updateFinalTotal();
-                };
-
-                quantityCell.addEventListener('input', calculateOtherTotal);
-            });
-
-            // 更新最终的总价，包括优惠前和优惠后的总价
-            const updateFinalTotal = () => {
-                let geneTotal = 0;
-                let geneDiscountTotal = 0;
-
-                rows.forEach((row, index) => {
-                    if (index > 2 && row.querySelector('[rowspan="2"]')) {
-                        const totalCell = row.querySelectorAll('td')[6]; // 获取合计单元格
-                        const discountTotalCell = row.querySelectorAll('td')[7]; // 获取优惠后合计单元格
-
-                        geneTotal += parseFloat(totalCell.textContent) || 0;
-                        geneDiscountTotal += parseFloat(discountTotalCell.textContent) || 0;
-                    }
-                });
-                console.log(geneTotal, geneDiscountTotal);
-                let otherTotal = 0;
-
-                otherRows.forEach(({ index }) => {
-                    const row = rows[index];
-                    const totalPriceCell = row.querySelectorAll('td')[5]; // 获取总价单元格,
-                    otherTotal += parseFloat(totalPriceCell.textContent) || 0;
-                });
-                // console.log(geneTotal, geneDiscountTotal, otherTotal);
-
-                totalBeforeDiscount = geneTotal + otherTotal;
-                totalAfterDiscount = geneDiscountTotal + otherTotal;
-
-                document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
-                document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
-            };
+    // 监听 "全选" checkbox 的点击事件
+    document.querySelector('#select-all').addEventListener('change', function () {
+        const checked = this.checked;
+        const checkboxes = document.querySelectorAll('.row-select');
+        
+        checkboxes.forEach(function (checkbox) {
+            checkbox.checked = checked;
+            const row = checkbox.closest('tr');
+            if (checked) {
+                row.classList.add('selected');
+            } else {
+                row.classList.remove('selected');
+            }
         });
-
-    </script>
-    
-</body>
-</html>
+    });
+</script>
+{% endblock %}
 

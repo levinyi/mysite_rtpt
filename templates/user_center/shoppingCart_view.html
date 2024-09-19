@@ -93,7 +93,7 @@
                     <td>
                         <!-- 复选框 -->
                         <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}" 
-                            data-length="{{ gene.saved_seq|length }}" data-date="{{ group.date }}">
+                            data-length="{{ gene.saved_seq|safe|base_length }}" data-date="{{ group.date }}" data-vector="{{ gene.vector }}">
                     </td>
                     <td>{{ forloop.counter }}</td>
                     <td>
@@ -191,11 +191,11 @@
                 <p id="total-genes" class="mb-0">Total 0 Genes</p>
                 <p class="mb-0">Delivery:
                     <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Depends on your location. Please fill in your shipping address in your account's profile."></i></p>
-                <p id="total-price" class="mb-0">Total: $0</p>
+                <p id="total-price" class="mb-0">Total: ￥0</p>
             </div>
             <div class="d-flex justify-content-between">
                 <p id="total-length" class="mb-0">Total 0 bp</p>
-                <p id="delivery-fee" class="mb-0">$0 delivery fee</p>
+                <p id="delivery-fee" class="mb-0">￥0 delivery fee</p>
                 <p class="mb-0">
                     <a class="text-decoration-none" href="#" data-bs-toggle="modal" data-bs-target="#detailsModal">See details <i class="bi bi-caret-down-fill"></i></a>
                 </p>
@@ -360,7 +360,8 @@
 
                     <!-- 交付信息 -->
                     <tr><td colspan="8" class="table-header">交付信息</td></tr>
-                    <tr><td colspan="8" contenteditable="true">交付：提供的  <span id="total-count-display"></span>个基因片段，构建载体为 {{ gene.vector }}，交付形式：质粒溶液，交付容器：单管。<br> 周期：<strong>5-7周</strong></td></tr>
+                    <tr><td colspan="8" contenteditable="true">交付：提供的 <strong> <span id="total-count-display"></span> </strong>个基因片段，构建载体为 ：<strong><span id="vector-list"></span></strong>，
+                        交付形式 : <strong>质粒溶液</strong>, 交付容器：<strong>单管 </strong>。<br> 周期：<strong>5-7周</strong></td></tr>
 
                     <!-- 报价说明 -->
                     <tr><td colspan="8" class="table-header">报价说明</td></tr>
@@ -437,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '>5001': 0.4
         }
     };
+    
     function getPriceGroup(totalCounts) {
         if (totalCounts <= 99) {
             return priceTable['0-99'];
@@ -466,12 +468,21 @@ document.addEventListener('DOMContentLoaded', () => {
             '>5001': { count: 0, length: 0 }
         };
 
+        // 用于统计选中的 vector 类型
+        const selectedVectors = new Set();
+
         // 处理选中的基因复选框
         $('input.gene-checkbox:checked:visible').each(function() {
             var length = $(this).data('length');
             var group = length < 450 ? '<450' : length < 3001 ? '450-3000' : length < 5001 ? '3001-5000' : '>5001';
             lengthGroups[group].count++;
             lengthGroups[group].length += length;  
+
+            // 将 vector 类型添加到集合中
+            var vectorType = $(this).data('vector');
+            if (vectorType) {
+                selectedVectors.add(vectorType);
+            }
         });
 
         // 更新表格，但只更新没有手动修改过的单元格
@@ -488,6 +499,9 @@ document.addEventListener('DOMContentLoaded', () => {
         totalLength = lengthGroups['<450'].length + lengthGroups['450-3000'].length + lengthGroups['3001-5000'].length + lengthGroups['>5001'].length;
         totalCounts = lengthGroups['<450'].count + lengthGroups['450-3000'].count + lengthGroups['3001-5000'].count + lengthGroups['>5001'].count;
         document.querySelector('#total-count').textContent = totalCounts;
+
+        // 将所有选中的 vector 类型显示在某个地方（假设有一个容器 id 为 `vector-list`）
+        document.querySelector('#vector-list').textContent = Array.from(selectedVectors).join(', ');
 
         return totalLength;
     }
@@ -524,7 +538,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 获取适用的单价表
         const priceGroup = getPriceGroup(totalCounts);
-        console.log(priceGroup);
 
         // 获取所有的表格行
         const rows = document.querySelectorAll('#price-detail-table tr');
@@ -639,10 +652,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFinalTotal(); // 再更新总价
 
         const totalPrice = totalBeforeDiscount || 0;
-        console.log("totalPrice and totalLength", totalPrice, totalLength);
 
         // 更新页面显示
-        $('#total-price').text('Total: $' + totalPrice.toFixed(2));
+        $('#total-price').text('Total ￥: ≈' + totalPrice.toFixed(2));
         $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
         $('#total-length').text('Total ' + totalLength + ' bp');
     }
@@ -828,7 +840,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function optimizeSelected() {
         const selectedValues = getSelectedValues();
         if (selectedValues.length > 0) {
-            console.log("Optimizing: ", selectedValues);
             // Example: send data to server
             // fetch('/optimize', {
             //     method: 'POST',
@@ -845,8 +856,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function bulkdownloadSelectedGenBank() {
         const selectedValues = getSelectedValues();
         if (selectedValues.length > 0) {
-            console.log("Downloading: ", selectedValues);
-
             fetch('{% url "user_center:bulk_download_genbank" %}', {
                 method: 'POST',
                 body: JSON.stringify({ 'gene_ids': selectedValues }),
@@ -871,7 +880,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 a.remove();
             })
             .catch(error => {
-                console.error('Error:', error);
                 alert(error.message);
             });
         } else {
@@ -882,7 +890,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function bulkDownloadSelectedExcelInfo() {
         const selectedValues = getSelectedValues();
         if (selectedValues.length > 0) {
-            console.log("Downloading: ", selectedValues);
             // Example: send data to server
             fetch('{% url "user_center:bulk_download_geneinfo_excel" %}', {
                 method: 'POST',
@@ -921,8 +928,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function bulkViewSelectedGeneDetails() {
         const selectedValues = getSelectedValues();
         if (selectedValues.length > 0) {
-            console.log("Viewing: ", selectedValues);
-
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '{% url "user_center:bulk_view_gene_detail" %}';
