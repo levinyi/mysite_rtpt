@@ -34,7 +34,6 @@ urlpatterns = [
     path('order_delete/', views.order_delete, name='order_delete'),
     # vector
     path('manage_vector/', views.manage_vector, name='manage_vector'),
-    path('manage_vector_old/', views.manage_vector_old, name='manage_vector_old'),
     path('customer_vector_data_api/', views.customer_vector_data_api, name='customer_vector_data_api'),
     path('rootpath_vector_data_api/', views.rootpath_vector_data_api, name='rootpath_vector_data_api'),
 

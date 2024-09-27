@@ -243,26 +243,19 @@
     <div class="row mt-3">
         {% for gene in gene_list %}
         <div class="accordion mb-3" id="accordion{{ forloop.counter }}">
-            <!-- First Row -->
             <div class="card accordion-item">
                 <div class="accordion-header" id="heading{{ forloop.counter }}">
                     <button class="accordion-button text-white  
-                        {% if gene.status == 'forbidden' %}
-                            bg-danger
-                        {% elif gene.penalty_score > 50 %}
-                            bg-warning
-                        {% else %}
-                            bg-success
-                        {% endif %}" 
+                        {% if gene.status == 'forbidden' %} bg-danger {% elif gene.penalty_score > 50 %} bg-warning {% else %} bg-success {% endif %}" 
                     type="button" 
                     data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
                         <div class="col-4 text-start">
                             {{ forloop.counter }}. Item Name: {{ gene.gene_name }} 
                         </div>
-                        <div class="col-4">
+                        <div class="col-6">
                             Found Forbidden Sequence: {{ gene.contained_forbidden_list }}
                         </div>
-                        <div class="col-4 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <10; yellow:10<score<30; red:score>30">
+                        <div class="col-2 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <10; yellow:10<score<30; red:score>30">
                             {% if gene.penalty_score %}
                                 Total Penalty Score: {{ gene.penalty_score }}
                             {% else %}
@@ -271,8 +264,7 @@
                         </div>
                     </button>
                 </div>
-                <div id="collapse{{ forloop.counter }}" class="accordion-collapse" aria-labelledby="heading{{ forloop.counter }}" 
-                    data-bs-parent="#accordion{{ forloop.counter }}">
+                <div id="collapse{{ forloop.counter }}" class="accordion-collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordion{{ forloop.counter }}">
                     <div class="card-body">
                         <!-- Sequence box -->
                         <div class="row">
@@ -284,10 +276,10 @@
                                 <!-- sequences content here -->
                                 <div class="card">
                                     <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate">
-                                        {{ gene.original_seq|highlight_sequence:gene.original_highlights|safe }}
+                                        {{ gene.original_seq|highlight_sequence_with_offset:gene.original_highlights|safe }}
                                     </div>
-                                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %}  class="card-body monospace-text first_col_full" id="sequence">
-                                        {{ gene.original_seq|highlight_sequence:gene.original_highlights|safe }}
+                                    <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="card-body monospace-text first_col_full" id="sequence">
+                                        {{ gene.original_seq|highlight_sequence_with_offset:gene.original_highlights|safe }}
                                     </div>
                                 </div>
                             </div>
@@ -298,9 +290,12 @@
                                     This only provides a view for insertion site, which is not counted for charging"></i> : Length {{gene.saved_seq|length}} bp. Overall GC content {{ gene.modified_gc_content|floatformat }}%</p>
                                 <div class="card">
                                     <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate second_col_trun" contenteditable="false" id="edited-sequence-trun">
-                                        {{ gene.saved_seq|highlight_sequence:gene.modified_highlights|safe }}</div>
+                                        {{ gene.saved_seq|highlight_sequence_no_offset:gene.modified_highlights|safe }}
+                                        {{ gene.saved_seq}}
+                                    </div>
                                     <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="card-body monospace-text second_col_full" contenteditable="true" id="edited-sequence">
-                                        {{ gene.saved_seq|highlight_sequence:gene.modified_highlights|safe }}</div>
+                                        {{ gene.saved_seq|highlight_sequence_no_offset:gene.modified_highlights|safe }}
+                                    </div>
                                 </div>
                             </div>
                             <!-- Third Column Edit Buttons -->
@@ -377,6 +372,15 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- 密码子使用频次显示Box -->
+                        <div class="row mt-2">
+                            <div class="col-md-10 col-12">
+                                <div class="card">
+                                    <p class="text-center"> Codon Usage Graph {{ gene.id }}</p>
+                                    <canvas id="codonUsageChart-{{ gene.id }}" style="height:400px;"></canvas>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -401,6 +405,7 @@
 <script src="{% static 'species/species_data.js' %}"></script>
 
 <script>
+    // Bulk Optimization Modal
     $(document).ready(function() {
         var selectAllState = false;
 
@@ -825,7 +830,7 @@
     });
 </script>
 <script>
-    // 其他代码： 处理序列高亮显示等
+    // 鼠标移动到序列时高亮：暂时还有bug
     document.querySelectorAll('.sequence-highlighter').forEach(function(item) {
         item.addEventListener('mouseenter', function() {
             // 提取序列部分，考虑到可能有分号分隔的多个序列
@@ -863,32 +868,43 @@
 </script>
 <!-- Chart.js scripts -->
 <script>
+    // 顶部画图的处理
     const genesList = [
-            {% for gene in gene_list %}
-                {
-                    gene_classification: "{{ gene.status|default:'unknown' }}",
-                    saved_seq: "{{ gene.saved_seq|escapejs }}",
-                    modified_gc_content: {{ gene.modified_gc_content }},
-                    penalty_score: {{ gene.penalty_score|default:"0" }}
-                }{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
+        {% for gene in gene_list %}
+            {
+                gene_classification: "{{ gene.status|default:'unknown' }}",
+                saved_seq: "{{ gene.saved_seq|escapejs }}",
+                modified_gc_content: {{ gene.modified_gc_content }},
+                penalty_score: {{ gene.penalty_score|default:"0" }}
+            }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
     
-    const geneClassification = genesList.map(gene => gene.gene_classification||'unknown');
+    const geneClassification = genesList.map(gene => gene.gene_classification || 'unknown');
     const geneLength = genesList.map(gene => gene.saved_seq.length);
     const gcContent = genesList.map(gene => gene.modified_gc_content);
     const geneComplexity = genesList.map(gene => gene.penalty_score);
 
-    // 统计每种分类的数量
+    // 动态生成分类颜色
+    const getColorForClassification = (classification) => {
+        switch(classification) {
+            case 'forbidden': return '#dc3545'; // 红色
+            case 'validated': return '#28a745'; // 绿色
+            default: return '#6c757d'; // 其他为灰色
+        }
+    };
+
     const classificationCounts = geneClassification.reduce((acc, classification) => {
         acc[classification] = (acc[classification] || 0) + 1;
         return acc;
     }, {});
 
-    // 提取分类名称和对应的数量
     const classificationLabels = Object.keys(classificationCounts);
     const classificationData = Object.values(classificationCounts);
     
+    // 为每种分类分配颜色
+    const classificationColors = classificationLabels.map(label => getColorForClassification(label));
+
     const ctx1 = document.getElementById('geneClassificationChart').getContext('2d');
     const geneClassificationChart = new Chart(ctx1, {
         type: 'doughnut',
@@ -896,7 +912,7 @@
             labels: classificationLabels,
             datasets: [{
                 data: classificationData,
-                backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d'],
+                backgroundColor: classificationColors, // 使用动态分配的颜色
                 hoverOffset: 4
             }]
         },
@@ -910,13 +926,14 @@
         }
     });
 
+    // 修改 GC 含量图表，确保横坐标为整数
     const ctx2 = document.getElementById('gcContentChart').getContext('2d');
     const gcContentScatterChart = new Chart(ctx2, {
         type: 'scatter',
         data: {
             datasets: [{
                 label: 'GC Content',
-                data: genesList.map((gene, index) => ({ x: index + 1, y: gene.modified_gc_content })), // Format data for scatter plot
+                data: genesList.map((gene, index) => ({ x: index + 1, y: gene.modified_gc_content })), // 使用从 1 开始的整数作为横坐标
                 backgroundColor: 'rgba(54, 162, 235, 0.2)',
                 borderColor: 'rgba(54, 162, 235, 1)',
                 pointBackgroundColor: 'rgba(54, 162, 235, 1)',
@@ -931,10 +948,14 @@
                 x: {
                     type: 'linear',
                     position: 'bottom',
-                    beginAtZero: true,
+                    beginAtZero: false,
                     title: {
                         display: true,
                         text: 'Gene Index'
+                    },
+                    ticks: {
+                        stepSize: 1, // 强制横坐标为整数
+                        callback: function(value) { return Number.isInteger(value) ? value : null; }
                     }
                 },
                 y: {
@@ -974,14 +995,13 @@
         }
     });
 
-    // Sequence Complexity Scatter Plot
     const ctx4 = document.getElementById('sequenceComplexityChart').getContext('2d');
     const sequenceComplexityChart = new Chart(ctx4, {
         type: 'scatter',
         data: {
             datasets: [{
                 label: 'Penalty Score',
-                data: genesList.map((gene, index) => ({ x: index, y: gene.penalty_score })),
+                data: genesList.map((gene, index) => ({ x: index + 1, y: gene.penalty_score })), // 确保x从1开始
                 backgroundColor: 'rgba(255, 99, 132, 0.2)',
                 borderColor: 'rgba(255, 99, 132, 1)',
                 pointBackgroundColor: 'rgba(255, 99, 132, 1)',
@@ -996,9 +1016,14 @@
                 x: {
                     type: 'linear',
                     position: 'bottom',
+                    beginAtZero: false,
                     title: {
                         display: true,
                         text: 'Gene Index'
+                    },
+                    ticks: {
+                        stepSize: 1, // 设置步长为1
+                        callback: function(value) { return Number.isInteger(value) ? value : null; } // 确保显示整数
                     }
                 },
                 y: {
@@ -1011,6 +1036,171 @@
             }
         }
     });
+</script>
+<script>
+// 定义遗传密码表
+const codonTable = {
+    'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
+    'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
+    'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
+    'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',
+    'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
+    'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
+    'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
+    'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
+    'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
+    'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
+    'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
+    'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
+    'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
+    'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
+    'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
+    'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
+};
+
+// 计算密码子使用频率，并归一化为100%
+function countCodonUsage(dnaSequence) {
+    let codonUsage = {};
+    
+    // 分割DNA序列为三个碱基一组
+    for (let i = 0; i < dnaSequence.length; i += 3) {
+        const codon = dnaSequence.slice(i, i + 3);
+        const aminoAcid = codonTable[codon];
+
+        if (aminoAcid) {
+            if (!codonUsage[aminoAcid]) {
+                codonUsage[aminoAcid] = {};
+            }
+
+            if (!codonUsage[aminoAcid][codon]) {
+                codonUsage[aminoAcid][codon] = 1;
+            } else {
+                codonUsage[aminoAcid][codon]++;
+            }
+        }
+    }
+
+    // 归一化：计算每个氨基酸下所有密码子的比例
+    for (const aminoAcid in codonUsage) {
+        const totalCount = Object.values(codonUsage[aminoAcid]).reduce((a, b) => a + b, 0);
+        for (const codon in codonUsage[aminoAcid]) {
+            codonUsage[aminoAcid][codon] = (codonUsage[aminoAcid][codon] / totalCount) * 100;
+        }
+    }
+
+    return codonUsage;
+}
+
+// 定义氨基酸单字母简写到三字母简写的映射表
+const aminoAcidThreeLetterNames = {
+    'I': 'I (Ile)', 'M': 'M (Met)', 'T': 'T (Thr)', 'N': 'N (Asn)', 'K': 'K (Lys)',
+    'S': 'S (Ser)', 'R': 'R (Arg)', 'L': 'L (Leu)', 'P': 'P (Pro)', 'H': 'H (His)',
+    'Q': 'Q (Gln)', 'V': 'V (Val)', 'A': 'A (Ala)', 'D': 'D (Asp)', 'E': 'E (Glu)',
+    'G': 'G (Gly)', 'F': 'F (Phe)', 'Y': 'Y (Tyr)', 'C': 'C (Cys)', 'W': 'W (Trp)',
+    '*': 'Stop'
+};
+
+// 在生成图表时，使用氨基酸的三个字母缩写
+function createCodonUsageChart(geneId, codonUsage) {
+    const ctx = document.getElementById('codonUsageChart-' + geneId).getContext('2d');
+    
+    // 将氨基酸单字母替换为三字母简写
+    let aminoAcids = Object.keys(codonUsage).map(acid => aminoAcidThreeLetterNames[acid]);
+    
+    let codonData = {};
+    for (const aminoAcid in codonUsage) {
+        for (const codon in codonUsage[aminoAcid]) {
+            if (!codonData[codon]) {
+                codonData[codon] = [];
+            }
+        }
+    }
+
+    for (const aminoAcid in codonUsage) {
+        for (const codon in codonData) {
+            codonData[codon].push(codonUsage[aminoAcid][codon] || 0);
+        }
+    }
+
+    let datasets = [];
+    for (const codon in codonData) {
+        datasets.push({
+            label: codon,
+            data: codonData[codon],
+            backgroundColor: getRandomColor(),
+        });
+    }
+
+    ctx.canvas.height = 300;  // 设置高度为300px
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: aminoAcids,  // 使用氨基酸三个字母缩写作为横坐标
+            datasets: datasets,
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: true,
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return value + '%';  // 添加百分号
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false  // 隐藏图例
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            let value = context.raw || 0;
+                            return label + ': ' + value.toFixed(2) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 生成随机颜色的函数，用于每个密码子的背景颜色
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
+// 页面加载后为每个基因生成图表
+// 页面加载后为每个基因生成图表
+document.addEventListener('DOMContentLoaded', function () {
+    {% for gene in gene_list %}
+    (function() {
+        const geneId = "{{ gene.id }}";
+        const dnaSequence = "{{ gene.original_seq }}";
+        const codonUsage = countCodonUsage(dnaSequence);
+        
+        // 创建独立的图表
+        createCodonUsageChart(geneId, codonUsage);
+    })();
+    {% endfor %}
+});
+
+
+
+
 </script>
 {% endblock %}
 

@@ -34,70 +34,67 @@ def get_previous(value, arg):
 
 
 @register.filter
-def highlight_sequence(sequence, highlights):
+def highlight_sequence_with_offset(sequence, highlights):
+    """
+    针对 original_seq 的高亮，位移前移 20bp
+    """
+    return highlight_sequence(sequence, highlights, 20)
+
+@register.filter
+def highlight_sequence_no_offset(sequence, highlights):
+    """
+    针对 saved_seq 的高亮，不需要位移
+    """
+    return highlight_sequence(sequence, highlights, 0)
+
+def highlight_sequence(sequence, highlights, offset):
     """
     根据给定的高亮列表，将 DNA 序列的不同部分用 HTML 标签进行高亮显示
     :param sequence: 字符串，DNA 序列
     :param highlights: 列表，包含高亮信息的字典
+    :param offset: 偏移量
     :return: 字符串，带 HTML 标签的高亮序列
     """
-    # print("sequence: ", sequence)
-    # print("highlights: ", highlights)
-    # print("I'm in template tags")
-    # 初始化所有的标记点
     tags = []
     if highlights is None:
         return sequence
-    # 为每个标签类型标记起始和结束位置
     for highlight in highlights:
-        tags.append((highlight['start'], 'start', highlight['type']))
-        tags.append((highlight['end'], 'end', highlight['type']))
+        tags.append((highlight['start'] - offset, 'start', highlight['type']))
+        tags.append((highlight['end'] - offset, 'end', highlight['type']))
 
-    # 将标记点按位置排序，位置相同的点按起止顺序排序
     tags.sort(key=lambda x: (x[0], x[1] == 'end'))
 
-    # 定义标签的 HTML 映射
     tag_map = {
         'text-warning': ('<i class="text-warning">', '</i>'),
         'bg-danger': ('<span class="bg-danger">', '</span>')
     }
 
-    # 结果列表
     result = []
     tag_stack = []
     last_index = 0
 
     def close_tag(tag_type):
-        """关闭指定类型的标签"""
-        close_tag_str = tag_map[tag_type][1]
-        result.append(close_tag_str)
+        result.append(tag_map[tag_type][1])
 
     def open_tag(tag_type):
-        """打开指定类型的标签"""
-        open_tag_str = tag_map[tag_type][0]
-        result.append(open_tag_str)
+        result.append(tag_map[tag_type][0])
 
-    # 遍历标记点，将它们插入到结果列表中
     for index, tag_type, highlight_type in tags:
         if last_index < index:
             result.append(sequence[last_index:index])
 
         if tag_type == 'start':
-            # 如果有重叠的标签，确保嵌套顺序
             tag_stack.append(highlight_type)
             open_tag(highlight_type)
         elif tag_type == 'end':
-            # 关闭所有正在进行的标签，直到找到当前结束标签对应的开始标签
             temp_stack = []
             while tag_stack and tag_stack[-1] != highlight_type:
                 temp_stack.append(tag_stack.pop())
                 close_tag(temp_stack[-1])
 
-            # 关闭当前的结束标签
             tag_stack.pop()
             close_tag(highlight_type)
 
-            # 按相反顺序重新打开之前临时关闭的标签
             while temp_stack:
                 tag_type_temp = temp_stack.pop()
                 tag_stack.append(tag_type_temp)
@@ -105,15 +102,12 @@ def highlight_sequence(sequence, highlights):
 
         last_index = index
 
-    # 添加最后剩余的字符串
     if last_index < len(sequence):
         result.append(sequence[last_index:])
 
-    # 关闭所有剩余的标签
     while tag_stack:
         close_tag(tag_stack.pop())
 
-    # print("".join(result))
     return ''.join(result)
 
 @register.filter
