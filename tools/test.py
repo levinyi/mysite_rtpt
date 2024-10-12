@@ -1,6 +1,7 @@
 import sys
 import pandas as pd
 sys.path.append("/cygene4/dushiyi/mysite_rtpt/tools/scripts/")
+sys.path.append("/cygene4/dushiyi/mysite_rtpt/user_center/")
 from scripts.AnalysisSequence import DNARepeatsFinder
 from user_center.views import convert_gene_table_to_RepeatsFinder_Format
 

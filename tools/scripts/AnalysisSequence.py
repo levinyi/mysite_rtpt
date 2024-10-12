@@ -679,6 +679,13 @@ class DNARepeatsFinder:
             # 'protein_complexity': protein_complexity,
         }]
 
+    # 10) Length
+    def get_length(self, index=None):
+        s, sa, lcp = self._get_sequence_data(index)
+        return [{
+            'seqType': 'length',
+            'length': len(s),
+        }]
 
 
 
@@ -691,8 +698,4 @@ class DNARepeatsFinder:
 # finder = DNARepeatsFinder(sequence=sequence)
 # # print(finder.find_dinucleotide_repeats())
 # print(finder.find_dispersed_repeats())
-
-
-
-
 

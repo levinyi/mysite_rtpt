@@ -376,7 +376,10 @@
                         <div class="row mt-2">
                             <div class="col-md-10 col-12">
                                 <div class="card">
-                                    <p class="text-center"> Codon Usage Graph {{ gene.id }}</p>
+                                    <p class="text-center"> Codon Usage Graph </p>
+                                    <div id="loading-{{ gene.id }}" class="spinner-border" role="status" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
                                     <canvas id="codonUsageChart-{{ gene.id }}" style="height:400px;"></canvas>
                                 </div>
                             </div>
@@ -1148,6 +1151,7 @@ function createCodonUsageChart(geneId, codonUsage) {
                 y: {
                     stacked: true,
                     beginAtZero: true,
+                    max: 100, // 设置最大值为100%
                     ticks: {
                         callback: function (value) {
                             return value + '%';  // 添加百分号
@@ -1171,6 +1175,9 @@ function createCodonUsageChart(geneId, codonUsage) {
             }
         }
     });
+
+    // 隐藏加载动画
+    document.getElementById('loading-' + geneId).style.display = 'none';
 }
 
 // 生成随机颜色的函数，用于每个密码子的背景颜色

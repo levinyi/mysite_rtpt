@@ -43,7 +43,7 @@ def order_create(request):
 
         # 将 gene_table 转换为 DataFrame，并删除空行，重置索引，如果为空则返回错误信息
         df = pd.DataFrame(gene_table)
-        df = df.dropna().reset_index(drop=True)
+        # df = df.dropna().reset_index(drop=True)
         if df.empty:
             return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
         
@@ -166,6 +166,7 @@ def order_create(request):
             print("Processing AA sequence")
 
             df.columns = ['GeneName', 'OriginalSeq', 'Species', 'ForbiddenSeqs', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
+            df['protein_sequence'] = df['OriginalSeq']
             # df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","")  # 去掉换行符和空格
             df['OriginalSeq'], df['warnings'] = zip(*df['protein_sequence'].apply(clean_and_check_protein_sequence))
     
@@ -274,7 +275,8 @@ def clean_and_check_protein_sequence(sequence):
     
     # 4. 返回处理后的序列以及非法氨基酸的提醒信息（包含位置信息）
     if non_standard_amino_acids_info:
-        warnings = f"警告: 发现非法氨基酸片段 {', '.join([f'start: {item['start']}, end: {item['end']}, content: {item['content']}' for item in non_standard_amino_acids_info])}"
+        warnings = [{'start': item['start'], 'end': item['end'], 'content': item['content']} for item in non_standard_amino_acids_info]
+        # warnings = f"警告: 发现非法氨基酸片段 {', '.join([f'start: {item['start']}, end: {item['end']}, content: {item['content']}' for item in non_standard_amino_acids_info])}"
         return cleaned_sequence if has_terminal_stop else cleaned_sequence, warnings
     
     # 如果有终止密码子，添加它到处理后的序列
@@ -471,7 +473,7 @@ def convert_gene_table_to_RepeatsFinder_Format(gene_table):
             'highGC': finder_dataset.find_high_gc_content(index=index, window_size=30, max_GC_content=80),
             'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=30, min_GC_content=20),
             'LCC': finder_dataset.get_lcc(index=index),
-            'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=10),
+            'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=12),
         }
     #将结果列表转换为DataFrame， 处理长度不一致问题
     df = pd.DataFrame(results).T
