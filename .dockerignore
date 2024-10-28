@@ -15,5 +15,3 @@ media/
 *.tar
 *.sql
 staticfiles
-*.npy
-*.pkl

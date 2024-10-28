@@ -1,6 +1,9 @@
+import json
 import re
+import sys
 from Bio.Seq import Seq
 from Bio.SeqUtils.lcc import lcc_simp
+from Bio.SeqUtils import gc_fraction as GC
 import pandas as pd
 
 
@@ -61,15 +64,6 @@ class DNARepeatsFinder:
     def is_homopolymer(self, unit):
         '''Check if a given DNA sequence is a homopolymer (consisting of only one type of base).'''
         return len(set(unit)) == 1
-    
-    def calculate_gc_content(self, sequence):
-        '''
-        Calculate the GC content of a DNA sequence.
-        '''
-        sequence = sequence.upper().replace(" ", "")
-        gc_count = sequence.count('G') + sequence.count('C')
-        gc_content = (gc_count / len(sequence)) * 100
-        return round(gc_content, 2)
 
     def calculate_homopolymer_penalty_score(self, length):
         return length *10 if length > 10 else length
@@ -141,21 +135,9 @@ class DNARepeatsFinder:
 
         for repeat in repeats:
             repeat['length'] = len(repeat['sequence'])
-            repeat['seqType'] = 'tandem_repeats'
-            repeat['gc_content'] = self.calculate_gc_content(repeat['sequence'])
+            repeat['gc_content'] = GC(repeat['sequence'])
             repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
 
-        # 处理空结果，仍然返回相应的表头
-        if not repeats:
-            repeats = [{
-                'seqType': 'tandem_repeats',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'length': '',
-                'gc_content': '',
-                'penalty_score': '',
-            }]
         return repeats
 
     # 2) Dispersed Repeats
@@ -213,26 +195,13 @@ class DNARepeatsFinder:
                 distances = [matches[j] - matches[j - 1] for j in range(1, len(matches))]
                 if all(d >= min_len for d in distances):
                     repeats.append({
-                        'seqType': 'long_repeats',
                         'sequence': seq,
                         'start': matches,
                         'end': [match + len(seq) - 1 for match in matches],
-                        'gc_content': self.calculate_gc_content(seq),
+                        'gc_content': GC(seq),
                         'length': len(seq),
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
-
-        # 处理空结果，仍然返回相应的表头
-        if not repeats:
-            repeats = [{
-                'seqType': 'long_repeats',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'gc_content': '',
-                'length': '',
-                'penalty_score': '',
-            }]
         return repeats
 
     # 3) Palindrome Repeats
@@ -255,7 +224,6 @@ class DNARepeatsFinder:
             while start >= 0 and end < n and s[start] == s[end]:
                 if end - start + 1 >= min_len:
                     palindromes.append({
-                        'seqType': 'palindrome_repeats',
                         'sequence': s[start:end+1],
                         'start': start,
                         'end': end,
@@ -270,7 +238,6 @@ class DNARepeatsFinder:
             while start >= 0 and end < n and s[start] == s[end]:
                 if end - start + 1 >= min_len:
                     palindromes.append({
-                        'seqType': 'palindrome_repeats',
                         'sequence': s[start:end+1],
                         'start': start,
                         'end': end,
@@ -291,22 +258,11 @@ class DNARepeatsFinder:
                 merged_palindromes[-1]['end'] = new_end
                 merged_palindromes[-1]['sequence'] = s[merged_palindromes[-1]['start']:new_end + 1]
                 merged_palindromes[-1]['length'] = new_end - merged_palindromes[-1]['start'] + 1
-                merged_palindromes[-1]['gc_content'] = self.calculate_gc_content(merged_palindromes[-1]['sequence'])
+                merged_palindromes[-1]['gc_content'] = GC(merged_palindromes[-1]['sequence'])
                 merged_palindromes[-1]['penalty_score'] = self.calculate_palindrome_repeats_penalty_score(merged_palindromes[-1]['length'])
             else:
                 merged_palindromes.append(palindrome)
 
-        # 处理空结果，仍然返回相应的表头
-        if not merged_palindromes:
-            merged_palindromes = [{
-                'seqType': 'palindrome_repeats',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'length': '',
-                'gc_content': '',
-                'penalty_score': '',
-            }]
         return merged_palindromes
 
     # 4) Inverted Repeats
@@ -338,7 +294,6 @@ class DNARepeatsFinder:
                         if i + length <= j:  # 确保不重叠
                             distance = j - (i + length)
                             inverted_repeats.append({
-                                'seqType': 'inverted_repeats',
                                 'sequence': segment,
                                 'inverted_sequence': segment,
                                 'start1': i,
@@ -350,20 +305,6 @@ class DNARepeatsFinder:
                                 'penalty_score': self.calculate_inverted_repeats_penalty_score(len(segment), distance),
                             })
 
-        # 处理空结果，仍然返回相应的表头
-        if not inverted_repeats:
-            inverted_repeats = [{
-                'seqType': 'inverted_repeats',
-                'sequence': '',
-                'inverted_sequence': '',
-                'start1': '',
-                'end1': '',
-                'start2': '',
-                'end2': '',
-                'length': '',
-                'distance': '',
-                'penalty_score': '',
-            }]
         return inverted_repeats
 
     # 5) Homopolymers
@@ -379,7 +320,6 @@ class DNARepeatsFinder:
                 if length >= min_len:
                     seq = s[start:i]
                     homopolymers.append({
-                        'seqType': 'homopolymers',
                         'sequence': seq,
                         'start': start,
                         'end': i - 1,
@@ -387,17 +327,6 @@ class DNARepeatsFinder:
                         'penalty_score': self.calculate_homopolymer_penalty_score(length),
                     })
                 start = i
-        
-        # 处理空结果，仍然返回相应的表头
-        if not homopolymers:
-            homopolymers = [{
-                'seqType': 'homopolymers',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'length': '',
-                'penalty_score': '',
-            }]
         return homopolymers
 
     # 6) W8S8 Motifs
@@ -415,7 +344,6 @@ class DNARepeatsFinder:
                 matched_sequence2 = match.group(0)
                 if not self.is_homopolymer(matched_sequence):
                     motifs.append({
-                        'seqType': motif_type + '_motifs',
                         'motif_type': motif_type,
                         'sequence': s[start:end],
                         'start': start,
@@ -429,95 +357,17 @@ class DNARepeatsFinder:
         S_motifs = find_motifs(S_pattern, 'S' + str(min_S_length))
 
         motifs = W_motifs + S_motifs
-        # 处理空结果，仍然返回相应的表头
-        if not motifs:
-            motifs = [{
-                'seqType': 'W' + str(min_W_length) + 'S' + str(min_S_length) + '_motifs',
-                'motif_type': '',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'length': '',
-                'penalty_score': '',
-            }]
         return motifs
 
     # 7) Local GC Content by Window
-    def find_local_gc_content(self, index=None, window_size=30, min_GC_content=20, max_GC_content=80):
-        s, sa, lcp = self._get_sequence_data(index)
-
-        n = len(s)
-        if n < window_size:
-            # 将整个序列作为一个窗口
-            gc_content = self.calculate_gc_content(s)
-            if gc_content < min_GC_content or gc_content > max_GC_content:
-                return [{
-                    'seqType': 'local_gc',
-                    'length': n,
-                    'sequence': s,
-                    'start': 0,
-                    'end': n - 1,
-                    'gc_content': gc_content,
-                    'penalty_score': self.calculate_local_gc_penalty_score(s, gc_content),
-                }]
-            return []
-        
-        gc_contents_temp = []
-
-        for i in range(n - window_size + 1):
-            window = s[i:i + window_size]
-            gc_content = self.calculate_gc_content(window)
-            
-            if gc_content < min_GC_content or gc_content > max_GC_content:
-                gc_contents_temp.append({
-                    'sequence': window,
-                    'start': i,
-                    'end': i + window_size - 1,
-                    'gc_content': gc_content,
-                    'penalty_score': self.calculate_local_gc_penalty_score(gc_content, min_GC_content, max_GC_content),
-                })
-
-        # Merge overlapping windows according to the continuous sequence, 
-        # do not merge windows with different regions.
-        gc_contents = []
-        for gc_content in gc_contents_temp:
-            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
-                # 扩展上一个窗口
-                old_end = gc_contents[-1]['end']
-                new_end = max(old_end, gc_content['end'])
-                gc_contents[-1]['end'] = new_end
-                gc_contents[-1]['sequence'] = s[gc_contents[-1]['start']:new_end + 1]
-                # penalty score 要叠加
-                gc_contents[-1]['penalty_score'] += gc_content['penalty_score']
-            else:
-                gc_contents.append(gc_content)
-        # recalculate the GC content of the merged windows, and calculate the penalty score
-        for gc_content in gc_contents:
-            gc_content['seqType'] = 'local_gc'
-            gc_content['length'] = len(gc_content['sequence'])
-            gc_content['gc_content'] = self.calculate_gc_content(gc_content['sequence'])
-
-        if not gc_contents:
-            gc_contents = [{
-                'seqType': 'local_gc',
-                'length': '',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'gc_content': '',
-                'penalty_score': '',
-            }]
-        return gc_contents
-    
     def find_high_gc_content(self, index=None, window_size=30, max_GC_content=80):
         s, sa, lcp = self._get_sequence_data(index)
 
         n = len(s)
         if n < window_size:
-            gc_content = self.calculate_gc_content(s)
+            gc_content = GC(s)
             if gc_content > max_GC_content:
                 return [{
-                    'seqType': 'highGC',
                     'length': n,
                     'sequence': s,
                     'start': 0,
@@ -531,8 +381,7 @@ class DNARepeatsFinder:
 
         for i in range(n - window_size + 1):
             window = s[i:i + window_size]
-            gc_content = self.calculate_gc_content(window)
-            
+            gc_content = GC(window)*100
             if gc_content > max_GC_content:
                 high_gc_contents_temp.append({
                     'sequence': window,
@@ -551,10 +400,10 @@ class DNARepeatsFinder:
 
         n = len(s)
         if n < window_size:
-            gc_content = self.calculate_gc_content(s)
+            # 将整个序列作为一个窗口
+            gc_content = GC(s)*100
             if gc_content < min_GC_content:
                 return [{
-                    'seqType': 'lowGC',
                     'length': n,
                     'sequence': s,
                     'start': 0,
@@ -563,13 +412,13 @@ class DNARepeatsFinder:
                     'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), min_GC_content, min_GC_content),
                 }]
             return []
+        
 
         low_gc_contents_temp = []
 
         for i in range(n - window_size + 1):
             window = s[i:i + window_size]
-            gc_content = self.calculate_gc_content(window)
-            
+            gc_content = GC(window)*100
             if gc_content < min_GC_content:
                 low_gc_contents_temp.append({
                     'sequence': window,
@@ -598,26 +447,15 @@ class DNARepeatsFinder:
         for gc_content in gc_contents:
             gc_content['seqType'] = gc_type
             gc_content['length'] = len(gc_content['sequence'])
-            gc_content['gc_content'] = self.calculate_gc_content(gc_content['sequence'])
+            gc_content['gc_content'] = GC(gc_content['sequence'])*100
             if gc_type == 'lowGC':
                 gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(float(gc_content['gc_content']), min_GC_content, max_GC_content)
             elif gc_type == 'highGC':
                 gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(float(gc_content['gc_content']), min_GC_content, max_GC_content)
-
-        if not gc_contents:
-            gc_contents = [{
-                'seqType': gc_type,
-                'length': '',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'gc_content': '',
-                'penalty_score': '',
-            }]
         return gc_contents
 
     # 8) Dinucleotide Repeats
-    def find_dinucleotide_repeats(self, index=None, threshold=10):
+    def find_dinucleotide_repeats(self, index=None, threshold=12):
         s, sa, lcp = self._get_sequence_data(index)
         n = len(s)
         repeats = []
@@ -639,28 +477,16 @@ class DNARepeatsFinder:
                 # 判断是否为homopolymer
                 if dinucleotide[0] != dinucleotide[1]:
                     repeats.append({
-                        'seqType': 'dinucleotide_repeats',
+                        # 'seqType': 'dinucleotide_repeats',
                         'sequence': sequence,
                         'start': i,
                         'end': i + repeat_length - 1,
                         'length': repeat_length,
-                        'gc_content': self.calculate_gc_content(sequence),
+                        'gc_content': GC(sequence)*100,
                         'penalty_score': repeat_length // 2
                     })
             
             i += repeat_length  # 跳过已检测到的重复序列
-
-        # 处理空结果，仍然返回相应的表头
-        if not repeats:
-            repeats = [{
-                'seqType': 'dinucleotide_repeats',
-                'sequence': '',
-                'start': '',
-                'end': '',
-                'length': '',
-                'gc_content': '',
-                'penalty_score': '',
-            }]
         return repeats
 
     # 9) lcc
@@ -669,130 +495,116 @@ class DNARepeatsFinder:
         n = len(s)
         lcc = 0
         dna_seq = Seq(s)
-        # protein_seq = dna_seq.translate()
-
         dna_complexity = lcc_simp(dna_seq)
-        # protein_complexity = lcc_simp(protein_seq)
 
-        return [{
-            'seqType': 'LCC',
-            'penalty_score': dna_complexity,
-            # 'protein_complexity': protein_complexity,
-        }]
-
-    # 10) Length
-    def get_length(self, index=None):
-        s, sa, lcp = self._get_sequence_data(index)
-        return [{
-            'seqType': 'length',
-            'length': len(s),
-        }]
+        return f'{dna_complexity:.2f}'
 
 
-
-def convert_gene_table_to_RepeatsFinder_Format(gene_table):
-    def expanded_rows_to_gene_table(df, gene_table):
-        expanded_results = []
-        all_columns = set()
-        gene_analysis_types = []
-
-        # 首先收集所有可能的列名
-        for _, row in df.iterrows():
-            for analysis_type, results_list in row.items():
-                if analysis_type not in gene_analysis_types:
-                    gene_analysis_types.append(analysis_type)
-                if results_list:
-                    for result in results_list:
-                        for key, value in result.items():
-                            column_name = f'{analysis_type}_{key}'
-                            all_columns.add(column_name)
-
-        # 按照检测类型和键的字母顺序排序列名
-        gene_analysis_types = list(set(gene_analysis_types))  # 去除重复项
-        sorted_columns = ['gene_id'] + sorted(all_columns, key=lambda x: (gene_analysis_types.index(x.split('_')[0]), x.split('_')[1]))
-
-        # 初始化每个 result_dict，并确保所有可能的列名都在字典中
-        for gene_id, row in df.iterrows():
-            result_dict = {col: '' for col in sorted_columns}
-            result_dict['gene_id'] = gene_id
-            
-            for analysis_type, results_list in row.items():
-                if results_list:
-                    for result in results_list:
-                        for key, value in result.items():
-                            column_name = f'{analysis_type}_{key}'
-                            if 'penalty_score' in key:
-                                if value == '':
-                                    continue  # 跳过空值
-                                if result_dict[column_name] != '':
-                                    try:
-                                        result_dict[column_name] += float(value)
-                                    except ValueError:
-                                        print(f'Error: {value} is not a valid float')
-                                else:
-                                    try:
-                                        result_dict[column_name] = float(value)
-                                    except ValueError:
-                                        print(f'Error: {value} is not a valid float')
-                            elif 'seqType' in key:
-                                if value == '':
-                                    continue
-                                result_dict[column_name] = value
-                            else:
-                                if result_dict[column_name] != '':
-                                    result_dict[column_name] += f';{value}'
-                                else:
-                                    result_dict[column_name] = str(value)
-                else:
-                    continue
-                
-            expanded_results.append(result_dict)
-
-        expanded_df = pd.DataFrame(expanded_results)
-        # 将所有带有penalty_score的列，求和赋值给total_penalty_score列
-        penalty_columns = [col for col in expanded_df.columns if 'penalty_score' in col]
-        expanded_df[penalty_columns] = expanded_df[penalty_columns].apply(pd.to_numeric, errors='coerce')
-        expanded_df['total_penalty_score'] = expanded_df[penalty_columns].fillna(0).sum(axis=1).round(0).astype(int)
-
-        gene_table = gene_table.merge(expanded_df, on='gene_id', how='left')
-
-        return gene_table
-    
-    # Remove rows with None
+def convert_gene_table_to_RepeatsFinder_Format(gene_table, long_repeats_min_len=16, homopolymers_min_len=7,
+                                               min_w_length=12, min_s_length=12, window_size=30, 
+                                               min_gc_content=20, max_gc_content=80):
     finder_dataset = DNARepeatsFinder(data_set=gene_table)
 
     results = {}
     for index, row in gene_table.iterrows():
         gene_id = row['gene_id']
         results[gene_id] = {
-            # 'tandem_repeats': finder_dataset.find_tandem_repeats(index=index, min_unit=3, min_copies=3),
-            'LongRepeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
-            # 'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
-            # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
-            'Homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
-            'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
-            'highGC': finder_dataset.find_high_gc_content(index=index, window_size=30, max_GC_content=80),
-            'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=30, min_GC_content=20),
+            'LongRepeats': finder_dataset.find_dispersed_repeats(index=index, min_len=long_repeats_min_len),
+            'Homopolymers': finder_dataset.find_homopolymers(index=index, min_len=homopolymers_min_len),
+            'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=min_w_length, min_S_length=min_s_length),
+            'highGC': finder_dataset.find_high_gc_content(index=index, window_size=window_size, max_GC_content=max_gc_content),
+            'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=window_size, min_GC_content=min_gc_content),
             'LCC': finder_dataset.get_lcc(index=index),
             'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=12),
-            'length': finder_dataset.get_length(index=index),
+            'length': len(finder_dataset._get_sequence_data(index)[0])
         }
-    #将结果列表转换为DataFrame， 处理长度不一致问题
-    df = pd.DataFrame(results).T
     
-    gene_table = expanded_rows_to_gene_table(df, gene_table)
-
-    return gene_table
-
+    # print(json.dumps(results, indent=4))
+    return results
 
 
-# sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtAAGATAAAGCGCTGCGTAGCATGTATCGTGTGCTGAAACCAGGTGGTCGTCTGCTGGTGCTGGAATTTAGCAAACCGATTATTGAACCGCTGAGCAAAGCGTATGATGCGTATAGCTTTCATGTCCTGCCGCGTATTGGTAGCCTGGTGGCGAACGATGCGGATAGCTATCGTTATCTGGCGGAAAGCATTCGTATGCATCCGGATCAGGATACCCTGAAAGCGATGATGCAGGATGCGGGCTTTGAAAGCGTGGACTACTATAACCTGACAGCTGGCGTTGTCGCCCTGCACCGCGGCTATAAGTTCGGGTCTGGTGGCAGCCATCATCATCATCATCATCATCATTGAGATCCGGCTGCTAACGATGGGTTGAGGATGGTTacccggaaccacatggagattacttgttgtaggagggaggacactatggaaatcaatacacacgcaacaagcatggagacacacatcaacggTAGCTGATCCTTGTCGCATGGTCGACGATTGATGCAcccaccatcgccaacTCGGGAATTCGGATTGGA"
-# sequence = "ATGGTTTCCTGTGCAGCAaGTCTCtCAGTCACTATTCTTGATGGCAAGCAATATTCTGGCAACATTTGACATAAAGAAGAAGATTGCTGCTGATGGTACTATTCTGGAACCTTCTATTGAGTGGACTGGATCAATGGCCATGTGAAAGCTTGGTACCGCGGCTAGCTAAGATCCGCTCTGATGGGTTGAGGATGGTTaacacccacgagcggatcggcatcaactttagccccgaatgtattgagagcatcaatactagggactgcacaatcaactggcatgaaaacaacgctagggatcatatgtccgaagcaggactcgaggccagcaatgctaccagggccctcatcagcactatttgggctagcatgtgccatagcactcggtgtaagtggattacacattgcgagagaaccgccatcaacttcgcctgcaccagcatcaacacccacgaggacatcagcacccggatcaccatcaacttcacccacgagatcaatTTGCAACGTACCTGGACTTGGTCGACGATTGATGCAaacaaccggtgtgAATCGTTGCCATCTTGCC"
-# sequence = "TGCTGTCTTGTCCAACGTaGTCTCtAACTGTGTTCAGAAGGGCCAGAAATGCCAAGGACTCAGGGGAGGGACCGGGTCATTGGGGTCAGGTTACTCCGGGTCATTGGGGTCAGGTGTCACCGGGTCATTGGGGTCAGGCTCTATGTTTGCTTTGATGTGTATCCTATGTCCAGTATGAAATAAAAACTGCCTCCTTCCACATTGAGAGACTTGGTCGACGATTGATGCAgagattacctcctgccatcggatctttacatttcgcgcatccagctaAACATGGACTCCTTGCGT"
-# sequence = "ACGTACGTACGTACGTACGTACGTACACACACACACACACACGTGTGTGTGT"
-# sequence = "CTCTAGTTAGGCTTCCGGGATAACCGATTGCGGAGACAGCTTCTTGGCGGACGTGCACAGATAACTTCGTATAATGTACATTATACGAAGTTATTCTTTGAAAAGATAATGTATGATTATGCTTTCACTCATATTTATACAGAAACTTGATGTTTTCTTTCGAGTATATACAAGGTGATTACATGTACGTTTGAAGTACAACTCTAGATTTTGTAGTGCCCTCTTGGGCTAGCGGTAAAGGTGCGCATTTTTTCACACCCTACAATGTTCTGTTCAAAAGATTTTGGTCAAACGCTGTAGAAGTGAAAGTTGGTGCGCATGTTTCGGCGTTCGAAACTTCTCCGCAGTGAAAGATAAATGATCCCAACCGTTGTGACCTTCCAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAAGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCACGAGTTTGTAACACTCTGCAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAAGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCACAAAAGGTTTAGAATTTCCAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCTTTTGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCAAGAAGGGCTTGGTTTCGAAAGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAAGCGCAAGTGGTTTAGTGGTAAAATCCAACGTTGCCATCGTTGGGCCCCCGGTTCGATTCCGGGCTTGCGCAAATGTCCTCCCCTTGGTGGGGTTTTAGAGCTAGAAATAGCAAGTTAAAATAAGGCTAGTCCGTTATCAACTTGAAAAAGTGGCACCGAGTCGGTGCAAACAATTTATTTTTTGTCACTATTGTTATGTAAAATGCCACCTCTGACAGTATGGAACGCAAACTTCTGTCTAGTGGATAACAGAATTTTTCTATGGCCAATTTAATAACTTCGTATAATGTACATTATACGAAGTTATAGTTAGTTTGTTTAAACAACAAACTTTTTTCATTTCTTTTGTTTCCCCTTCTCTTCTTTTAGTTAGTTTGTTTAAACAACAAACTATAGTATTGTCGTTTGGGTGGCTTCATTTAGACGGTACTGCATCTTAAATAATATGAATG"
-# sequence = sequence.upper()
-# finder = DNARepeatsFinder(sequence=sequence)
-# # print(finder.find_dinucleotide_repeats())
-# print(finder.find_dispersed_repeats())
+# 格式化函数：将特征信息合并为字符串
+def format_feature_data(feature_data, keys):
+    if not feature_data:
+        return ""
+    values = []
+    if isinstance(feature_data, list):  # 处理多个对象的情况
+        for item in feature_data:
+            parts = []
+            for key in keys:
+                parts.append(f"{key}: {item.get(key, '')}")
+            values.append(" | ".join(parts))
+    else:
+        for key in keys:
+            if isinstance(feature_data[key], list):
+                values.append(f"{key}: {', '.join(map(str, feature_data[key]))}")
+            else:
+                values.append(f"{key}: {feature_data[key]}")
+    return "; ".join(values)
 
+
+def calculate_total_penalty_score(feature_list):
+    # 定义函数来计算每个特征的总 penalty score
+    return sum(item.get('penalty_score', 0) for item in feature_list)
+
+# 数据处理函数，返回处理后的 DataFrame
+def process_gene_table_results(data):
+    records = []
+    for gene, details in data.items():
+        long_repeats_penalty = calculate_total_penalty_score(details.get("LongRepeats", []))
+        homopolymers_penalty = calculate_total_penalty_score(details.get("Homopolymers", []))
+        w12s12motifs_penalty = calculate_total_penalty_score(details.get("W12S12Motifs", []))
+        highGC_penalty = calculate_total_penalty_score(details.get("highGC", []))
+        lowGC_penalty = calculate_total_penalty_score(details.get("lowGC", []))
+        doubleNT_penalty = calculate_total_penalty_score(details.get("doubleNT", []))
+
+        record = {
+            "GeneName": gene,
+            "Total_Length": details.get("length"),
+            "LCC": details.get("LCC"),
+            "LongRepeats": format_feature_data(details.get("LongRepeats", []), ["sequence", "start", "end", "length", "gc_content"]),
+            "LongRepeats_penalty_score": long_repeats_penalty,
+            "Homopolymers": format_feature_data(details.get("Homopolymers", []), ["sequence", "start", "end", "length"]),
+            "Homopolymers_penalty_score": homopolymers_penalty,
+            "W12S12Motifs": format_feature_data(details.get("W12S12Motifs", []), ["sequence", "start", "end", "length"]),
+            "W12S12Motifs_penalty_score": w12s12motifs_penalty,
+            "HighGC": format_feature_data(details.get("highGC", []), ["sequence", "start", "end", "length", "gc_content"]),
+            "HighGC_penalty_score": highGC_penalty,
+            "LowGC": format_feature_data(details.get("lowGC", []), ["sequence", "start", "end", "length", "gc_content"]),
+            "LowGC_penalty_score": lowGC_penalty,
+            "DoubleNT": format_feature_data(details.get("doubleNT", []), ["sequence", "start", "end", "length", "gc_content"]),
+            "DoubleNT_penalty_score": doubleNT_penalty,
+        }
+        records.append(record)
+
+    # 转换为 DataFrame
+    df = pd.DataFrame(records)
+
+    return df
+
+if __name__ == '__main__':
+    input_file = sys.argv[1]
+    if input_file.endswith('.xlsx'):
+        gene_table = pd.read_excel(input_file)
+    elif input_file.endswith('.csv'):
+        gene_table = pd.read_csv(input_file)
+    else:
+        raise ValueError("Invalid file format. Please provide a .csv or .xlsx file")
+    
+    gene_table['gene_id'] = gene_table['GeneName']
+    gene_table['sequence'] = gene_table['FullSeqREAL']
+
+    data = convert_gene_table_to_RepeatsFinder_Format(gene_table)
+
+    # 处理数据并获取结果 DataFrame
+    result_df = process_gene_table_results(data)
+    print(result_df)
+    # 合并原始表格
+    df = gene_table.merge(result_df, on='GeneName', how='left')
+    print(df)
+    # 删除不需要的列
+    df.drop(['gene_id', 'sequence'], axis=1, inplace=True)
+    # 保存结果
+    output_file = input_file.replace('.xlsx', '_output.txt').replace('.csv', '_output.txt')
+
+    # result_df.to_csv(output_file, sep="\t", index=False)

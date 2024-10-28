@@ -10,10 +10,12 @@ from django.shortcuts import get_list_or_404, render, get_object_or_404, redirec
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.utils import timezone
+from django.conf import settings
 
 from product.models import GeneSynEnzymeCutSite, Species, Vector
-from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format
+from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
 from tools.scripts.ParsingGenBank import addFeaturesToGeneBank
+from tools.scripts.penalty_score_predict import predict_new_data_from_df
 from .models import Cart, GeneInfo, GeneOptimization, OrderInfo
 from .utils.render_to_pdf import render_to_pdf
 from urllib.parse import quote
@@ -36,26 +38,27 @@ def dashboard(request):
 def order_create(request):
     '''创建订单页'''
     if request.method == 'POST':
+        # check if user is authenticated
+        if not request.user.is_authenticated:
+            return JsonResponse({'status': 'error', 'message': 'Please login first.'})
+        
         # Parse JSON data from request
         data = json.loads(request.body.decode('utf-8'))
         vector_id = data.get("vectorId")
         gene_table = data.get("genetable")
 
-        # 将 gene_table 转换为 DataFrame，并删除空行，重置索引，如果为空则返回错误信息
-        df = pd.DataFrame(gene_table)
-        # df = df.dropna().reset_index(drop=True)
-        if df.empty:
-            return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
-        
         # validate Vector ID
         try:
             vector = Vector.objects.get(id=vector_id)
         except Vector.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Invalid vector ID'})
         
-        # check if user is authenticated
-        if not request.user.is_authenticated:
-            return JsonResponse({'status': 'error', 'message': 'Please login first.'})
+        # 将 gene_table 转换为 DataFrame，并删除空行，重置索引，如果为空则返回错误信息
+        df = pd.DataFrame(gene_table)
+        df = df.dropna(how='all').reset_index(drop=True) # 删除空行,
+        print(df)
+        if df.empty:
+            return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
         
         # Get or create a shopping cart for the user
         cart, created = Cart.objects.get_or_create(user=request.user)
@@ -65,26 +68,24 @@ def order_create(request):
 
         # 处理基因表格，根据列数判断是AA序列还是NT序列，NT序列只有两列，AA序列有6列
         if len(df.columns) == 2:
-            print("Processing NT sequence")
-
+            print("Start processing NT sequence")
             df.columns = ['GeneName', 'OriginalSeq']  # 重命名列名，方便后续处理
+            print(df)
+            ###############################################################################################################################
             # 去掉换行符和空格
             df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
-
             df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row["OriginalSeq"]}{vector.id20.lower()}', axis=1)
-            # 清理序列并检查是否包含非法碱基
-            df['CombinedSeq'], df['warnings'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
-
+            
+            ###############################################################################################################################
             # 计算GC含量, 将序列转换为大写后计算GC含量
             df['original_gc_content'] = df['OriginalSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
             df['modified_gc_content'] = df['CombinedSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
 
-            # Repeats Finder. sequence 和 gene_id 是查找repeats时必须的字段, 给这两列重新赋值，不需要重命名。
-            df['gene_id'] = df['GeneName']
-            df['sequence'] = df['CombinedSeq']
-            df = convert_gene_table_to_RepeatsFinder_Format(df)
-            df['analysis_results'] = df.apply(lambda row: penalty_column_to_dict(row), axis=1)
+            ###############################################################################################################################
+            # 清理序列并检查是否包含非法碱基
+            df['CombinedSeq'], df['warnings'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
 
+            ##########################################################################################################################
             # Forbidden Check : 检测序列中是否包含禁止序列，有则记录其起始和终止位置和序列,
             # 从酶切位点数据库中获取禁止序列，每个禁止序列都有一个适用范围，即起始和终止位置
             # 然后应用到每个基因序列中，如果基因序列中包含禁止序列，则记录其起始和终止位置
@@ -96,19 +97,38 @@ def order_create(request):
                 axis=1
             )
 
-            # 密码子检查，检查序列内部是否有终止密码子
-            df['stop_codons'] = df['CombinedSeq'].apply(detect_stop_codons)
-
             # 检查forbidden 修改status
             df['status'] = df.apply(
-                lambda row: 'forbidden' if row['forbidden_info'] or row['warnings'] or row['stop_codons'] else 'validated', 
+                lambda row: 'forbidden' if row['forbidden_info'] or row['warnings'] else 'validated', 
                 axis=1
             )
 
-            # 整合,把forbidden seq，warnings，stop codons的content加到 FoundForbiddenSequence中，在header中展示。
-            df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
+            ###############################################################################################################################
+            # Repeats Finder. sequence 和 gene_id 是查找repeats时必须的字段, 给这两列重新赋值，不需要重命名。
+            df['gene_id'] = df['GeneName']
+            df['sequence'] = df['CombinedSeq']
+            # print("df: \n", df)
+            data_json = convert_gene_table_to_RepeatsFinder_Format(df)
+            print("data_json: \n", data_json)
+            result_df = process_gene_table_results(data_json)
 
-            # 整合：把forbidden_seq, warnings, stop codons的位置信息加到highlights_positions中，用于前端展示
+            # 调用模型去预测， 去函数里面处理吧
+            model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_10.pkl')
+            weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_10.npy')
+            predicted_data = predict_new_data_from_df(
+                result_df, 
+                model_path=model_path, 
+                scaler=None, 
+                weights_path=weights_path
+            )
+            # 将结果合并到原始数据中
+            df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')
+            
+            ###############################################################################################################################
+            # 整合  把forbidden seq，warnings，stop codons的content加到 FoundForbiddenSequence中，在header中展示。
+            df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
+            
+            # 整合：把forbidden_seq, warnings, stop codons 的位置信息加到 highlights_positions中，用于前端展示
             df['highlights_positions'] = df.apply(
                 lambda row: process_highlights_positions(row),
                 axis=1
@@ -116,31 +136,43 @@ def order_create(request):
 
             # 最后把CombinedSeq赋值给saved_seq
             df['saved_seq'] = df['CombinedSeq']  # 有必要写到这里吗？
-            # 将 DataFrame 转换为 GeneInfo 对象
-            gene_objects = [
-                GeneInfo(
-                    user=request.user,
-                    gene_name=row['gene_id'],
-                    original_seq=row['OriginalSeq'],
-                    vector=vector,
-                    species=row.get('species', None),
-                    status=row.get('status', 'validated'),  # check if status is valid 
-                    forbid_seq=row.get('forbidden_check_list', ''),
-                    combined_seq=row['CombinedSeq'],
-                    i5nc=row.get('i5nc', ''),
-                    i3nc=row.get('i3nc', ''),
-                    saved_seq=row.get('saved_seq', ''),
-                    forbidden_check_list=row.get('forbidden_check_list', ''),
-                    contained_forbidden_list=row.get('contained_forbidden_list', ''),
-                    original_gc_content=row.get('original_gc_content', ''),
-                    modified_gc_content=row.get('modified_gc_content', ''),
-                    original_highlights=row.get('highlights_positions', []),
-                    modified_highlights=row.get('highlights_positions', []),
-                    penalty_score=row.get('total_penalty_score', None),
-                    analysis_results=row['analysis_results'],
+            
+            gene_objects = []
+
+            for _, row in df.iterrows():
+                gene_id = row['gene_id']
+
+                # 查找与当前行 gene_id 对应的分析结果
+                # 查找与当前行 gene_id 对应的分析结果
+                analysis_results = data_json.get(gene_id, {})
+
+                # 创建 GeneInfo 对象，存储分析结果
+                gene_objects.append(
+                    GeneInfo(
+                        user=request.user,
+                        gene_name=gene_id,
+                        original_seq=row['OriginalSeq'],
+                        vector=vector,
+                        species=row.get('species', None),
+                        status=row.get('status', 'validated'),  # check if status is valid 
+                        forbid_seq=row.get('forbidden_check_list', ''),
+                        combined_seq=row['CombinedSeq'],
+                        i5nc=row.get('i5nc', ''),
+                        i3nc=row.get('i3nc', ''),
+                        saved_seq=row.get('saved_seq', ''),
+                        forbidden_check_list=row.get('forbidden_check_list', ''),
+                        contained_forbidden_list=row.get('contained_forbidden_list', ''),
+                        original_gc_content=row.get('original_gc_content', ''),
+                        modified_gc_content=row.get('modified_gc_content', ''),
+                        original_highlights=row.get('highlights_positions', []),
+                        modified_highlights=row.get('highlights_positions', []),
+                        penalty_score=row.get('total_penalty_score', None),
+
+                        # 存储从 data_json 匹配到的分析结果
+                        analysis_results=analysis_results  # 假设你有一个 JSONField 或 TextField 存储分析结果
+                    )
                 )
-                for _, row in df.iterrows()
-            ]
+
             # Capture the current timestamp
             current_timestamp = timezone.now()
 
@@ -167,11 +199,45 @@ def order_create(request):
 
             df.columns = ['GeneName', 'OriginalSeq', 'Species', 'ForbiddenSeqs', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
             df['protein_sequence'] = df['OriginalSeq']
-            # df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","")  # 去掉换行符和空格
+            df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","")  # 去掉换行符和空格
+            
+            # 检测非氨基酸字符
             df['OriginalSeq'], df['warnings'] = zip(*df['protein_sequence'].apply(clean_and_check_protein_sequence))
-    
-            # 暂时不处理AA序列
-            pass
+
+            # 整合
+            df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
+            df['highlights_positions'] = df.apply(
+                lambda row: process_highlights_positions(row),
+                axis=1
+            )
+
+            gene_objects = []
+
+            for _, row in df.iterrows():
+                gene_id = row['GeneName']
+
+                # 创建 GeneInfo 对象，存储分析结果
+                gene_objects.append(
+                    GeneInfo(
+                        user=request.user,
+                        gene_name=gene_id,
+                        original_seq=row['OriginalSeq'],
+                        vector=vector,
+                        species=row.get('Species', None),
+                        status=row.get('status', 'validated'),  # check if status is valid 
+                        forbid_seq=row.get('forbidden_check_list', ''),
+                        combined_seq=row['protein_sequence'],
+                        i5nc=row.get('i5nc', ''),
+                        i3nc=row.get('i3nc', ''),
+                        saved_seq=row.get('protein_sequence', ''),
+                        forbidden_check_list=row.get('forbidden_check_list', ''),
+                        contained_forbidden_list=row.get('contained_forbidden_list', ''),
+                        original_highlights=row.get('highlights_positions', []),
+                        modified_highlights=row.get('highlights_positions', []),
+                        penalty_score=row.get('total_penalty_score', None),
+                    )
+                )
+            new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
 
         # Store the new gene IDs in the session for later use
         request.session['new_gene_ids'] = new_gene_ids_for_session
@@ -191,42 +257,7 @@ def order_create(request):
         customer_vectors = Vector.objects.filter(user=request.user, status="ReadyToUse")
         return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_names_json': species_names_json})
 
-# 定义遗传密码表，将密码子翻译为氨基酸
-codon_table = {
-    'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
-    'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
-    'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
-    'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',                 
-    'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
-    'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
-    'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
-    'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
-    'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
-    'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
-    'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
-    'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
-    'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
-    'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
-    'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
-    'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
-}
 
-def detect_stop_codons(dna_sequence, offset=20):
-    dna_sequence = dna_sequence[offset:-offset]  # 去掉前后20bp
-    stop_codon_info = []
-    # 将DNA序列按三个碱基分割为密码子
-    codons = [dna_sequence[i:i+3] for i in range(0, len(dna_sequence), 3)]
-    
-    # 遍历除了最后一个密码子的所有密码子
-    for idx, codon in enumerate(codons[:-1]):  # 最后一个密码子不包括
-        amino_acid = codon_table.get(codon, '?')  # 翻译密码子为氨基酸
-        if amino_acid == '*':  # 终止密码子
-            start = idx * 3
-            end = start + 3
-            content = codon
-            stop_codon_info.append({'start': start +offset, 'end': end + offset, 'content': content})
-    
-    return stop_codon_info
 
 def clean_and_check_dna_sequence(sequence):
     # 1. 删除空格、换行符等无关字符
@@ -244,7 +275,6 @@ def clean_and_check_dna_sequence(sequence):
     
     # 3. 返回处理后的序列以及非法碱基的提醒信息（包含位置信息）
     if non_dna_bases_info:
-        # warnings = [f'start: {item['start']}, end: {item['end']}, content: {item['content']}' for item in non_dna_bases_info]
         warnings = [{'start': item['start'], 'end': item['end'], 'content': item['content']} for item in non_dna_bases_info]
         return cleaned_sequence, warnings
     
@@ -273,10 +303,19 @@ def clean_and_check_protein_sequence(sequence):
         content = match.group()
         non_standard_amino_acids_info.append({'start': start, 'end': end, 'content': content})
     
+    # 检查终止密码子是否存在于序列中间
+    if '*' in sequence_to_check:
+        # 如果终止密码子出现在中间，记录其位置
+        for match in re.finditer(r'\*', sequence_to_check):
+            non_standard_amino_acids_info.append({
+                'start': match.start(),
+                'end': match.start(),  # 单个字符位置
+                'content': '*'
+            })
+
     # 4. 返回处理后的序列以及非法氨基酸的提醒信息（包含位置信息）
     if non_standard_amino_acids_info:
         warnings = [{'start': item['start'], 'end': item['end'], 'content': item['content']} for item in non_standard_amino_acids_info]
-        # warnings = f"警告: 发现非法氨基酸片段 {', '.join([f'start: {item['start']}, end: {item['end']}, content: {item['content']}' for item in non_standard_amino_acids_info])}"
         return cleaned_sequence if has_terminal_stop else cleaned_sequence, warnings
     
     # 如果有终止密码子，添加它到处理后的序列
@@ -289,43 +328,40 @@ def process_contained_forbidden_list(row):
 
     # 获取 warnings，如果存在的话
     warning_seqs = [each['content'] for each in row['warnings'] if 'content' in each] if row['warnings'] else []
-    # warning_seqs = [each['content'] for each in (row['warnings'] or []) if 'content' in each]
-
-    # 获取密码子检查中的终止密码子，如果存在的话
-    stop_codons = [each['content'] for each in row['stop_codons']]
 
     # 合并 forbidden_seqs 和 warning_seqs
-    contained_forbidden_list = forbidden_seqs + warning_seqs + stop_codons
+    contained_forbidden_list = forbidden_seqs + warning_seqs #+ stop_codons
 
     return contained_forbidden_list
-
-def penalty_column_to_dict(row):
-    '''将 row 中的所有列直接转换为字典'''
-    row_dict = row.to_dict()
-    # 确保字典中的所有值都是 JSON 兼容的
-    row_dict_cleaned = {key: (value if pd.notna(value) else '') for key, value in row_dict.items()}
-    return row_dict_cleaned
 
 
 def process_highlights_positions(row):
     '''处理高亮位置'''
     highlights_positions = []
 
-    # Define a regex pattern to extract all numeric values from a string
+    # 定义一个正则表达式模式来提取所有数字
     pattern = r'\d+'
 
-    # Iterate over all analysis types to process start and end positions
-    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'highGC', 'lowGC', 'doubleNT']:
-        if row[f'{analysis_type}_start'] and row[f'{analysis_type}_end']:
-            # Use regex to find all numbers in the string and convert them to integers
-            start_results = list(map(int, re.findall(pattern, str(row[f'{analysis_type}_start']))))
-            end_results = list(map(int, re.findall(pattern, str(row[f'{analysis_type}_end']))))
+    # 遍历每种分析类型以处理 start 和 end 位置
+    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT']:
+        # 分割该类型的字符串值
+        analysis_data = row[analysis_type].split('|')
+        
+        # 找到 start 和 end 的值
+        start_data = [data.strip() for data in analysis_data if 'start' in data]
+        end_data = [data.strip() for data in analysis_data if 'end' in data]
 
-            # Ensure start and end lists are of the same length
+        # 确保同时存在 start 和 end 值
+        if start_data and end_data:
+            # 提取所有的 start 和 end 数值
+            start_results = list(map(int, re.findall(pattern, start_data[0])))
+            end_results = list(map(int, re.findall(pattern, end_data[0])))
+
+            # 确保 start 和 end 列表长度一致
             if len(start_results) != len(end_results):
-                continue  # Skip this row or handle the inconsistency as needed
+                continue  # 如果不一致，跳过当前分析类型
 
-            # Iterate over the extracted positions and add them to highlights_positions
+            # 遍历提取出的 start 和 end 位置，并添加到 highlights_positions
             for index in range(len(start_results)):
                 highlights_positions.append({
                     'start': start_results[index],
@@ -333,7 +369,7 @@ def process_highlights_positions(row):
                     'type': 'text-warning',
                 })
 
-    # If there is forbidden information, process and add it to highlights_positions
+    # 处理 forbidden_info 和 warnings 字段
     if row['forbidden_info']:
         for info in row['forbidden_info']:
             highlights_positions.append({
@@ -341,7 +377,7 @@ def process_highlights_positions(row):
                 'end': info['end'],
                 'type': 'bg-danger',
             })
-    
+
     if row['warnings']:
         for warning in row['warnings']:
             highlights_positions.append({
@@ -350,44 +386,7 @@ def process_highlights_positions(row):
                 'type': 'bg-danger',
             })
 
-    if row['stop_codons']:
-        for stop_codon in row['stop_codons']:
-            highlights_positions.append({
-                'start': stop_codon['start'],
-                'end': stop_codon['end'],
-                'type': 'bg-danger',
-            })
-
     return highlights_positions
-
-
-def process_forbidden_seq(row):
-    '''处理禁止序列'''
-    forbidden_seq = row['forbidden_check_list']
-    if forbidden_seq:
-        forbidden_seq = forbidden_seq.replace(" ", "").replace(",", ";")
-        forbidden_seq = forbidden_seq.split(";")
-        forbidden_seq_positions = []
-        for seq in forbidden_seq:
-            start = row['sequence'].find(seq)
-            end = start + len(seq)
-            if start != -1:
-                forbidden_seq_positions.append({
-                    'start': start,
-                    'end': end,
-                    'seq': seq,
-                    'type': 'bg-danger',
-                })
-        if forbidden_seq_positions:
-            row['forbidden_check_list_start'] = forbidden_seq_positions[0]['start']
-            row['forbidden_check_list_end'] = forbidden_seq_positions[-1]['end']
-        else:
-            row['forbidden_check_list_start'] = None
-            row['forbidden_check_list_end'] = None
-    else:
-        row['forbidden_check_list_start'] = None
-        row['forbidden_check_list_end'] = None
-    return row
 
 
 # checked
@@ -418,6 +417,7 @@ def gene_detail(request):
     
     return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names': species_names})
 
+
 @login_required
 def bulk_view_gene_detail(request):
     ''' 批量查看基因详情 '''
@@ -432,6 +432,7 @@ def bulk_view_gene_detail(request):
         return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names': species_names})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @login_required
 def gene_data_api(request):
@@ -1068,7 +1069,8 @@ def customer_vector_data_api(request):
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20', 
         'status', 'user__username', 'vector_file', 'vector_png', 'vector_gb'
     )
-    return JsonResponse({'data': list(vector_list)}, safe=False)
+    data = list(vector_list)
+    return JsonResponse({'data': data}, safe=False)
 
 
 @login_required

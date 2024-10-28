@@ -17,3 +17,5 @@ openpyxl
 # 08-05-2024
 python-pptx 
 jinja2
+joblib
+sklearn

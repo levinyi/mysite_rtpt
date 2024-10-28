@@ -5,182 +5,18 @@ from django.core.exceptions import BadRequest
 from django.shortcuts import redirect, render
 from .models import Tool
 from django.contrib.auth.decorators import login_required
-from tools.scripts.AnalysisSequence import DNARepeatsFinder
+from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
 from tools.scripts.split_enzyme_site import find_enzyme_sites
 import pandas as pd
 from Bio import SeqIO
 import zipfile
 from io import BytesIO
+from tools.scripts.penalty_score_predict import predict_new_data_from_df
 
 
 def tools_list(request):
     tools = Tool.objects.all()
     return render(request, 'tools/tools_list.html', {'tools': tools})
-
-
-# def expanded_rows_to_gene_table(df, gene_table):
-#     expanded_results = []
-#     all_columns = set()
-#     gene_analysis_types = []
-
-#     # 首先收集所有可能的列名
-#     for _, row in df.iterrows():
-#         for analysis_type, results_list in row.items():
-#             if analysis_type not in gene_analysis_types:
-#                 gene_analysis_types.append(analysis_type)
-#             if results_list:
-#                 for result in results_list:
-#                     for key, value in result.items():
-#                         column_name = f'{analysis_type}_{key}'
-#                         all_columns.add(column_name)
-
-#     # 按照检测类型和键的字母顺序排序列名
-#     gene_analysis_types = list(set(gene_analysis_types))  # 去除重复项
-#     sorted_columns = ['gene_id'] + sorted(all_columns, key=lambda x: (gene_analysis_types.index(x.split('_')[0]), x.split('_')[1]))
-
-#     # 初始化每个 result_dict，并确保所有可能的列名都在字典中
-#     for gene_id, row in df.iterrows():
-#         result_dict = {col: '' for col in sorted_columns}
-#         result_dict['gene_id'] = gene_id
-        
-#         for analysis_type, results_list in row.items():
-#             if results_list:
-#                 for result in results_list:
-#                     for key, value in result.items():
-#                         column_name = f'{analysis_type}_{key}'
-#                         if 'penalty_score' in key:
-#                             if value == '':
-#                                 continue  # 跳过空值
-#                             if result_dict[column_name] != '':
-#                                 try:
-#                                     result_dict[column_name] += float(value)
-#                                 except ValueError:
-#                                     print(f'Error: {value} is not a valid float')
-#                             else:
-#                                 try:
-#                                     result_dict[column_name] = float(value)
-#                                 except ValueError:
-#                                     print(f'Error: {value} is not a valid float')
-#                         elif 'seqType' in key:
-#                             if value == '':
-#                                 continue
-#                             result_dict[column_name] = value
-#                         else:
-#                             if result_dict[column_name] != '':
-#                                 result_dict[column_name] += f';{value}'
-#                             else:
-#                                 result_dict[column_name] = str(value)
-#             else:
-#                 continue
-            
-#         expanded_results.append(result_dict)
-
-#     expanded_df = pd.DataFrame(expanded_results)
-#     # 将所有带有penalty_score的列，求和赋值给total_penalty_score列
-#     penalty_columns = [col for col in expanded_df.columns if 'penalty_score' in col]
-#     expanded_df[penalty_columns] = expanded_df[penalty_columns].apply(pd.to_numeric, errors='coerce')
-#     expanded_df['total_penalty_score'] = expanded_df[penalty_columns].fillna(0).sum(axis=1).round(0).astype(int)
-
-#     gene_table = gene_table.merge(expanded_df, on='gene_id', how='left')
-
-#     return gene_table
-
-def convert_gene_table_to_RepeatsFinder_Format(gene_table):
-    def expanded_rows_to_gene_table(df, gene_table):
-        expanded_results = []
-        all_columns = set()
-        gene_analysis_types = []
-
-        # 首先收集所有可能的列名
-        for _, row in df.iterrows():
-            for analysis_type, results_list in row.items():
-                if analysis_type not in gene_analysis_types:
-                    gene_analysis_types.append(analysis_type)
-                if results_list:
-                    for result in results_list:
-                        for key, value in result.items():
-                            column_name = f'{analysis_type}_{key}'
-                            all_columns.add(column_name)
-
-        # 按照检测类型和键的字母顺序排序列名
-        gene_analysis_types = list(set(gene_analysis_types))  # 去除重复项
-        sorted_columns = ['gene_id'] + sorted(all_columns, key=lambda x: (gene_analysis_types.index(x.split('_')[0]), x.split('_')[1]))
-
-        # 初始化每个 result_dict，并确保所有可能的列名都在字典中
-        for gene_id, row in df.iterrows():
-            result_dict = {col: '' for col in sorted_columns}
-            result_dict['gene_id'] = gene_id
-            
-            for analysis_type, results_list in row.items():
-                if results_list:
-                    for result in results_list:
-                        for key, value in result.items():
-                            column_name = f'{analysis_type}_{key}'
-                            if 'penalty_score' in key:
-                                if value == '':
-                                    continue  # 跳过空值
-                                if result_dict[column_name] != '':
-                                    try:
-                                        result_dict[column_name] += float(value)
-                                    except ValueError:
-                                        print(f'Error: {value} is not a valid float')
-                                else:
-                                    try:
-                                        result_dict[column_name] = float(value)
-                                    except ValueError:
-                                        print(f'Error: {value} is not a valid float')
-                            elif 'seqType' in key:
-                                if value == '':
-                                    continue
-                                result_dict[column_name] = value
-                            else:
-                                if result_dict[column_name] != '':
-                                    result_dict[column_name] += f';{value}'
-                                else:
-                                    result_dict[column_name] = str(value)
-                else:
-                    continue
-                
-            expanded_results.append(result_dict)
-
-        expanded_df = pd.DataFrame(expanded_results)
-        # 将所有带有penalty_score的列，求和赋值给total_penalty_score列
-        penalty_columns = [col for col in expanded_df.columns if 'penalty_score' in col]
-        expanded_df[penalty_columns] = expanded_df[penalty_columns].apply(pd.to_numeric, errors='coerce')
-        expanded_df['total_penalty_score'] = expanded_df[penalty_columns].fillna(0).sum(axis=1).round(0).astype(int)
-
-        gene_table = gene_table.merge(expanded_df, on='gene_id', how='left')
-
-        return gene_table
-    # Remove rows with None
-    finder_dataset = DNARepeatsFinder(data_set=gene_table)
-
-    results = {}
-    for index, row in gene_table.iterrows():
-        gene_id = row['gene_id']
-        results[gene_id] = {
-            # 'tandem_repeats': finder_dataset.find_tandem_repeats(index=index, min_unit=3, min_copies=3),
-            'LongRepeats': finder_dataset.find_dispersed_repeats(index=index, min_len=16),
-            # 'palindromes': finder_dataset.find_palindrome_repeats(index=index, min_len=15),
-            # # 'inverted_repeats': finder_dataset.find_inverted_repeats(index=index, min_len=10),
-            'Homopolymers': finder_dataset.find_homopolymers(index=index, min_len=7),
-            # 'W8S8_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=8, min_S_length=8),
-            'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=12, min_S_length=12),
-            # 'W16S16_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=16, min_S_length=16),
-            # 'W20S20_motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=20, min_S_length=20),
-            # 'localGCcontent': finder_dataset.find_local_gc_content(index=index, window_size=30, min_GC_content=20, max_GC_content=80),
-            # 在适当的位置调用
-            'highGC': finder_dataset.find_high_gc_content(index=index, window_size=30, max_GC_content=80),
-            'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=30, min_GC_content=20),
-            'LCC': finder_dataset.get_lcc(index=index),
-            'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=10),
-        }
-    #将结果列表转换为DataFrame， 处理长度不一致问题
-    df = pd.DataFrame(results).T
-    
-    gene_table = expanded_rows_to_gene_table(df, gene_table)
-
-    return gene_table
 
 
 def process_fasta_file(fasta_file):
@@ -224,25 +60,34 @@ def SequenceAnalyzer(request):
         min_gc_content = int(request.POST.get('minGCContent', 20))
         max_gc_content = int(request.POST.get('maxGCContent', 80))
 
-        finder_dataset = DNARepeatsFinder(data_set=gene_table)
-        results = {}
-        for index, row in gene_table.iterrows():
-            gene_id = row['gene_id']
-            results[gene_id] = {
-                'LongRepeats': finder_dataset.find_dispersed_repeats(index=index, min_len=long_repeats_min_len),
-                'homopolymers': finder_dataset.find_homopolymers(index=index, min_len=homopolymers_min_len),
-                'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=min_w_length, min_S_length=min_s_length),
-                'highGC': finder_dataset.find_high_gc_content(index=index, window_size=window_size, max_GC_content=max_gc_content),
-                'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=window_size, min_GC_content=min_gc_content),
-                'LCC': finder_dataset.get_lcc(index=index),
-                'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=12),
-            }
-        df = pd.DataFrame(results).T
+        data = convert_gene_table_to_RepeatsFinder_Format(
+            gene_table,
+            long_repeats_min_len=long_repeats_min_len,
+            homopolymers_min_len=homopolymers_min_len,
+            min_w_length=min_w_length,
+            min_s_length=min_s_length,
+            window_size=window_size,
+            min_gc_content=min_gc_content,
+            max_gc_content=max_gc_content
+        )
+        # 处理数据并获取结果 DataFrame
+        result_df = process_gene_table_results(data)
 
-        gene_table = expanded_rows_to_gene_table(df, gene_table)
-        gene_table['total_penalty_score'] = gene_table.apply(lambda row: row.filter(like='penalty_score').sum(), axis=1)
+        result_df = gene_table.merge(result_df, left_on='gene_id', right_on='GeneName', how='left')
+        print("This is the result_df, 看看有没有sequence 列")
+        print(result_df.columns)
+        print(result_df)
+        # 看看这里需要删除什么列
+        
+        # predict penalty score
+        model_path = 'tools/scripts/best_rf_model_10.pkl'
+        weights_path = 'tools/scripts/best_rf_weights_10.npy'
+        result_df = predict_new_data_from_df(result_df, model_path, weights_path=weights_path)
+        print("This is the result_df after predict penalty score")
+        print(result_df)
+        # result_df 结果到会话中
 
-        request.session['gene_table'] = gene_table.to_dict(orient='records')
+        request.session['gene_table'] = result_df.to_dict(orient='records')
         return JsonResponse({'status': 'success', 'redirect_url': '/tools/sequence_analysis_detail/'})    
     return render(request, 'tools/SequenceAnalyzer.html')
 

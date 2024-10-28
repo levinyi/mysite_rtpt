@@ -6,10 +6,16 @@
 
 {% block content %}
 <div class="container mt-3">
+    <!-- 顶部信息 -->
     <div class="row">
         <div class="col-md-8">
             <h2>Sequence Analysis Results</h2>
             <p>Total Genes: {{ gene_table|length }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i> Download CSV</a>
+        </div>
+        <div class="col-12">
             <div class="progress mb-4">
                 <div class="progress-bar bg-success" role="progressbar" style="width: {{ green_percentage }}%" aria-valuenow="{{ green_percentage }}" aria-valuemin="0" aria-valuemax="100">
                     <span class="text-dark">{{ green_count }}</span>
@@ -22,21 +28,19 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4 text-end">
-            <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i> Download CSV</a>
-        </div>
     </div>
+    <!-- Gene Table -->
     <div class="row">
         {% for g in gene_table %}
         <div class="col-12 mb-3">
             <!-- Gene Card -->
             <div class="card">
-                <div class="card-header {% if g.total_penalty_score < 10 %}bg-success{% elif g.total_penalty_score < 30 %}bg-warning{% elif g.total_penalty_score >= 30 %}bg-danger{% endif %}">
+                <div class="card-header {% if g.total_penalty_score < 100 %}bg-success{% elif g.total_penalty_score < 300 %}bg-warning{% elif g.total_penalty_score >= 300 %}bg-danger{% endif %}">
                     <div class="row">
                         <div class="col-6 text-start">
                             Gene ID: {{ g.gene_id }}
                         </div>
-                        <div class="col-6 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <10; yellow:10<score<30; red:score>30">
+                        <div class="col-6 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <100; yellow:100<score<300; red:score>300">
                             Total Penalty Score: {{ g.total_penalty_score }}
                         </div>
                     </div>
@@ -56,31 +60,38 @@
                                     <!-- Display other information as list -->
                                     <ul>
                                         {% if g.tandem_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">Check Tandem Repeats: {{ g.tandem_repeats_sequence }},score: {{ g.tandem_repeats_penalty_score}}</li>
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">
+                                            Check Tandem Repeats: {{ g.tandem_repeats }},score: {{ g.tandem_repeats_penalty_score}}</li>
                                         {% endif %}
                                         {% if g.inverted_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.inverted_repeats_sequence }}">Check Inverted Repeats: {{ g.inverted_repeats_sequence }}, score: {{ g.inverted_repeats_penalty_score}}</li>
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.inverted_repeats_sequence }}">
+                                            Check Inverted Repeats: {{ g.inverted_repeats }}, score: {{ g.inverted_repeats_penalty_score}}</li>
                                         {% endif %}
-                                        {% if g.W12S12Motifs_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.W12S12Motifs_sequence }}">Check W8S8 motif: {{ g.W12S12Motifs_sequence }}, score: {{ g.W12S12Motifs_penalty_score }}</li>
+                                        {% if g.W12S12Motifs %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.W12S12Motifs }}">
+                                            Check W12S12 motif: {{ g.W12S12Motifs }}. score: {{ g.W12S12Motifs_penalty_score }}.
+                                        </li>
                                         {% endif %}
-                                        {% if g.homopolymers_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.homopolymers_sequence }}">Check Homopolymers: {{ g.homopolymers_sequence }}, score: {{ g.homopolymers_penalty_score }}</li>
+                                        {% if g.Homopolymers %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.Homopolymers }}">
+                                        Check Homopolymers: {{ g.Homopolymers }}, score: {{ g.Homopolymers_penalty_score }}</li>
                                         {% endif %}
-                                        {% if g.LongRepeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.long_repeats_sequence }}">Check Long Repeats: {{ g.LongRepeats_sequence }}, score: {{ g.LongRepeats_penalty_score}}</li>
+                                        {% if g.LongRepeats %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.LongRepeats }}">
+                                        Check Long Repeats: {{ g.LongRepeats }}, score: {{ g.LongRepeats_penalty_score}}</li>
                                         {% endif %}
-                                        {% if g.local_gc_content_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.local_gc_content_sequence }}">Check Local GC content: {{ g.local_gc_content_sequence }}, score: {{ g.local_gc_content_penalty_score}}</li>
+                                        
+                                        {% if g.palindromes %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.palindromes }}">
+                                        Check Palindromes: {{ g.Palindromes }}, score: {{g.Palindromes_penalty_score}}</li>
                                         {% endif %}
-                                        {% if g.palindromes_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.palindromes_sequence }}">Check Palindromes: {{ g.palindromes_sequence }}, score: {{g.palindromes_penalty_score}}</li>
+                                        {% if g.LowGC %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.LowGC }}">
+                                        Check LowGC: {{ g.LowGC }}, score: {{ g.LowGC_penalty_score }}</li>
                                         {% endif %}
-                                        {% if g.lowGC_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.lowGC_sequence }}"> Check LowGC: {{ g.lowGC_sequence }}, score: {{ g.lowGC_penalty_score }}</li>
-                                        {% endif %}
-                                        {% if g.highGC_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.highGC_sequence }}"> Check HighGC: {{ g.highGC_sequence }}, score: {{ g.highGC_penalty_score }}</li>
+                                        {% if g.HighGC %}
+                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.HighGC }}">
+                                        Check HighGC: {{ g.HighGC }}, score: {{ g.HighGC_penalty_score }}</li>
                                         {% endif %}
                                     </ul>
                                 </div>
@@ -116,8 +127,10 @@
             item.addEventListener('mouseenter', function() {
                 // 提取序列部分，考虑到可能有分号分隔的多个序列
                 const fullText = this.textContent.trim();
-                const targetSequencePart = fullText.split(':')[1].split(',')[0].trim();  // 提取序列部分
-                const targetSequences = targetSequencePart.split(';');  // 处理可能的多序列情况
+                console.log('Full Text:', fullText);  // 打印完整文本 Check W12S12 motif: sequence: TTTTTTTTTTTTTTAA | start: 458 | end: 473 | length: 16; sequence: CGCGCGCGCGCGCGCGCGCGCGCG | start: 386 | end: 409 | length: 24. score: 9.0.
+                // 序列是分散的，需要提取序列部分
+                const targetSequencePart = fullText.split(':')[2].split(',')[0];  // 提取序列部分
+                const targetSequences = targetSequencePart.split('|');  // 处理可能的多序列情况
                 const targetId = this.getAttribute('data-target');
                 const targetElement = document.querySelector(targetId);
 

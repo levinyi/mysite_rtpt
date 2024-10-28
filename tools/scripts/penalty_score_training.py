@@ -12,17 +12,16 @@ RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
 def main(data, index):
-
     # 提取特征和标签
-    X = data[['highGC_penalty_score', 'lowGC_penalty_score', 'W12S12Motifs_penalty_score', 
-            'LongRepeats_penalty_score', 'Homopolymers_penalty_score', 'doubleNT_penalty_score',
-            'LCC_penalty_score',
+    X = data[['HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score', 
+            'LongRepeats_penalty_score', 'Homopolymers_penalty_score', 'DoubleNT_penalty_score',
+            'LCC', 'Total_Length'
             ]]
     y = data['MTP_Results']
 
-    # 移除前5列全为空的行
-    X = X.dropna(subset=['highGC_penalty_score', 'lowGC_penalty_score', 'W12S12Motifs_penalty_score', 
-                        'LongRepeats_penalty_score', 'Homopolymers_penalty_score','doubleNT_penalty_score'], how='all')
+    # 移除前ji列全为空的行
+    X = X.dropna(subset=['HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score', 
+                        'LongRepeats_penalty_score', 'Homopolymers_penalty_score','DoubleNT_penalty_score'], how='all')
     y = y.loc[X.index]
 
     # 标准化特征
@@ -87,6 +86,8 @@ def main(data, index):
     best_rf_weights = best_rf_model.feature_importances_
     joblib.dump(best_rf_model, f'best_rf_model_{index}.pkl')
     np.save(f'best_rf_weights_{index}.npy', best_rf_weights)
+    print("weights file saved: ", f'best_rf_weights_{index}.npy')
+    print("model file saved: ", f'best_rf_model_{index}.pkl')
 
     # 计算混淆矩阵和其他指标
     predictions = best_rf_model.predict(X)
@@ -104,6 +105,9 @@ def main(data, index):
     else:
         print("Error: Confusion matrix is not 2x2")
 
+    # 把data 和预测结果合并
+    data['predictions'] = predictions
+    data.to_csv(f'predicted_{index}.csv', index=False)
 
 if __name__ == '__main__':
     # file_path = sys.argv[1]
@@ -115,13 +119,17 @@ if __name__ == '__main__':
     #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.20.mixed.samples.txt',
     # ]
 
-    # new data
+    # # new data
+    # file_path_list = [
+    #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.11samples.20240819.txt',
+    #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.longSequence.samples.20240819.txt',
+    #     '/cygene4/pipeline/check_sequence_penalty_score/Pooled.20.mixed.samples.20240819.txt',
+    # ]
     file_path_list = [
-        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.11samples.20240819.txt',
-        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.longSequence.samples.20240819.txt',
-        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.20.mixed.samples.20240819.txt',
+        '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.mixed.samples.20241017.txt',
     ]
     # 逐个处理数据, 新模型从7开始保存，
-    for index, file_path in enumerate(file_path_list, start=7):
+    for index, file_path in enumerate(file_path_list, start=10):
         data = pd.read_csv(file_path, sep="\t", low_memory=False)
+        # print(data.columns)
         main(data, index)

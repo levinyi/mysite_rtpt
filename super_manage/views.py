@@ -26,7 +26,7 @@ from user_center.views import \
 from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
 from user_center.utils.pagination import Pagination
-from tools.scripts.ParsingGenBankOld import readGenBank
+# from tools.scripts.ParsingGenBankOld import readGenBank
 
 def custom_user_passes_test(test_func):
     """
@@ -154,6 +154,32 @@ def vector_delete(request):
     return JsonResponse(data={
         'status': 'success',
     })
+
+
+
+@csrf_exempt  # 使用此装饰器来禁用 CSRF 保护，如果你在 AJAX 请求中已提供 CSRF token，则不需要这个装饰器
+def vector_update_field(request):
+    if request.method == 'POST':
+        vector_id = request.POST.get('vector_id')
+        field = request.POST.get('field')
+        value = request.POST.get('value')
+        
+        # 检查是否提供了 vector_id 和字段
+        if not vector_id or not field:
+            return JsonResponse({'status': 'error', 'message': 'Missing vector ID or field name'})
+
+        # 获取相应的 vector 实例
+        vector = Vector.objects.get(id=vector_id)
+        
+        # 检查并更新字段
+        if hasattr(vector, field):
+            setattr(vector, field, value)
+            vector.save()
+            return JsonResponse({'status': 'success', 'message': 'Field updated successfully'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Invalid field name'})
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 
 @login_required

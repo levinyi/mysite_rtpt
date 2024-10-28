@@ -14,23 +14,6 @@
         margin: auto; /* 如果内容不够宽，则居中 */
     }
 
-    .text-truncate {
-        flex-grow: 1; /* 让文本占据多余的空间 */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .copy-icon {
-        flex-shrink: 0; /* 防止图标大小被压缩 */
-        cursor: pointer;
-        margin-left: 8px; /* 在图标和文本之间留一些空间 */
-        display: none;
-    }
-    .copy-container:hover .copy-icon {
-        display: inline; /* 或者 display: block; 根据需要 */
-    }
-
     /* CSS样式和动画 */
     .copy-success {
         display: none;
@@ -98,6 +81,9 @@
             </div>
         </div>
         <div class="card-body">
+            <div class="alert alert-info" role="alert">
+            Please note: Once you've uploaded your vector file, it will require approval by RootPath staff. Only when the status is updated to 'ReadyToUse' will your vector be available on the ordering page.
+            </div>
             <div id="customer-vector-table"></div>
         </div>
     </div>
@@ -154,32 +140,32 @@
         .then(data => {
             new gridjs.Grid({
                 columns: [
-                    { name: '#', width: '50px'},
-                    { name: 'Vector Name', width: '170px'},
+                    { name: '#', width: '50px' },
+                    { name: 'Vector Name', width: '170px' },
                     { name: 'Vector File(Original)', formatter: (cell, row) => {
                         const vectorId = row.cells[7].data;
                         return gridjs.html(`
-                        <a href="/user_center/vector_download/${vectorId}/file/" 
-                            data-bs-toggle="tooltip" data-bs-placement="top" title="See details" class="text-decoration-none">
-                            ${cell}
-                        </a>`);
+                            <a href="/user_center/vector_download/${vectorId}/file/" 
+                                data-bs-toggle="tooltip" data-bs-placement="top" title="See details" class="text-decoration-none">
+                                ${cell}
+                            </a>`);
                     }},
                     { name: 'Status', formatter: (cell, row) => {
                         const badgeClass = cell === 'readyToUse' ? 'bg-primary' : 'bg-info';
                         return gridjs.html(`<span class="badge ${badgeClass}">${cell}</span>`);
                     }},
                     { name: 'Vector ID' },
-                    { name: 'iU20', width: '150px' },
-                    { name: 'iD20', width: '150px' },
+                    { name: 'iU20' },
+                    { name: 'iD20' },
                     { 
-                        name: 'Download Map', 
+                        name: 'Download Map & GenBank',
                         formatter: (cell, row) => {
                             const vectorId = row.cells[7].data;
-                            const pngFile = row.cells[8] && row.cells[8].data;  // PNG file data is in the 9th column
-                            const gbFile = row.cells[9] && row.cells[9].data;   // GB file data is in the 10th column
                             return gridjs.html(`
-                                ${pngFile ? `<a href="/user_center/vector_download/${vectorId}/map" data-bs-toggle="tooltip" title="Click to download PNG map"><i class="bi bi-filetype-png"></i></a>` : `<i class="bi bi-filetype-png text-muted" data-bs-toggle="tooltip" title="No map file available"></i>`}
-                                ${gbFile ? `<a href="/user_center/vector_download/${vectorId}/gb" data-bs-toggle="tooltip" title="Download genebank"><i class="bi bi-file-earmark-binary"></i></a>` : `<i class="bi bi-file-earmark-binary text-muted" data-bs-toggle="tooltip" title="No genebank file available"></i>`}
+                                <div style="display: flex; justify-content: center;">
+                                    <a href="/user_center/vector_download/${vectorId}/map" data-bs-toggle="tooltip" title="Click to download map"><i class="bi bi-filetype-png"></i></a>
+                                    <a href="/user_center/vector_download/${vectorId}/gb" data-bs-toggle="tooltip" title="Download genebank"><i class="bi bi-file-earmark-binary"></i></a>
+                                </div>
                             `);
                         }
                     },
@@ -203,9 +189,8 @@
                     vector.vector_id,
                     vector.iu20,
                     vector.id20,
-                    vector.id,  // 下载图谱
-                    vector.vector_png ? vector.vector_png : '',
-                    vector.vector_gb ? vector.vector_gb : '',
+                    vector.id,  // For download links
+                    ''  // Placeholder to maintain correct cell count if necessary
                 ]),
                 pagination: {
                     enabled: true,
@@ -224,6 +209,7 @@
                 }
             }).render(document.getElementById("customer-vector-table"));
         });
+
 
         fetch("{% url 'user_center:rootpath_vector_data_api' %}")
         .then(response => response.json())

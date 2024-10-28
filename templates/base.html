@@ -31,6 +31,23 @@
             #report-bug-link:hover {
                 opacity: 0.8; /* 悬浮时的透明度变化 */
             }
+            .loading-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(255, 255, 255, 0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+
+            .loading-content {
+                text-align: center;
+            }
+
         </style>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
@@ -47,6 +64,17 @@
         <!-- <a href="https://t114xle63y.feishu.cn/docx/Do0qdSPxho0TBWxwRFQcgTqOnue" id="report-bug-link" data-bs-toggle="tooltip" data-bs-replacement="left" title="Report Bug">
             <img src="{% static 'images/reportbug.png' %}" alt="Report Bug" />
         </a> -->
+
+        <!-- Global Loading Indicator -->
+        <div id="loading-indicator" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>正在加载...</p>
+            </div>
+        </div>
+
 
         {% include "header.html" %}
         {% block content %} {% endblock %}
@@ -69,6 +97,15 @@
             $(function () {
                 $('[data-bs-toggle="tooltip"]').tooltip()
             })
+        </script>
+        <script>
+            function showLoading() {
+                document.getElementById("loading-indicator").style.display = "flex";
+            }
+
+            function hideLoading() {
+                document.getElementById("loading-indicator").style.display = "none";
+            }
         </script>
         {% block javascript %} {% endblock %}
         {% include "footer.html" %}

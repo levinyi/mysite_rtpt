@@ -63,6 +63,39 @@
 </style>
 {% endblock %}
 {% block content %}
+<!-- 悬浮的竖条，用于触发Offcanvas -->
+<div class="fixed-right" data-bs-toggle="offcanvas" data-bs-target="#offcanvasWithBothOptions" aria-controls="offcanvasWithBothOptions">
+    <div class="action-inner">
+        <i class="bi bi-exclamation-circle"></i>
+        <div class="action-text">WARNING</div>
+    </div>
+</div>
+
+<!-- Warning Offcanvas -->
+<div class="offcanvas offcanvas-end" data-bs-scroll="true" tabindex="-1" id="offcanvasWithBothOptions" aria-labelledby="offcanvasWithBothOptionsLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasWithBothOptionsLabel">Prohibition and Risk</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <!-- Tier 1 Warning -->
+        <h4 class="bg-secondary text-white p-2">Tier 1 Warning:</h4>
+        <p class="p-2"><span class="bg-danger text-white">Red color</span> highlighted sequences are <span class="text-danger">NOT</span> allowed for synthesis. Ordering will not proceed until approved by our SequenceAnalyzer.</p>
+        <ul>
+            <li>Overall GC% across the entire sequence is &le; 20% or &ge; 80%.</li>
+            <li>Presence of forbidden sequences in the inquiry form.</li>
+        </ul>
+        <!-- Tier 2 Warning -->
+        <h4 class="bg-secondary text-white p-2">Tier 2 Warning:</h4>
+        <p class="p-2"><span class="bg-warning text-dark">Yellow color</span> highlighted sequences are <span class="text-warning">AT RISK</span> for synthesis. Modifications are recommended.</p>
+        <p>We understand some sequences may not be editable. In this case, ordering can proceed, but it may affect the gene's success rate.</p>
+        <ul>
+            <li>Overall GC% across the entire sequence is within (20%, 30%] or [70%, 80%).</li>
+            <li>Extremely high local GC content.</li>
+            <li>Presence of long consecutive A/T/G/C.</li>
+        </ul>
+    </div>
+</div>
 
 <!-- Modal for bulk optimization settings -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="bulkOptimizationModal" tabindex="-1" aria-labelledby="bulkOptimizationModalLabel" aria-hidden="true">
@@ -151,7 +184,7 @@
 </div>
 
 <!-- Main Page -->
-<div class="container-fluid" style="padding-left:50px;padding-right:50px;">
+<div class="container-fluid" style="padding-left:50px;">
     <!-- Breadcrumb -->
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
         <div class="d-flex justify-content-between align-items-center">
@@ -163,52 +196,47 @@
         </div>
     </nav>
     <!-- Gene Information -->
-    <div class="card mt-3" style="background-color: #f0f0f0;">
+    <div class="card mt-3">
         <div class="container">
-            <div class="row mt-4">
-                <!-- Spinner -->
-                <div id="loadingSpinner" class="text-center mb-4" style="display: none;">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-                <!-- Total Genes Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ gene_list.count }} Total Genes</h5>
-                            <canvas id="geneClassificationChart" width="100" height="100"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <!-- GC Content Distribution Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">GC Content Distribution</h5>
-                            <canvas id="gcContentChart" width="100" height="100"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <!-- Gene Length Distribution Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">Gene Length Distribution</h5>
-                            <canvas id="geneLengthChart" width="100" height="100"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <!-- Sequence Complexity Card -->
-                <div class="col-md-3 mb-4">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">Sequence Penalty</h5>
-                            <canvas id="sequenceComplexityChart" width="100" height="100"></canvas>
-                        </div>
+
+        <div class="row mt-4">
+            <!-- Total Genes Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ gene_list.count }} Total Genes</h5>
+                        <canvas id="geneClassificationChart" width="100" height="100"></canvas>
                     </div>
                 </div>
             </div>
+            <!-- GC Content Distribution Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">GC Content Distribution</h5>
+                        <canvas id="gcContentChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Gene Length Distribution Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Gene Length Distribution</h5>
+                        <canvas id="geneLengthChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+            <!-- Sequence Complexity Card -->
+            <div class="col-md-3 mb-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Sequence Penalty</h5>
+                        <canvas id="sequenceComplexityChart" width="100" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
     <!-- Gene List -->
@@ -348,33 +376,11 @@
                         <div class="row mt-2">
                             <div class="col-md-10 col-12">
                                 <div class="card">
-                                    <!-- Clickable text to trigger chart loading and toggle visibility -->
-                                    <p>
-                                        <span
-                                            style="cursor: pointer; color: blue;"
-                                            data-bs-toggle="collapse"
-                                            data-bs-target="#collapseChart-{{ gene.id }}"
-                                            aria-expanded="false"
-                                            aria-controls="collapseChart-{{ gene.id }}"
-                                            onclick="loadChart('{{ gene.id }}', '{{ gene.original_seq|escapejs }}', '{{ gene.species.species_name|default:"Human"|escapejs }}')">
-                                            <!-- Triangle icon indicating collapsibility -->
-                                            <i id="icon-{{ gene.id }}" class="bi bi-caret-right"></i> Codon Usage Graph
-                                        </span>
-                                    </p>
-                                    
-                                    <!-- Collapsible container for the chart and loading spinner -->
-                                    <div id="collapseChart-{{ gene.id }}" class="collapse" data-bs-parent=".row">
-                                        <!-- Loading animation, initially hidden -->
-                                        <div
-                                            id="loading-{{ gene.id }}"
-                                            class="spinner-border text-danger"
-                                            role="status"
-                                            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                        <!-- Chart canvas, initially hidden -->
-                                        <canvas id="codonUsageChart-{{ gene.id }}" style="height:300px; display: none;"></canvas>
+                                    <p class="text-center"> Codon Usage Graph </p>
+                                    <div id="loading-{{ gene.id }}" class="spinner-border" role="status" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                                        <span class="visually-hidden">Loading...</span>
                                     </div>
+                                    <canvas id="codonUsageChart-{{ gene.id }}" style="height:400px;"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -393,9 +399,6 @@
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
             <i class="bi bi-check2-all me-2"></i>Bulk Optimization
         </button>
-        <!-- 总的按钮，加载所有序列的图表 -->
-        <button class="btn btn-primary" onclick="loadAllCharts()">
-        <i class="bi bi-bar-chart-line me-2"></i>Load All Codon Usage Charts</button>
     </div>
 </div>
 {% endblock %}
@@ -1037,9 +1040,8 @@
         }
     });
 </script>
-
 <script>
-// 定义遗传密码表，将密码子映射为氨基酸
+// 定义遗传密码表
 const codonTable = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
     'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
@@ -1059,250 +1061,152 @@ const codonTable = {
     'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
 };
 
-// 固定颜色顺序，从高到低的颜色依次为（绿色->蓝色->黄色->橙色->粉色->红色）：
-const colorPalette = ['#70AC48', '#5A9AD7', '#FFC100', '#ED7D31', '#FF00FE', '#FE0000'];
-
-// 定义横坐标氨基酸顺序
-const aminoAcidOrder = [
-    "H (His)", "S (Ser)", "G (Gly)", "M (Met)", "I (Ile)", "T (Thr)", "A (Ala)", "L (Leu)",
-    "R (Arg)", "D (Asp)", "W (Trp)", "K (Lys)", "V (Val)", "F (Phe)", "P (Pro)", "N (Asn)", 
-    "Q (Gln)", "Y (Tyr)", "E (Glu)", "C (Cys)", "* (Stop)"
-];
-
-// 定义氨基酸单字母简写到三字母简写的映射表
-const aminoAcidThreeLetterNames = {
-    'H': 'H (His)', 'S': 'S (Ser)', 'G': 'G (Gly)', 'M': 'M (Met)', 'I': 'I (Ile)',
-    'T': 'T (Thr)', 'A': 'A (Ala)', 'L': 'L (Leu)', 'R': 'R (Arg)', 'D': 'D (Asp)',
-    'W': 'W (Trp)', 'K': 'K (Lys)', 'V': 'V (Val)', 'F': 'F (Phe)', 'P': 'P (Pro)',
-    'N': 'N (Asn)', 'Q': 'Q (Gln)', 'Y': 'Y (Tyr)', 'E': 'E (Glu)', 'C': 'C (Cys)',
-    '*': '* (Stop)'
-};
-
-// 计算DNA序列中的密码子使用次数
-function countCodonsInSequence(dnaSequence) {
-    let codonCounts = {};
+// 计算密码子使用频率，并归一化为100%
+function countCodonUsage(dnaSequence) {
+    let codonUsage = {};
+    
+    // 分割DNA序列为三个碱基一组
     for (let i = 0; i < dnaSequence.length; i += 3) {
         const codon = dnaSequence.slice(i, i + 3);
         const aminoAcid = codonTable[codon];
+
         if (aminoAcid) {
-            if (!codonCounts[aminoAcid]) {
-                codonCounts[aminoAcid] = {};
+            if (!codonUsage[aminoAcid]) {
+                codonUsage[aminoAcid] = {};
             }
-            codonCounts[aminoAcid][codon] = (codonCounts[aminoAcid][codon] || 0) + 1;
+
+            if (!codonUsage[aminoAcid][codon]) {
+                codonUsage[aminoAcid][codon] = 1;
+            } else {
+                codonUsage[aminoAcid][codon]++;
+            }
         }
     }
-    return codonCounts;
+
+    // 归一化：计算每个氨基酸下所有密码子的比例
+    for (const aminoAcid in codonUsage) {
+        const totalCount = Object.values(codonUsage[aminoAcid]).reduce((a, b) => a + b, 0);
+        for (const codon in codonUsage[aminoAcid]) {
+            codonUsage[aminoAcid][codon] = (codonUsage[aminoAcid][codon] / totalCount) * 100;
+        }
+    }
+
+    return codonUsage;
 }
 
+// 定义氨基酸单字母简写到三字母简写的映射表
+const aminoAcidThreeLetterNames = {
+    'I': 'I (Ile)', 'M': 'M (Met)', 'T': 'T (Thr)', 'N': 'N (Asn)', 'K': 'K (Lys)',
+    'S': 'S (Ser)', 'R': 'R (Arg)', 'L': 'L (Leu)', 'P': 'P (Pro)', 'H': 'H (His)',
+    'Q': 'Q (Gln)', 'V': 'V (Val)', 'A': 'A (Ala)', 'D': 'D (Asp)', 'E': 'E (Glu)',
+    'G': 'G (Gly)', 'F': 'F (Phe)', 'Y': 'Y (Tyr)', 'C': 'C (Cys)', 'W': 'W (Trp)',
+    '*': 'Stop'
+};
 
-function createCodonUsageChart(dnaSequence, species, geneId) {
-    const canvas = document.getElementById('codonUsageChart-' + geneId);
+// 在生成图表时，使用氨基酸的三个字母缩写
+function createCodonUsageChart(geneId, codonUsage) {
+    const ctx = document.getElementById('codonUsageChart-' + geneId).getContext('2d');
     
-    // Set the canvas width and height attributes
-    canvas.width = canvas.parentElement.offsetWidth; // Set width to parent container's width
-    canvas.height = 300;  // Fixed height in pixels
-
-    const ctx = canvas.getContext('2d');
-
-    // 获取DNA序列中的密码子使用次数
-    const codonCounts = countCodonsInSequence(dnaSequence); 
-    const codonUsageData = aminoAcid[species]; 
-
-    let datasets = []; // 用于存储每个密码子的 `dataset`
-    let labels = [];   // 用于存储每个氨基酸的标签
-
-    // 遍历固定顺序的氨基酸列表
-    aminoAcidOrder.forEach(threeLetterAminoAcid => {
-        const aminoAcid = Object.keys(aminoAcidThreeLetterNames).find(key => aminoAcidThreeLetterNames[key] === threeLetterAminoAcid);
-
-        if (codonUsageData[aminoAcid]) {
-            let totalCodons = 0;
-            
-            // 获取该氨基酸的每个密码子的真实使用数据
-            let codonRatios = codonUsageData[aminoAcid].map(item => {
-                const realCount = codonCounts[aminoAcid] && codonCounts[aminoAcid][item.Triplet] ? codonCounts[aminoAcid][item.Triplet] : 0;
-                totalCodons += realCount;
-                return {
-                    codon: item.Triplet,
-                    fraction: realCount,  // 实际使用次数
-                    frequency: item.Fraction  // 用于颜色排序
-                };
-            });
-
-            // 对 codonRatios 进行排序
-            codonRatios.sort((a, b) => b.frequency - a.frequency).reverse();
-
-            // 将该氨基酸的标签添加到 X 轴标签中
-            labels.push(aminoAcidThreeLetterNames[aminoAcid]);
-
-            // 颜色分配
-            const numberOfCodons = codonRatios.length;
-            const selectedColors = colorPalette.slice(0, numberOfCodons).reverse();
-
-            // 构建 `datasets`
-            codonRatios.forEach((ratio, index) => {
-                let dataset = datasets.find(d => d.label === ratio.codon);
-                if (!dataset) {
-                    dataset = {
-                        label: ratio.codon,
-                        backgroundColor: selectedColors[index], 
-                        data: Array(labels.length - 1).fill(0) // 填充已有氨基酸位置的 0
-                    };
-                    datasets.push(dataset);
-                }
-                dataset.data.push((totalCodons > 0 ? (ratio.fraction / totalCodons) * 100 : 0));
-            });
-
-            // 对剩下的 dataset 填充 0
-            datasets.forEach(dataset => {
-                if (dataset.data.length < labels.length) {
-                    dataset.data.push(0); 
-                }
-            });
+    // 将氨基酸单字母替换为三字母简写
+    let aminoAcids = Object.keys(codonUsage).map(acid => aminoAcidThreeLetterNames[acid]);
+    
+    let codonData = {};
+    for (const aminoAcid in codonUsage) {
+        for (const codon in codonUsage[aminoAcid]) {
+            if (!codonData[codon]) {
+                codonData[codon] = [];
+            }
         }
-    });
+    }
 
-    // 创建 Chart.js 图表
-    const chartInstance = new Chart(ctx, {
+    for (const aminoAcid in codonUsage) {
+        for (const codon in codonData) {
+            codonData[codon].push(codonUsage[aminoAcid][codon] || 0);
+        }
+    }
+
+    let datasets = [];
+    for (const codon in codonData) {
+        datasets.push({
+            label: codon,
+            data: codonData[codon],
+            backgroundColor: getRandomColor(),
+        });
+    }
+
+    ctx.canvas.height = 300;  // 设置高度为300px
+
+    new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: labels,  
-            datasets: datasets,  
+            labels: aminoAcids,  // 使用氨基酸三个字母缩写作为横坐标
+            datasets: datasets,
         },
         options: {
-            responsive: false,  // 启用响应式行为
-            maintainAspectRatio: false,
+            responsive: true,
             scales: {
                 x: {
-                    stacked: true, 
+                    stacked: true,
                 },
                 y: {
-                    stacked: true, 
+                    stacked: true,
                     beginAtZero: true,
-                    max: 100, 
+                    max: 100, // 设置最大值为100%
                     ticks: {
-                        callback: function(value) {
-                            return value + '%';  
+                        callback: function (value) {
+                            return value + '%';  // 添加百分号
                         }
                     }
                 }
             },
             plugins: {
                 legend: {
-                    display: false  
+                    display: false  // 隐藏图例
                 },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            let codon = context.dataset.label || '';  
-                            let value = context.raw || 0;  
-                            return codon + ': ' + value.toFixed(2) + '%';  
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            let value = context.raw || 0;
+                            return label + ': ' + value.toFixed(2) + '%';
                         }
                     }
                 }
             }
         }
     });
-    
+
     // 隐藏加载动画
     document.getElementById('loading-' + geneId).style.display = 'none';
-
-    return chartInstance;
 }
 
-// Store chart instances and loading states
-const charts = {};
-const isLoading = {};
-
-// Function to load chart when collapsible element is expanded
-function loadChart(geneId, dnaSequence, species) {
-    const iconElement = document.getElementById('icon-' + geneId);
-    const collapseElement = document.getElementById('collapseChart-' + geneId);
-
-    // Toggle the icon state when collapsed or expanded
-    collapseElement.addEventListener('shown.bs.collapse', function () {
-        iconElement.classList.remove('bi-caret-right');
-        iconElement.classList.add('bi-caret-down-fill');
-    });
-
-    collapseElement.addEventListener('hidden.bs.collapse', function () {
-        iconElement.classList.remove('bi-caret-down-fill');
-        iconElement.classList.add('bi-caret-right');
-    });
-
-    // Load the chart if it hasn't been loaded yet
-    if (!charts[geneId]) {
-        myFunction(geneId, dnaSequence, species);
+// 生成随机颜色的函数，用于每个密码子的背景颜色
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
     }
+    return color;
 }
 
-// Function to load the chart
-function myFunction(geneId, dnaSequence, species) {
-    // console.log('Loading chart for gene:', geneId);
-    // console.log('DNA Sequence:', dnaSequence);
-    // console.log('Species:', species);
+// 页面加载后为每个基因生成图表
+document.addEventListener('DOMContentLoaded', function () {
+    {% for gene in gene_list %}
+    (function() {
+        const geneId = "{{ gene.id }}";
+        const dnaSequence = "{{ gene.original_seq }}";
+        const codonUsage = countCodonUsage(dnaSequence);
+        
+        // 创建独立的图表
+        createCodonUsageChart(geneId, codonUsage);
+    })();
+    {% endfor %}
+});
 
-    const loadingIndicator = document.getElementById('loading-' + geneId);
-    const canvas = document.getElementById('codonUsageChart-' + geneId);
 
-    // Show loading animation
-    loadingIndicator.style.display = 'block';
 
-    // Prevent multiple loads
-    if (isLoading[geneId]) {
-        console.warn('Chart is already loading.');
-        return;
-    }
-    isLoading[geneId] = true;
 
-    // Destroy existing chart if it exists
-    if (charts[geneId]) {
-        charts[geneId].destroy();
-        charts[geneId] = null;
-    }
-
-    // Simulate loading delay (optional)
-    setTimeout(() => {
-        try {
-            charts[geneId] = createCodonUsageChart(dnaSequence, species, geneId);
-            // console.log('Chart created successfully:', charts[geneId]);
-        } catch (error) {
-            console.error('Error creating chart:', error);
-        } finally {
-            // Hide loading animation, show canvas
-            loadingIndicator.style.display = 'none';
-            canvas.style.display = 'block';
-            isLoading[geneId] = false;
-        }
-    }, 500); // 500ms delay simulating load
-}
-
-// 加载所有序列的图表
-function loadAllCharts() {
-    const allGenes = [
-        {% for gene in gene_list %}
-        {
-            id: '{{ gene.id }}',
-            original_seq: '{{ gene.original_seq|escapejs }}',
-            species: '{{ gene.species.species_name|default:"Human" }}'
-        },
-        {% endfor %}
-    ];
-    // console.log('All Genes:', allGenes);
-
-    // 遍历所有的基因信息，并调用 myFunction() 为每个序列加载图表
-    allGenes.forEach(gene => {
-        myFunction(gene.id, gene.original_seq, gene.species);  // 传递 gene.id 和 gene.original_seq
-
-        // 获取每个collapse元素并将其展开
-        const collapseElement = document.getElementById('collapseChart-' + gene.id);
-        const bsCollapse = new bootstrap.Collapse(collapseElement, {
-            toggle: false
-        });
-        bsCollapse.show();  // 手动展开
-    });
-}
 </script>
-
 {% endblock %}
 

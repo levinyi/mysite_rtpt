@@ -3,18 +3,28 @@
 {% load static %}
 {% block title %}Vector Manage{% endblock %}
 {% block extra_head %}
+<style>
+
+    .truncate {
+        display: inline-block;
+        max-width: 150px;  /* 限制宽度，可根据需求调整 */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;  /* 使用省略号显示截断 */
+    }
+</style>
 {% endblock %}
 {% block manage_content %}
-<div class="container-fluid pt-1">
+<div class="container-fluid pt-1" style="padding-right:50px;">
     <div class="card mt-4">
         <div class="card-header">
             <div class="row">
                 <div class="col-6">
-                    <h4><i class="bi bi-list-ul"></i> RootPath Vectors </h4>
+                    <h4><i class="bi bi-list-ul"></i> RootPath and Custmer Vectors (all) </h4>
                 </div>
                 <div class="col-6 text-end">
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
-                        <i class="bi bi-plus-circle-dotted me-2"></i>Add Vector
+                        <i class="bi bi-plus-circle-dotted me-2"></i>Add RootPath Vector
                     </button>
                 </div>
             </div>
@@ -47,7 +57,7 @@
     </div>
 </div>
 
-<!-- 上传文件模态框 -->
+<!-- 上传RootPath Vector 文件模态框 -->
 <div class="modal fade" id="uploadCsvModal" tabindex="-1" aria-labelledby="uploadCsvModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -78,9 +88,12 @@
 {% block javascript %}
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // 显示加载状态
+        showLoading();
         fetch("{% url 'super_manage:vector_data_api' %}")
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 new gridjs.Grid({
                     columns: [
                         { name: '#', width: '80px'},
@@ -145,11 +158,11 @@
                                 `);
                             }
                         },
-                        { name: 'Seq', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'NC5', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'NC3', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'iu20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
-                        { name: 'id20', formatter: (cell) => gridjs.html(`<span class="d-inline-block text-truncate" style="max-width: 100px;">${cell}</span>`) },
+                        { name: 'Seq', formatter: (cell, row) => editableCellFormatter(cell, row, 'vector_map')},
+                        { name: 'NC5', formatter: (cell, row) => editableCellFormatter(cell, row, 'NC5')},
+                        { name: 'NC3', formatter: (cell, row) => editableCellFormatter(cell, row, 'NC3')},
+                        { name: 'iu20', formatter: (cell, row) => editableCellFormatter(cell, row, 'iu20')},
+                        { name: 'id20', formatter: (cell, row) => editableCellFormatter(cell, row, 'id20')},
                     ],
                     data: data.data.map((vector, index) => [
                         index + 1,
@@ -185,8 +198,72 @@
                     }
                 }).render(document.getElementById('vector-table'));
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+            });
     });
+
+    function editableCellFormatter(cell, row, field) {
+        const vectorId = row.cells[2].data;
+        const isSeqField = field === 'vector_map';  // 检查是否为 Seq 列
+        
+        return gridjs.html(`
+            <span 
+                class="editable-field ${isSeqField ? 'truncate' : ''}" 
+                id="display-${field}-${vectorId}" 
+                title="${cell || ''}"  <!-- 设置悬停显示完整内容 -->
+                ${cell || ''}
+            </span>
+            <input type="text" id="input-${field}-${vectorId}" class="form-control d-none" value="${cell || ''}" style="max-width: 100px;" />
+            <a href="javascript:void(0);" onclick="editField('${vectorId}', '${field}')" title="Edit"><i class="bi bi-pencil-square text-primary"></i></a>
+            <a href="javascript:void(0);" onclick="saveEditedField('${vectorId}', '${field}')" id="save-${field}-${vectorId}" class="d-none" title="Save"><i class="bi bi-check-square text-success"></i></a>
+        `);
+    }
+
+    function editField(vectorId, field) {
+        document.getElementById(`display-${field}-${vectorId}`).classList.add('d-none');
+        document.getElementById(`input-${field}-${vectorId}`).classList.remove('d-none');
+        document.getElementById(`save-${field}-${vectorId}`).classList.remove('d-none');
+    }
+
+    function saveEditedField(vectorId, field) {
+        const inputElem = document.getElementById(`input-${field}-${vectorId}`);
+        const newValue = inputElem.value;
+        var csrftoken = getCookie('csrftoken');
+
+        showLoading();
+
+        $.ajax({
+            url: "{% url 'super_manage:vector_update_field' %}",
+            type: "POST",
+            data: {
+                'csrfmiddlewaretoken': csrftoken,
+                'vector_id': vectorId,
+                'field': field,
+                'value': newValue
+            },
+            success: function(response) {
+                hideLoading();
+                if (response.status === 'success') {
+                    alert('更新成功');
+                    document.getElementById(`display-${field}-${vectorId}`).innerText = newValue;
+                    document.getElementById(`display-${field}-${vectorId}`).classList.remove('d-none');
+                    inputElem.classList.add('d-none');
+                    document.getElementById(`save-${field}-${vectorId}`).classList.add('d-none');
+                } else {
+                    alert('更新失败: ' + response.message);
+                }
+            },
+            error: function(xhr, errmsg, err) {
+                hideLoading();
+                alert('更新失败');
+            }
+        });
+    }
+
+
+    
 
     // 删除Vector
     function del_gene(the, gene_id) {
@@ -345,6 +422,7 @@
         var modal = bootstrap.Modal.getInstance(document.getElementById('uploadCsvModal'));
         modal.hide();
     });
+
     // 获取CSRF token
     function getCookie(name) {
         var cookieValue = null;
