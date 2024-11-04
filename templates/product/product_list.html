@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Product list{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Product List</h5>
+            <table id="product_table" class="display" style="width:100%; display:none">
+                <thead>
+                    <tr>
+                        <th></th> <!-- For Select Checkboxes -->
+                        <th>#</th>
+                        <th>GeneName</th>
+                        <th>CCDS</th>
+                        <th>GeneID_NCBI</th>
+                        <th>ProteinID_NP</th>
+                        <th>TranscriptID</th>
+                        <th>NTSeq</th>
+                        <th>AASeq</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for gene in gene_list %}
+                    <tr data-gene-id="{{ gene.id }}"> 
+                        <td></td> <!-- DataTables will render checkboxes here -->
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ gene.GeneName }}</td>
+                        <td>{{ gene.CCDS }}</td>
+                        <td>{{ gene.GeneID_NCBI }}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate" style="display: block">{{ gene.ProteinID_NP }}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate">{{ gene.TranscriptID }}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate">{{ gene.FullSeqREAL }}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate">{{ gene.AASeq }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+    // Bulk Optimization Modal
+    $(document).ready(function() {
+        showLoading();
+
+        var selectAllState = false;
+
+        // Custom selectAll button
+        $.fn.dataTable.ext.buttons.selectAll = {
+            text: 'Select All',
+            action: function (e, dt, node, config) {
+                if (selectAllState) {
+                    dt.rows({ search: 'applied' }).deselect();
+                    node.text('Select All');
+                } else {
+                    dt.rows({ search: 'applied' }).select();
+                    node.text('Deselect All');
+                }
+                selectAllState = !selectAllState;
+            }
+        };
+
+        var table = $('#product_table').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                {
+                    extend: 'selectAll',
+                }
+            ],
+            select: {
+                style: 'multi+shift'
+            },
+            columnDefs: [{
+                orderable: false,
+                className: 'select-checkbox',
+                targets: 0
+            }],
+            order: [[ 1, 'asc' ]],
+            initComplete: function () {
+                hideLoading();
+                $('#product_table').show();
+            }
+        });
+    });
+</script>
+{% endblock %}

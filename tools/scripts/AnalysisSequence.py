@@ -85,9 +85,9 @@ class DNARepeatsFinder:
     
     def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=None, max_GC_threshold=None):
         if min_GC_threshold is not None and gc_content < min_GC_threshold:
-            penalty_score = round(abs(min_GC_threshold - gc_content + 1) / 10, 1)
+            penalty_score = round(abs(min_GC_threshold - gc_content + 1) /10, 1)
         elif max_GC_threshold is not None and gc_content > max_GC_threshold:
-            penalty_score = round(abs(gc_content - max_GC_threshold + 1) / 10, 1)
+            penalty_score = round(abs(gc_content - max_GC_threshold + 1) /10, 1)
         else:
             # 表示不在范围内
             penalty_score = 0
@@ -135,7 +135,7 @@ class DNARepeatsFinder:
 
         for repeat in repeats:
             repeat['length'] = len(repeat['sequence'])
-            repeat['gc_content'] = GC(repeat['sequence'])
+            repeat['gc_content'] = GC(repeat['sequence'])*100
             repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
 
         return repeats
@@ -198,7 +198,7 @@ class DNARepeatsFinder:
                         'sequence': seq,
                         'start': matches,
                         'end': [match + len(seq) - 1 for match in matches],
-                        'gc_content': GC(seq),
+                        'gc_content': GC(seq)*100,
                         'length': len(seq),
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
@@ -258,7 +258,7 @@ class DNARepeatsFinder:
                 merged_palindromes[-1]['end'] = new_end
                 merged_palindromes[-1]['sequence'] = s[merged_palindromes[-1]['start']:new_end + 1]
                 merged_palindromes[-1]['length'] = new_end - merged_palindromes[-1]['start'] + 1
-                merged_palindromes[-1]['gc_content'] = GC(merged_palindromes[-1]['sequence'])
+                merged_palindromes[-1]['gc_content'] = GC(merged_palindromes[-1]['sequence'])*100
                 merged_palindromes[-1]['penalty_score'] = self.calculate_palindrome_repeats_penalty_score(merged_palindromes[-1]['length'])
             else:
                 merged_palindromes.append(palindrome)
@@ -365,7 +365,7 @@ class DNARepeatsFinder:
 
         n = len(s)
         if n < window_size:
-            gc_content = GC(s)
+            gc_content = GC(s) * 100
             if gc_content > max_GC_content:
                 return [{
                     'length': n,

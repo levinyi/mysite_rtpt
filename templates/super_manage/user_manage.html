@@ -12,9 +12,11 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    showLoading();
     fetch("{% url 'super_manage:user_data_api' %}")
         .then(response => response.json())
         .then(data => {
+            hideLoading();
             const grid = new gridjs.Grid({
                 columns: [
                     { name: '#' },
@@ -91,7 +93,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
             grid.render(document.getElementById('user-table'));
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => {
+            hideLoading();
+            console.error('Error:', error);
+        });
 });
 
 

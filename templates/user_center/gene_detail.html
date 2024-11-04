@@ -3,64 +3,61 @@
 {% load custom_filters %}
 {% block title %}Edit sequences{% endblock %}
 {% block extra_head %}
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.min.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.7.1/css/buttons.dataTables.min.css">
-<style>
-    .small-dropdown-menu {
-        --bs-dropdown-min-width:10px;
-        --bs-dropdown-padding-y:0px;
-    }
-    .small-dropdown-item {
-        padding:4px;
-    }
-    .small-dropdown-item:hover {
-      background-color: rgba(5, 109, 232, 0.1);
-    }
-    .codon {
-        border: 1px dashed black;
-        display: inline-block;
-        margin-right: -1px;
-    }
-    .fixed-right {
-        position: fixed;
-        right: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        background-color: #f0f0f0; /* 调整背景颜色 */
-        border-radius: 10px 0 0 10px; /* 半圆形的边缘 */
-    }
-    .action-inner {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 10px;
-    }
-    .bi-exclamation-circle {
-        font-size: 2rem;
-        color: #dc3545;
-    }
-    .action-text {
-        font-size: 0.8rem;
-        color: #dc3545;
-    }
-    .fixed-right:hover {
-        background-color: #e0e0e0;
-        cursor: pointer;
-    }
-    .danger { background-color: red; }
-    .warning { background-color: yellow; }
-    .row {
-        display: flex;
-        flex-wrap: wrap;
-    }
-    .col-md-3 {
-        display: flex;
-    }
-    .card {
-        flex: 1;
-    }
-</style>
+    <style>
+        .small-dropdown-menu {
+            --bs-dropdown-min-width:10px;
+            --bs-dropdown-padding-y:0px;
+        }
+        .small-dropdown-item {
+            padding:4px;
+        }
+        .small-dropdown-item:hover {
+        background-color: rgba(5, 109, 232, 0.1);
+        }
+        .codon {
+            border: 1px dashed black;
+            display: inline-block;
+            margin-right: -1px;
+        }
+        .fixed-right {
+            position: fixed;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #f0f0f0; /* 调整背景颜色 */
+            border-radius: 10px 0 0 10px; /* 半圆形的边缘 */
+        }
+        .action-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+        .bi-exclamation-circle {
+            font-size: 2rem;
+            color: #dc3545;
+        }
+        .action-text {
+            font-size: 0.8rem;
+            color: #dc3545;
+        }
+        .fixed-right:hover {
+            background-color: #e0e0e0;
+            cursor: pointer;
+        }
+        .danger { background-color: red; }
+        .warning { background-color: yellow; }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .col-md-3 {
+            display: flex;
+        }
+        .card {
+            flex: 1;
+        }
+    </style>
 {% endblock %}
 {% block content %}
 
@@ -1037,271 +1034,270 @@
         }
     });
 </script>
-
 <script>
-// 定义遗传密码表，将密码子映射为氨基酸
-const codonTable = {
-    'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
-    'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
-    'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
-    'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',
-    'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
-    'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
-    'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
-    'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
-    'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
-    'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
-    'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
-    'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
-    'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
-    'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
-    'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
-    'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
-};
+    // 定义遗传密码表，将密码子映射为氨基酸
+    const codonTable = {
+        'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
+        'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
+        'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
+        'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',
+        'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
+        'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
+        'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
+        'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
+        'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
+        'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
+        'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
+        'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
+        'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
+        'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
+        'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
+        'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
+    };
 
-// 固定颜色顺序，从高到低的颜色依次为（绿色->蓝色->黄色->橙色->粉色->红色）：
-const colorPalette = ['#70AC48', '#5A9AD7', '#FFC100', '#ED7D31', '#FF00FE', '#FE0000'];
+    // 固定颜色顺序，从高到低的颜色依次为（绿色->蓝色->黄色->橙色->粉色->红色）：
+    const colorPalette = ['#70AC48', '#5A9AD7', '#FFC100', '#ED7D31', '#FF00FE', '#FE0000'];
 
-// 定义横坐标氨基酸顺序
-const aminoAcidOrder = [
-    "H (His)", "S (Ser)", "G (Gly)", "M (Met)", "I (Ile)", "T (Thr)", "A (Ala)", "L (Leu)",
-    "R (Arg)", "D (Asp)", "W (Trp)", "K (Lys)", "V (Val)", "F (Phe)", "P (Pro)", "N (Asn)", 
-    "Q (Gln)", "Y (Tyr)", "E (Glu)", "C (Cys)", "* (Stop)"
-];
-
-// 定义氨基酸单字母简写到三字母简写的映射表
-const aminoAcidThreeLetterNames = {
-    'H': 'H (His)', 'S': 'S (Ser)', 'G': 'G (Gly)', 'M': 'M (Met)', 'I': 'I (Ile)',
-    'T': 'T (Thr)', 'A': 'A (Ala)', 'L': 'L (Leu)', 'R': 'R (Arg)', 'D': 'D (Asp)',
-    'W': 'W (Trp)', 'K': 'K (Lys)', 'V': 'V (Val)', 'F': 'F (Phe)', 'P': 'P (Pro)',
-    'N': 'N (Asn)', 'Q': 'Q (Gln)', 'Y': 'Y (Tyr)', 'E': 'E (Glu)', 'C': 'C (Cys)',
-    '*': '* (Stop)'
-};
-
-// 计算DNA序列中的密码子使用次数
-function countCodonsInSequence(dnaSequence) {
-    let codonCounts = {};
-    for (let i = 0; i < dnaSequence.length; i += 3) {
-        const codon = dnaSequence.slice(i, i + 3);
-        const aminoAcid = codonTable[codon];
-        if (aminoAcid) {
-            if (!codonCounts[aminoAcid]) {
-                codonCounts[aminoAcid] = {};
-            }
-            codonCounts[aminoAcid][codon] = (codonCounts[aminoAcid][codon] || 0) + 1;
-        }
-    }
-    return codonCounts;
-}
-
-
-function createCodonUsageChart(dnaSequence, species, geneId) {
-    const canvas = document.getElementById('codonUsageChart-' + geneId);
-    
-    // Set the canvas width and height attributes
-    canvas.width = canvas.parentElement.offsetWidth; // Set width to parent container's width
-    canvas.height = 300;  // Fixed height in pixels
-
-    const ctx = canvas.getContext('2d');
-
-    // 获取DNA序列中的密码子使用次数
-    const codonCounts = countCodonsInSequence(dnaSequence); 
-    const codonUsageData = aminoAcid[species]; 
-
-    let datasets = []; // 用于存储每个密码子的 `dataset`
-    let labels = [];   // 用于存储每个氨基酸的标签
-
-    // 遍历固定顺序的氨基酸列表
-    aminoAcidOrder.forEach(threeLetterAminoAcid => {
-        const aminoAcid = Object.keys(aminoAcidThreeLetterNames).find(key => aminoAcidThreeLetterNames[key] === threeLetterAminoAcid);
-
-        if (codonUsageData[aminoAcid]) {
-            let totalCodons = 0;
-            
-            // 获取该氨基酸的每个密码子的真实使用数据
-            let codonRatios = codonUsageData[aminoAcid].map(item => {
-                const realCount = codonCounts[aminoAcid] && codonCounts[aminoAcid][item.Triplet] ? codonCounts[aminoAcid][item.Triplet] : 0;
-                totalCodons += realCount;
-                return {
-                    codon: item.Triplet,
-                    fraction: realCount,  // 实际使用次数
-                    frequency: item.Fraction  // 用于颜色排序
-                };
-            });
-
-            // 对 codonRatios 进行排序
-            codonRatios.sort((a, b) => b.frequency - a.frequency).reverse();
-
-            // 将该氨基酸的标签添加到 X 轴标签中
-            labels.push(aminoAcidThreeLetterNames[aminoAcid]);
-
-            // 颜色分配
-            const numberOfCodons = codonRatios.length;
-            const selectedColors = colorPalette.slice(0, numberOfCodons).reverse();
-
-            // 构建 `datasets`
-            codonRatios.forEach((ratio, index) => {
-                let dataset = datasets.find(d => d.label === ratio.codon);
-                if (!dataset) {
-                    dataset = {
-                        label: ratio.codon,
-                        backgroundColor: selectedColors[index], 
-                        data: Array(labels.length - 1).fill(0) // 填充已有氨基酸位置的 0
-                    };
-                    datasets.push(dataset);
-                }
-                dataset.data.push((totalCodons > 0 ? (ratio.fraction / totalCodons) * 100 : 0));
-            });
-
-            // 对剩下的 dataset 填充 0
-            datasets.forEach(dataset => {
-                if (dataset.data.length < labels.length) {
-                    dataset.data.push(0); 
-                }
-            });
-        }
-    });
-
-    // 创建 Chart.js 图表
-    const chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,  
-            datasets: datasets,  
-        },
-        options: {
-            responsive: false,  // 启用响应式行为
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    stacked: true, 
-                },
-                y: {
-                    stacked: true, 
-                    beginAtZero: true,
-                    max: 100, 
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';  
-                        }
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false  
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let codon = context.dataset.label || '';  
-                            let value = context.raw || 0;  
-                            return codon + ': ' + value.toFixed(2) + '%';  
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // 隐藏加载动画
-    document.getElementById('loading-' + geneId).style.display = 'none';
-
-    return chartInstance;
-}
-
-// Store chart instances and loading states
-const charts = {};
-const isLoading = {};
-
-// Function to load chart when collapsible element is expanded
-function loadChart(geneId, dnaSequence, species) {
-    const iconElement = document.getElementById('icon-' + geneId);
-    const collapseElement = document.getElementById('collapseChart-' + geneId);
-
-    // Toggle the icon state when collapsed or expanded
-    collapseElement.addEventListener('shown.bs.collapse', function () {
-        iconElement.classList.remove('bi-caret-right');
-        iconElement.classList.add('bi-caret-down-fill');
-    });
-
-    collapseElement.addEventListener('hidden.bs.collapse', function () {
-        iconElement.classList.remove('bi-caret-down-fill');
-        iconElement.classList.add('bi-caret-right');
-    });
-
-    // Load the chart if it hasn't been loaded yet
-    if (!charts[geneId]) {
-        myFunction(geneId, dnaSequence, species);
-    }
-}
-
-// Function to load the chart
-function myFunction(geneId, dnaSequence, species) {
-    // console.log('Loading chart for gene:', geneId);
-    // console.log('DNA Sequence:', dnaSequence);
-    // console.log('Species:', species);
-
-    const loadingIndicator = document.getElementById('loading-' + geneId);
-    const canvas = document.getElementById('codonUsageChart-' + geneId);
-
-    // Show loading animation
-    loadingIndicator.style.display = 'block';
-
-    // Prevent multiple loads
-    if (isLoading[geneId]) {
-        console.warn('Chart is already loading.');
-        return;
-    }
-    isLoading[geneId] = true;
-
-    // Destroy existing chart if it exists
-    if (charts[geneId]) {
-        charts[geneId].destroy();
-        charts[geneId] = null;
-    }
-
-    // Simulate loading delay (optional)
-    setTimeout(() => {
-        try {
-            charts[geneId] = createCodonUsageChart(dnaSequence, species, geneId);
-            // console.log('Chart created successfully:', charts[geneId]);
-        } catch (error) {
-            console.error('Error creating chart:', error);
-        } finally {
-            // Hide loading animation, show canvas
-            loadingIndicator.style.display = 'none';
-            canvas.style.display = 'block';
-            isLoading[geneId] = false;
-        }
-    }, 500); // 500ms delay simulating load
-}
-
-// 加载所有序列的图表
-function loadAllCharts() {
-    const allGenes = [
-        {% for gene in gene_list %}
-        {
-            id: '{{ gene.id }}',
-            original_seq: '{{ gene.original_seq|escapejs }}',
-            species: '{{ gene.species.species_name|default:"Human" }}'
-        },
-        {% endfor %}
+    // 定义横坐标氨基酸顺序
+    const aminoAcidOrder = [
+        "H (His)", "S (Ser)", "G (Gly)", "M (Met)", "I (Ile)", "T (Thr)", "A (Ala)", "L (Leu)",
+        "R (Arg)", "D (Asp)", "W (Trp)", "K (Lys)", "V (Val)", "F (Phe)", "P (Pro)", "N (Asn)", 
+        "Q (Gln)", "Y (Tyr)", "E (Glu)", "C (Cys)", "* (Stop)"
     ];
-    // console.log('All Genes:', allGenes);
 
-    // 遍历所有的基因信息，并调用 myFunction() 为每个序列加载图表
-    allGenes.forEach(gene => {
-        myFunction(gene.id, gene.original_seq, gene.species);  // 传递 gene.id 和 gene.original_seq
+    // 定义氨基酸单字母简写到三字母简写的映射表
+    const aminoAcidThreeLetterNames = {
+        'H': 'H (His)', 'S': 'S (Ser)', 'G': 'G (Gly)', 'M': 'M (Met)', 'I': 'I (Ile)',
+        'T': 'T (Thr)', 'A': 'A (Ala)', 'L': 'L (Leu)', 'R': 'R (Arg)', 'D': 'D (Asp)',
+        'W': 'W (Trp)', 'K': 'K (Lys)', 'V': 'V (Val)', 'F': 'F (Phe)', 'P': 'P (Pro)',
+        'N': 'N (Asn)', 'Q': 'Q (Gln)', 'Y': 'Y (Tyr)', 'E': 'E (Glu)', 'C': 'C (Cys)',
+        '*': '* (Stop)'
+    };
 
-        // 获取每个collapse元素并将其展开
-        const collapseElement = document.getElementById('collapseChart-' + gene.id);
-        const bsCollapse = new bootstrap.Collapse(collapseElement, {
-            toggle: false
+    // 计算DNA序列中的密码子使用次数
+    function countCodonsInSequence(dnaSequence) {
+        let codonCounts = {};
+        for (let i = 0; i < dnaSequence.length; i += 3) {
+            const codon = dnaSequence.slice(i, i + 3);
+            const aminoAcid = codonTable[codon];
+            if (aminoAcid) {
+                if (!codonCounts[aminoAcid]) {
+                    codonCounts[aminoAcid] = {};
+                }
+                codonCounts[aminoAcid][codon] = (codonCounts[aminoAcid][codon] || 0) + 1;
+            }
+        }
+        return codonCounts;
+    }
+
+
+    function createCodonUsageChart(dnaSequence, species, geneId) {
+        const canvas = document.getElementById('codonUsageChart-' + geneId);
+        
+        // Set the canvas width and height attributes
+        canvas.width = canvas.parentElement.offsetWidth; // Set width to parent container's width
+        canvas.height = 300;  // Fixed height in pixels
+
+        const ctx = canvas.getContext('2d');
+
+        // 获取DNA序列中的密码子使用次数
+        const codonCounts = countCodonsInSequence(dnaSequence); 
+        const codonUsageData = aminoAcid[species]; 
+
+        let datasets = []; // 用于存储每个密码子的 `dataset`
+        let labels = [];   // 用于存储每个氨基酸的标签
+
+        // 遍历固定顺序的氨基酸列表
+        aminoAcidOrder.forEach(threeLetterAminoAcid => {
+            const aminoAcid = Object.keys(aminoAcidThreeLetterNames).find(key => aminoAcidThreeLetterNames[key] === threeLetterAminoAcid);
+
+            if (codonUsageData[aminoAcid]) {
+                let totalCodons = 0;
+                
+                // 获取该氨基酸的每个密码子的真实使用数据
+                let codonRatios = codonUsageData[aminoAcid].map(item => {
+                    const realCount = codonCounts[aminoAcid] && codonCounts[aminoAcid][item.Triplet] ? codonCounts[aminoAcid][item.Triplet] : 0;
+                    totalCodons += realCount;
+                    return {
+                        codon: item.Triplet,
+                        fraction: realCount,  // 实际使用次数
+                        frequency: item.Fraction  // 用于颜色排序
+                    };
+                });
+
+                // 对 codonRatios 进行排序
+                codonRatios.sort((a, b) => b.frequency - a.frequency).reverse();
+
+                // 将该氨基酸的标签添加到 X 轴标签中
+                labels.push(aminoAcidThreeLetterNames[aminoAcid]);
+
+                // 颜色分配
+                const numberOfCodons = codonRatios.length;
+                const selectedColors = colorPalette.slice(0, numberOfCodons).reverse();
+
+                // 构建 `datasets`
+                codonRatios.forEach((ratio, index) => {
+                    let dataset = datasets.find(d => d.label === ratio.codon);
+                    if (!dataset) {
+                        dataset = {
+                            label: ratio.codon,
+                            backgroundColor: selectedColors[index], 
+                            data: Array(labels.length - 1).fill(0) // 填充已有氨基酸位置的 0
+                        };
+                        datasets.push(dataset);
+                    }
+                    dataset.data.push((totalCodons > 0 ? (ratio.fraction / totalCodons) * 100 : 0));
+                });
+
+                // 对剩下的 dataset 填充 0
+                datasets.forEach(dataset => {
+                    if (dataset.data.length < labels.length) {
+                        dataset.data.push(0); 
+                    }
+                });
+            }
         });
-        bsCollapse.show();  // 手动展开
-    });
-}
+
+        // 创建 Chart.js 图表
+        const chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,  
+                datasets: datasets,  
+            },
+            options: {
+                responsive: false,  // 启用响应式行为
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true, 
+                    },
+                    y: {
+                        stacked: true, 
+                        beginAtZero: true,
+                        max: 100, 
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';  
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false  
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let codon = context.dataset.label || '';  
+                                let value = context.raw || 0;  
+                                return codon + ': ' + value.toFixed(2) + '%';  
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // 隐藏加载动画
+        document.getElementById('loading-' + geneId).style.display = 'none';
+
+        return chartInstance;
+    }
+
+    // Store chart instances and loading states
+    const charts = {};
+    const isLoading = {};
+
+    // Function to load chart when collapsible element is expanded
+    function loadChart(geneId, dnaSequence, species) {
+        const iconElement = document.getElementById('icon-' + geneId);
+        const collapseElement = document.getElementById('collapseChart-' + geneId);
+
+        // Toggle the icon state when collapsed or expanded
+        collapseElement.addEventListener('shown.bs.collapse', function () {
+            iconElement.classList.remove('bi-caret-right');
+            iconElement.classList.add('bi-caret-down-fill');
+        });
+
+        collapseElement.addEventListener('hidden.bs.collapse', function () {
+            iconElement.classList.remove('bi-caret-down-fill');
+            iconElement.classList.add('bi-caret-right');
+        });
+
+        // Load the chart if it hasn't been loaded yet
+        if (!charts[geneId]) {
+            myFunction(geneId, dnaSequence, species);
+        }
+    }
+
+    // Function to load the chart
+    function myFunction(geneId, dnaSequence, species) {
+        // console.log('Loading chart for gene:', geneId);
+        // console.log('DNA Sequence:', dnaSequence);
+        // console.log('Species:', species);
+
+        const loadingIndicator = document.getElementById('loading-' + geneId);
+        const canvas = document.getElementById('codonUsageChart-' + geneId);
+
+        // Show loading animation
+        loadingIndicator.style.display = 'block';
+
+        // Prevent multiple loads
+        if (isLoading[geneId]) {
+            console.warn('Chart is already loading.');
+            return;
+        }
+        isLoading[geneId] = true;
+
+        // Destroy existing chart if it exists
+        if (charts[geneId]) {
+            charts[geneId].destroy();
+            charts[geneId] = null;
+        }
+
+        // Simulate loading delay (optional)
+        setTimeout(() => {
+            try {
+                charts[geneId] = createCodonUsageChart(dnaSequence, species, geneId);
+                // console.log('Chart created successfully:', charts[geneId]);
+            } catch (error) {
+                console.error('Error creating chart:', error);
+            } finally {
+                // Hide loading animation, show canvas
+                loadingIndicator.style.display = 'none';
+                canvas.style.display = 'block';
+                isLoading[geneId] = false;
+            }
+        }, 500); // 500ms delay simulating load
+    }
+
+    // 加载所有序列的图表
+    function loadAllCharts() {
+        const allGenes = [
+            {% for gene in gene_list %}
+            {
+                id: '{{ gene.id }}',
+                original_seq: '{{ gene.original_seq|escapejs }}',
+                species: '{{ gene.species.species_name|default:"Human" }}'
+            },
+            {% endfor %}
+        ];
+        // console.log('All Genes:', allGenes);
+
+        // 遍历所有的基因信息，并调用 myFunction() 为每个序列加载图表
+        allGenes.forEach(gene => {
+            myFunction(gene.id, gene.original_seq, gene.species);  // 传递 gene.id 和 gene.original_seq
+
+            // 获取每个collapse元素并将其展开
+            const collapseElement = document.getElementById('collapseChart-' + gene.id);
+            const bsCollapse = new bootstrap.Collapse(collapseElement, {
+                toggle: false
+            });
+            bsCollapse.show();  // 手动展开
+        });
+    }
 </script>
 
 {% endblock %}

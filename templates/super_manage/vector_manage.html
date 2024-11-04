@@ -99,10 +99,9 @@
                         { name: '#', width: '80px'},
                         { name: 'User', width: '120px', formatter: (cell) => cell ? cell : 'RootPath' },
                         { name: 'id', hidden: true },
-                        { name: 'ID', width: '200px'},
-                        { name: 'Name' },
-                        { 
-                            name: 'Vector File', width: '200px',
+                        { name: 'ID', width: '200px', formatter: (cell, row) => editableCellFormatter(cell, row, 'vector_id')},
+                        { name: 'Name', width: '200px', formatter: (cell, row) => editableCellFormatter(cell, row, 'vector_name')},
+                        { name: 'Vector File', width: '200px',
                             formatter: (cell, row) => {
                                 const vectorId = row.cells[2].data;
                                 return gridjs.html(`
@@ -112,8 +111,7 @@
                                 `);
                             }
                         },
-                        { 
-                            name: 'Vector_png', width: '200px',
+                        { name: 'Vector_png', width: '200px',
                             formatter: (cell, row) => {
                                 const vectorId = row.cells[2].data;
                                 return gridjs.html(`
@@ -123,8 +121,7 @@
                                 `);
                             }
                         },
-                        { 
-                            name: 'Vector_GB', 
+                        { name: 'Vector_GB', 
                             formatter: (cell, row) => {
                                 const vectorId = row.cells[2].data;
                                 return gridjs.html(`
@@ -134,15 +131,13 @@
                                 `);
                             }
                         },
-                        { 
-                            name: 'Status', 
+                        { name: 'Status', 
                             formatter: (cell, row) => {
                                 const badgeClass = cell === 'ReadyToUse' ? 'bg-primary' : 'bg-info';
                                 return gridjs.html(`<span class="badge ${badgeClass}">${cell}</span>`);
                             }
                         },
-                        { 
-                            name: 'Edit', 
+                        { name: 'Edit', 
                             formatter: (cell, row) => {
                                 const vectorId = row.cells[2].data;
                                 return gridjs.html(`
@@ -261,9 +256,6 @@
             }
         });
     }
-
-
-    
 
     // 删除Vector
     function del_gene(the, gene_id) {

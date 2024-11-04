@@ -8,4 +8,7 @@ urlpatterns = [
     # for species
     path('upload_species_codon_file/', views.upload_species_codon_file, name='upload_species_codon_file'),
     path('species_delete/', views.species_delete, name='species_delete'),
+
+    # for product
+    path('product_list/', views.product_list, name='product_list'),
 ]

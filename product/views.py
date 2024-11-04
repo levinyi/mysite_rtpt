@@ -142,3 +142,12 @@ def species_delete(request):
         return JsonResponse({'status': 'success', 'message': 'Species deleted Successfully'})
     else:
         return JsonResponse({'status': 'failed', 'message': 'Not A Post Request.'})
+
+def product_list(request):
+    # read excel file to get gene list, convert to json
+    gene_file = os.path.join(BASE_DIR, 'static', 'files', 'Human_TF_1774_Genes_20241104.For.DataBase.csv')
+    gene_df = pd.read_csv(gene_file)
+    gene_list = gene_df.to_dict(orient='records')
+
+    # print(gene_list)
+    return render(request, 'product/product_list.html', context={'gene_list': gene_list})

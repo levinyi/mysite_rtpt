@@ -14,9 +14,11 @@
 {% block javascript %}
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        showLoading();
         fetch("{% url 'super_manage:order_data_api' %}")
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 new gridjs.Grid({
                     columns: [
                         { name: '#' },
@@ -81,7 +83,10 @@
                     }
                 }).render(document.getElementById('order-table'));
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+            });
     });
 </script>
 {% endblock %}

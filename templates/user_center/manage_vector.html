@@ -135,9 +135,11 @@
 {% block javascript %}
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        showLoading();
         fetch("{% url 'user_center:customer_vector_data_api' %}")
         .then(response => response.json())
         .then(data => {
+            hideLoading();
             new gridjs.Grid({
                 columns: [
                     { name: '#', width: '50px' },
@@ -209,11 +211,11 @@
                 }
             }).render(document.getElementById("customer-vector-table"));
         });
-
-
+        showLoading();
         fetch("{% url 'user_center:rootpath_vector_data_api' %}")
         .then(response => response.json())
         .then(data => {
+            hideLoading();
             new gridjs.Grid({
                 columns: [
                     { name: '#', width: '80px'},
