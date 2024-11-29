@@ -68,7 +68,7 @@ def readGenBank(genebank_file):
     return record
 
 
-def addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_feature, end_feature, new_feature_name):
+def addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_feature_label, end_feature_label, new_feature_name):
     record = readGenBank(genebank_file)
     new_seq_length = len(new_sequence)
     
@@ -76,20 +76,18 @@ def addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_featur
     end_pos = None
     
     for feature in record.features:
-        print(feature)
-        if feature.qualifiers.get("label") == [start_feature]:
+        labels = feature.qualifiers.get("label", [])
+        if start_feature_label in labels:
             start_pos = feature.location.end
-            print("start_pos: ", start_pos)
-        elif feature.qualifiers.get("label") == [end_feature]:
+        elif end_feature_label in labels:
             end_pos = feature.location.start
-            print("end pos: ", end_pos)
     
     if start_pos is None or end_pos is None:
         raise ValueError("Start or end feature not found in the GenBank file")
     
     # Replace the sequence
     record.seq = record.seq[:start_pos] + Seq(new_sequence) + record.seq[end_pos:]
-    print(record.seq)
+    
     # Modify locations of existing features
     modify_locations(record.features, start_pos, end_pos, new_seq_length)
     
@@ -102,20 +100,12 @@ def addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_featur
         SeqIO.write(record, output_handle, "genbank")
 
 
-def extractFeatureSequenceFromGenBank(genebank_file, feature_label):
-    record = readGenBank(genebank_file)
-    for feature in record.features:
-        if feature.qualifiers.get("label") == [feature_label]:
-            return feature.location.extract(record.seq)
-    raise ValueError("Feature not found in the GenBank file")
-
-
 if __name__ == "__main__":
     genebank_file = sys.argv[1] # full path
     new_sequence = sys.argv[2] # sequence
     output_file = sys.argv[3]  # full path
-    start_feature = sys.argv[4] # start feature label
-    end_feature = sys.argv[5] # end feature label
+    start_feature_label = sys.argv[4] # start feature label
+    end_feature_label = sys.argv[5] # end feature label
     new_feature_name = sys.argv[6] # new feature name
 
-    addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_feature, end_feature, new_feature_name)
+    addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_feature_label, end_feature_label, new_feature_name)

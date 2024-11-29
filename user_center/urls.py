@@ -17,6 +17,7 @@ urlpatterns = [
     path('gene_validation/', views.gene_validation, name='gene_validation'),
     path('bulk_optimization_submit/', views.bulk_optimization_submit, name='bulk_optimization_submit'),
     path('bulk_optimization_display/', views.bulk_optimization_display, name='bulk_optimization_display'),
+    path('condon_optimization_api/', views.condon_optimization_api, name='condon_optimization_api'),
 
     # shopping cart
     path('view_cart/', views.view_cart, name='view_cart'),
@@ -42,5 +43,7 @@ urlpatterns = [
     path('validation_save/<int:id>/', views.validation_save, name='validation_save'),
     path('vector_download/<int:vector_id>/<str:file_type>/', views.vector_download, name='vector_download'),
 
+    # api
+    path('api/generate-genbank/', views.generate_genbank, name='generate_genbank'),
     path('test/', views.test, name='test'),
 ]

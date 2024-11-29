@@ -28,7 +28,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = ['*']
 CORS_ORIGIN_ALLOW_ALL = True
-CSRF_TRUSTED_ORIGINS = ['http://example.com']
+CSRF_TRUSTED_ORIGINS = ['https://www.rootpath.com.cn']
 
 # Application definition
 

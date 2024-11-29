@@ -1,7 +1,9 @@
 import sys
+import os
 import joblib
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
@@ -11,11 +13,15 @@ from sklearn.metrics import accuracy_score, confusion_matrix, recall_score
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
+# 获取脚本路径
+script_path = os.path.dirname(os.path.abspath(__file__))
+print(script_path)
+
 def main(data, index):
     # 提取特征和标签
     X = data[['HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score', 
             'LongRepeats_penalty_score', 'Homopolymers_penalty_score', 'DoubleNT_penalty_score',
-            'LCC', 'Total_Length'
+            'LCC'
             ]]
     y = data['MTP_Results']
 
@@ -26,17 +32,23 @@ def main(data, index):
 
     # 标准化特征
     '''
-    在机器学习中，是否需要标准化特征数据取决于您使用的模型类型。对于 RandomForestClassifier 这样的基于树的模型，标准化并不是严格必要的，因为随机森林不依赖于特征的尺度或分布。但是，对于一些基于距离的模型（如线性回归、逻辑回归、支持向量机、k近邻算法等），标准化是非常重要的。
+    在机器学习中，是否需要标准化特征数据取决于使用的模型类型。
+    对于 RandomForestClassifier 这样的基于树的模型，标准化并不是严格必要的，因为随机森林不依赖于特征的尺度或分布。
+    但是，对于一些基于距离的模型（如线性回归、逻辑回归、支持向量机、k近邻算法等），标准化是非常重要的。
     尽管如此，标准化特征数据仍然有一些好处：
     对比特征重要性：标准化后可以更直观地对比不同特征的重要性。
     处理具有不同量纲的特征：如果您的数据集中有一些特征的量纲差异很大，标准化可以防止这些特征对模型产生不均衡的影响。
+    '''
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    '''
 
     # 划分训练集和测试集
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=RANDOM_SEED)
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=RANDOM_SEED)
+
+    # save the scaler for prediction use.
+    joblib.dump(scaler, os.path.join(script_path, f'scaler_{index}.pkl'))
 
     # 随机森林超参数调优
     rf_param_dist = {
@@ -45,16 +57,9 @@ def main(data, index):
         'min_samples_split': [2, 5, 10],
         'min_samples_leaf': [1, 2, 4]
     }
-    # 随机森林超参数调优
-    # rf_param_dist = {
-    #     'n_estimators': [200, 500],  # 增加树的数量来提高模型的稳定性
-    #     'max_depth': [None, 30, 50],  # 增加树的深度来允许更复杂的模型
-    #     'min_samples_split': [2, 5],  # 减少分裂节点所需的最小样本数
-    #     'min_samples_leaf': [1, 2],  # 减少叶节点所需的最小样本数
-    #     'max_features': [None, 'sqrt', 'log2']  # 调整每棵树的最大特征数量
-    # }
 
-    # 使用 RandomizedSearchCV 来在给定的超参数范围内随机搜索最佳的超参数组合，然后用这些超参数训练一个 RandomForestClassifier。
+    # 使用 RandomizedSearchCV 来在给定的超参数范围内随机搜索最佳的超参数组合，
+    # 然后用这些超参数训练一个 RandomForestClassifier。
     rf_random_search = RandomizedSearchCV(
         RandomForestClassifier(random_state=RANDOM_SEED),
         rf_param_dist,
@@ -74,7 +79,8 @@ def main(data, index):
             使用 3 折交叉验证 (cv=3) 评估每组超参数组合的性能。
             使用 accuracy 作为评估标准 (scoring='accuracy')。
             在评估过程中，所有的随机性由 random_state=RANDOM_SEED 控制，以确保结果的可重复性。
-            最终，RandomizedSearchCV 将选择性能最好的那组超参数，并返回对应的 RandomForestClassifier 模型。这个模型就是 rf_random_search.best_estimator_，即 best_rf_model。
+            最终，RandomizedSearchCV 将选择性能最好的那组超参数，并返回对应的 RandomForestClassifier 模型。
+        这个模型就是 rf_random_search.best_estimator_，即 best_rf_model。
     '''
     rf_random_search.fit(X_train, y_train)
 
@@ -84,10 +90,9 @@ def main(data, index):
 
     # 保存模型和标准化器和权重
     best_rf_weights = best_rf_model.feature_importances_
-    joblib.dump(best_rf_model, f'best_rf_model_{index}.pkl')
-    np.save(f'best_rf_weights_{index}.npy', best_rf_weights)
-    print("weights file saved: ", f'best_rf_weights_{index}.npy')
-    print("model file saved: ", f'best_rf_model_{index}.pkl')
+    joblib.dump(best_rf_model, os.path.join(script_path, f'best_rf_model_{index}.pkl'))
+    np.save(os.path.join(script_path, f'best_rf_weights_{index}.npy'), best_rf_weights)
+
 
     # 计算混淆矩阵和其他指标
     predictions = best_rf_model.predict(X)
@@ -100,14 +105,14 @@ def main(data, index):
         specificity = tn / (tn + fp)
         accuracy = accuracy_score(y, predictions)
         false_positive_rate = fp / (fp + tn)
-        best_rf_weights = "\t".join([str(weight) for weight in best_rf_weights])
+        best_rf_weights = "\t".join([f"{weight:.4f}" for weight in best_rf_weights])
         print(f"{best_rf_accuracy:.4f}\t{best_rf_weights}\t{tn}\t{fp}\t{fn}\t{tp}\t{sensitivity:.4f}\t{specificity:.4f}\t{accuracy:.4f}\t{false_positive_rate:.4f}")
     else:
         print("Error: Confusion matrix is not 2x2")
 
     # 把data 和预测结果合并
     data['predictions'] = predictions
-    data.to_csv(f'predicted_{index}.csv', index=False)
+    data.to_csv(os.path.join(script_path, f'predictions_{index}.txt'), sep="\t", index=False)
 
 if __name__ == '__main__':
     # file_path = sys.argv[1]
@@ -129,7 +134,6 @@ if __name__ == '__main__':
         '/cygene4/pipeline/check_sequence_penalty_score/Pooled.9.mixed.samples.20241017.txt',
     ]
     # 逐个处理数据, 新模型从7开始保存，
-    for index, file_path in enumerate(file_path_list, start=10):
+    for index, file_path in enumerate(file_path_list, start=12):
         data = pd.read_csv(file_path, sep="\t", low_memory=False)
-        # print(data.columns)
         main(data, index)

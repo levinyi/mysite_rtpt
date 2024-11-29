@@ -1,16 +1,15 @@
-import json
 import os
+import re
+import json
+import pandas as pd
 from pathlib import Path
 from django.shortcuts import get_object_or_404, render
-
-from mysite import settings
-from .models import Species, Vector
-
+from django.core.cache import cache
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
-import pandas as pd
-import re
+from mysite import settings
+from .models import Species, Vector
 
 
 species_dir = os.path.join(settings.MEDIA_ROOT, 'codon_usage_table')
@@ -69,7 +68,7 @@ def vector_validation(request):
         return JsonResponse({'redirect_url': '/user_center/manage_vector/'})
     else:
         return JsonResponse({'status': 'error', 'message': 'Please use POST.'}, status=401)
-    
+ 
 
 def read_codon_usage_table(file):
     codon_df = pd.read_excel(file, header=None, names=["Triplet", "Amino acid", "Fraction", "Frequency", "Number"])
@@ -144,10 +143,14 @@ def species_delete(request):
         return JsonResponse({'status': 'failed', 'message': 'Not A Post Request.'})
 
 def product_list(request):
-    # read excel file to get gene list, convert to json
-    gene_file = os.path.join(BASE_DIR, 'static', 'files', 'Human_TF_1774_Genes_20241104.For.DataBase.csv')
-    gene_df = pd.read_csv(gene_file)
-    gene_list = gene_df.to_dict(orient='records')
+    gene_list = cache.get('gene_list')
+    if not gene_list:
+        # read excel file to get gene list, convert to json
+        gene_file = os.path.join(BASE_DIR, 'static', 'files', 'Human_TF_1774_Genes_20241104.For.DataBase.csv')
+        gene_df = pd.read_csv(gene_file)
+        gene_list = gene_df.to_dict(orient='records')
+        
+        # cache gene_list
+        cache.set('gene_list', gene_list, 60*60*24) # 24 hours
 
-    # print(gene_list)
     return render(request, 'product/product_list.html', context={'gene_list': gene_list})

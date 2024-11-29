@@ -124,7 +124,7 @@ class DNARepeatsFinder:
         # 合并重复序列
         repeats = []
         for repeat in repeats_temp:
-            print(repeat)
+            # print(repeat)
             if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
                 old_end = repeats[-1]['end']
                 new_end = max(old_end, repeat['end'])
@@ -598,10 +598,10 @@ if __name__ == '__main__':
 
     # 处理数据并获取结果 DataFrame
     result_df = process_gene_table_results(data)
-    print(result_df)
+    # print(result_df)
     # 合并原始表格
     df = gene_table.merge(result_df, on='GeneName', how='left')
-    print(df)
+    # print(df)
     # 删除不需要的列
     df.drop(['gene_id', 'sequence'], axis=1, inplace=True)
     # 保存结果

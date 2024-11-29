@@ -8,6 +8,7 @@ from django.core.files.storage import default_storage
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_list_or_404, render, get_object_or_404, redirect
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
@@ -56,7 +57,7 @@ def order_create(request):
         # 将 gene_table 转换为 DataFrame，并删除空行，重置索引，如果为空则返回错误信息
         df = pd.DataFrame(gene_table)
         df = df.dropna(how='all').reset_index(drop=True) # 删除空行,
-        print(df)
+
         if df.empty:
             return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
         
@@ -68,9 +69,8 @@ def order_create(request):
 
         # 处理基因表格，根据列数判断是AA序列还是NT序列，NT序列只有两列，AA序列有6列
         if len(df.columns) == 2:
-            print("Start processing NT sequence")
+            # print("Start processing NT sequence")
             df.columns = ['GeneName', 'OriginalSeq']  # 重命名列名，方便后续处理
-            print(df)
             ###############################################################################################################################
             # 去掉换行符和空格
             df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
@@ -109,12 +109,12 @@ def order_create(request):
             df['sequence'] = df['CombinedSeq']
             # print("df: \n", df)
             data_json = convert_gene_table_to_RepeatsFinder_Format(df)
-            print("data_json: \n", data_json)
+            # print("data_json: \n", data_json)
             result_df = process_gene_table_results(data_json)
 
-            # 调用模型去预测， 去函数里面处理吧
-            model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_10.pkl')
-            weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_10.npy')
+            # 调用模型去预测
+            model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_12.pkl')
+            weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_12.npy')
             predicted_data = predict_new_data_from_df(
                 result_df, 
                 model_path=model_path, 
@@ -143,7 +143,6 @@ def order_create(request):
                 gene_id = row['gene_id']
 
                 # 查找与当前行 gene_id 对应的分析结果
-                # 查找与当前行 gene_id 对应的分析结果
                 analysis_results = data_json.get(gene_id, {})
 
                 # 创建 GeneInfo 对象，存储分析结果
@@ -167,7 +166,7 @@ def order_create(request):
                         original_highlights=row.get('highlights_positions', []),
                         modified_highlights=row.get('highlights_positions', []),
                         penalty_score=row.get('total_penalty_score', None),
-
+                        seq_type='NT',  # 标记序列类型
                         # 存储从 data_json 匹配到的分析结果
                         analysis_results=analysis_results  # 假设你有一个 JSONField 或 TextField 存储分析结果
                     )
@@ -189,13 +188,11 @@ def order_create(request):
 
             # Add the gene objects to the cart's genes many-to-many relationship
             cart.genes.add(*gene_objects_with_ids)
-            print("gene_objects_with_ids", gene_objects_with_ids)
 
             # Extend the new_gene_ids_for_session with the IDs of the retrieved objects
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
-            print("new_gene_ids_for_session", new_gene_ids_for_session)
         else:
-            print("Processing AA sequence")
+            # print("Processing AA sequence")
 
             df.columns = ['GeneName', 'OriginalSeq', 'Species', 'ForbiddenSeqs', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
             df['protein_sequence'] = df['OriginalSeq']
@@ -235,6 +232,7 @@ def order_create(request):
                         original_highlights=row.get('highlights_positions', []),
                         modified_highlights=row.get('highlights_positions', []),
                         penalty_score=row.get('total_penalty_score', None),
+                        seq_type='AA',  # 标记序列类型
                     )
                 )
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
@@ -572,26 +570,75 @@ def bulk_optimization_submit(request):
         print("gene_ids", gene_ids)
         species_selected = request.POST.get('species_select')
         print("species_selected", species_selected)
-
-        # 遍历基因ID列表并创建GeneOptimization记录
-        for gene_id in gene_ids:
-            try:
-                gene_info = GeneInfo.objects.get(id=gene_id)
-                # 创建GeneOptimization实例
-                GeneOptimization.objects.create(
-                    gene=gene_info,
-                    user=request.user,
-                    vector=gene_info.vector,
-                    species=Species.objects.get(species_name=species_selected),
-                )
-            except GeneInfo.DoesNotExist:
-                print(f"GeneInfo with id {gene_id} does not exist.")
-            except Species.DoesNotExist:
-                print(f"Species with name {species_selected} does not exist.")
         
-        # 提交后重定向到展示页面
-        return redirect('user_center:bulk_optimization_display')  # 替换为你的展示页面的URL名称
+        # 修改GeneInfo的状态为optimizing
+        GeneInfo.objects.filter(id__in=gene_ids).update(status='pending', species=Species.objects.get(species_name=species_selected))
 
+        # 提交后重定向到展示页面
+        return redirect('user_center:bulk_optimization_display')
+
+def condon_optimization_api(request):
+    """
+    设置一个 API，用于 GET 和 POST 请求，
+    - 当 GET 请求时，根据 status 参数返回基因数据，默认返回所有 status 为 'pending' 的数据；
+    - 当 POST 请求时，将 POST 回来的数据更新到数据库中。
+    """
+    if request.method == "GET":
+        try:
+            # 获取查询参数中的 status 值，默认为 'pending'
+            status = request.GET.get('status', 'pending')
+
+            # 根据 status 过滤基因数据
+            gene_list = GeneInfo.objects.filter(status=status)
+            print(f"Filtering genes with status: {status}")
+            data = list(
+                gene_list.values(
+                    'id', 'gene_name', 'original_seq', 'status', 'i5nc', 'i3nc',
+                    'vector__vector_id', 'vector__NC5', 'vector__NC3',
+                    'forbid_seq', 'modified_gc_content',
+                    'species__species_name', 'saved_seq', 'optimization_method', 'seq_type'
+                )
+            )
+
+            # 调整返回的 JSON 结构
+            response_data = {'gene': data}
+
+            return JsonResponse({'status': 'success', 'response': response_data}, safe=False)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Failed to fetch genes: {str(e)}'}, status=500)
+
+    elif request.method == "POST":
+        try:
+            # 解析 POST 请求中的数据
+            data = json.loads(request.body.decode('utf-8'))
+            gene_id = data.get('gene_id')
+            gene_status = data.get('status')
+
+            # 更新数据库中的基因状态
+            gene = GeneInfo.objects.get(id=gene_id)
+            gene.status = gene_status
+            gene.save()
+
+            return JsonResponse({'status': 'success', 'message': 'Gene status updated successfully'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Failed to update gene status: {str(e)}'}, status=500)
+
+
+    elif request.method == "POST":
+        try:
+            # 解析 POST 请求中的数据
+            data = json.loads(request.body.decode('utf-8'))
+            gene_id = data.get('gene_id')
+            gene_status = data.get('status')
+
+            # 更新数据库中的基因状态
+            gene = GeneInfo.objects.get(id=gene_id)
+            gene.status = gene_status
+            gene.save()
+
+            return JsonResponse({'status': 'success', 'message': 'Gene status updated successfully'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Failed to update gene status: {str(e)}'}, status=500)
 
 @login_required
 def bulk_optimization_display(request):
@@ -605,17 +652,22 @@ def bulk_optimization_display(request):
 @login_required
 def view_cart(request):
     cart, created = Cart.objects.get_or_create(user=request.user)
-    shopping_cart = cart.genes.all()
 
-    grouped_shopping_cart = []
-    for key, group in itertools.groupby(
-        shopping_cart, 
-        key=lambda x: timezone.localtime(x.create_date).strftime('%Y-%m-%d %H:%M')
-        ):
-        grouped_shopping_cart.append({
+    # 获取并按 `create_date` 倒序排序
+    shopping_cart = cart.genes.all().order_by('-create_date')
+
+    # 分组
+    grouped_shopping_cart = [
+        {
             'date': key,
             'genes': list(group)
-        })
+        }
+        for key, group in itertools.groupby(
+            shopping_cart, 
+            key=lambda x: timezone.localtime(x.create_date).strftime('%Y-%m-%d %H:%M')
+        )
+    ]
+
     context = {
         'grouped_shopping_cart': grouped_shopping_cart,
     }
@@ -644,24 +696,72 @@ def gene_delete(request):
 @login_required
 def cart_genbank_download(request, gene_id):
     '''下载购物车中的基因的genbank文件'''
-    gene = GeneInfo.objects.get(user=request.user, id=gene_id)
+    try:
+        gene = GeneInfo.objects.get(user=request.user, id=gene_id)
+    except GeneInfo.DoesNotExist:
+        return HttpResponse("Gene not found", status=404)
+    
     sequence = re.sub(r'<[^>]*>', '', gene.saved_seq)
     # 删除序列前后的小写字母
     sequence = re.sub(r'^[a-z]+|[a-z]+$', '', sequence)
 
     vector = gene.vector
-    if vector.vector_gb:
+    if vector.vector_gb and os.path.exists(vector.vector_gb.path):
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
-        with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
-            # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)  # old
-            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', gene)
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file: # 确保文件使用后自动删除，减少空间占用
+            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', new_feature_name=gene)
             
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
             response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
             return response
     else:
-        return HttpResponse("No vector genbank file found")
+        return HttpResponse("No vector genbank file found", status=404)
+
+@csrf_exempt
+@require_POST
+def generate_genbank(request):
+    '''API :生成带有新特征的genbank文件'''
+    if request.method == 'POST':
+        print("Request method: ", request.method)
+        # 获取参数
+        plasmid_gzid = request.POST.get('Plasmid_GZID')
+        nt_sequence = request.POST.get('NT_Sequence')
+        start_feature_label = request.POST.get('start_feature_label', 'iU20')  # 默认值
+        end_feature_label = request.POST.get('end_feature_label', 'iD20')  # 默认值
+        new_feature_name = request.POST.get('new_feature_name')
+
+        # 验证参数完整性
+        if not plasmid_gzid or not nt_sequence or not new_feature_name:
+            return JsonResponse({"error": "Missing required parameters"}, status=400)
+
+        # 验证Plasmid GZID是否有对应的genbank文件
+        try:
+            vector = Vector.objects.get(vector_id=plasmid_gzid)
+        except Vector.DoesNotExist:
+            return JsonResponse({"error": "No vector GenBank file found"}, status=404)
+
+        if vector.vector_gb and os.path.exists(vector.vector_gb.path):
+            vector_genbank_file_path = vector.vector_gb.path  # 获取文件路径
+            print(vector_genbank_file_path)
+            # 清理输入序列
+            sequence = re.sub(r'<[^>]*>', '', nt_sequence)
+            sequence = re.sub(r'^[a-z]+|[a-z]+$', '', sequence)
+
+            # 生成带有新特征的GenBank文件
+            with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file:
+                addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, start_feature_label, end_feature_label, new_feature_name=new_feature_name)
+                
+                # 返回生成的文件
+                temp_file.seek(0)
+                response = HttpResponse(temp_file.read(), content_type='application/genbank')
+                response['Content-Disposition'] = f'attachment; filename="{plasmid_gzid}-{new_feature_name}.gb"'
+                return response
+        else:
+            return JsonResponse({"error": "No vector GenBank file found"}, status=404)
+    else:
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
 
 @require_POST
 @login_required
@@ -684,12 +784,13 @@ def bulk_download_genbank(request):
                     if vector.vector_gb:
                         vector_genbank_file_path = vector.vector_gb.path
                         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
-                            # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name)
                             addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', gene)
                             temp_file.seek(0)
                             genbank_content = temp_file.read()
                             genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
                             zf.writestr(genbank_filename, genbank_content)
+                            temp_file.close()
+                            os.remove(temp_file.name)
                     else:
                         zf.writestr(f"Error-{gene_id}.txt", "No vector GenBank file found")
                 except GeneInfo.DoesNotExist:
@@ -699,10 +800,12 @@ def bulk_download_genbank(request):
         response = HttpResponse(temp_zip.read(), content_type='application/zip')
         response['Content-Disposition'] = 'attachment; filename="RootPath-Online-Submission.zip"'
         temp_zip.close()
+        os.remove(temp_zip.name)
         return response
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+@login_required
 def bulk_download_geneinfo_excel(request):
     '''批量下载购物车中的基因信息到Excel文件'''
     try:
@@ -715,13 +818,16 @@ def bulk_download_geneinfo_excel(request):
         gene_info_list = gene_info_list.values(
             'gene_name', 'species__species_name', 'vector__vector_name', 'vector__vector_id', 
             'i5nc', 'i3nc', 'forbid_seq', 'original_seq','original_gc_content','saved_seq',
-            'modified_gc_content','status'
+            'modified_gc_content','status', 'penalty_score'
         )
+        # analysis_result 要处理一下，不能直接加入到DataFrame中
+        # 以后处理
 
         df = pd.DataFrame(gene_info_list)
         # 重新修改一下列名
         df.columns = ['GeneName', 'Species', 'VectorName', 'VectorID', 'i5nc', 'i3nc', 'ForbiddenSeqs', 
-                      'OriginalSeq', 'OriginalGCContent', 'ModifiedSeq', 'ModifiedGCContent', 'Status']
+                      'OriginalSeq', 'OriginalGCContent', 'ModifiedSeq', 'ModifiedGCContent', 'Status',
+                      'PenaltyScore']
 
         # Prepare response with Excel content
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

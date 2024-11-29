@@ -51,7 +51,6 @@ def SequenceAnalyzer(request):
         else:
             return JsonResponse({'status': 'error', 'message': 'Invalid upload type or missing data'})
 
-
         long_repeats_min_len = int(request.POST.get('longRepeatsMinLen', 16))
         homopolymers_min_len = int(request.POST.get('homopolymersMinLen', 7))
         min_w_length = int(request.POST.get('minWLength', 12))
@@ -72,20 +71,18 @@ def SequenceAnalyzer(request):
         )
         # 处理数据并获取结果 DataFrame
         result_df = process_gene_table_results(data)
-
         result_df = gene_table.merge(result_df, left_on='gene_id', right_on='GeneName', how='left')
-        print("This is the result_df, 看看有没有sequence 列")
-        print(result_df.columns)
-        print(result_df)
-        # 看看这里需要删除什么列
         
-        # predict penalty score
-        model_path = 'tools/scripts/best_rf_model_10.pkl'
-        weights_path = 'tools/scripts/best_rf_weights_10.npy'
-        result_df = predict_new_data_from_df(result_df, model_path, weights_path=weights_path)
-        print("This is the result_df after predict penalty score")
-        print(result_df)
-        # result_df 结果到会话中
+        # USE Model 11
+        # model_path = 'tools/scripts/best_rf_model_11.pkl'
+        # weights_path = 'tools/scripts/best_rf_weights_11.npy'
+        # scale_path = 'tools/scripts/scaler_11.pkl'
+
+        # USE Model 12
+        model_path = 'tools/scripts/best_rf_model_12.pkl'
+        weights_path = 'tools/scripts/best_rf_weights_12.npy'
+        scale_path = None
+        result_df = predict_new_data_from_df(result_df, model_path, scaler=scale_path, weights_path=weights_path)
 
         request.session['gene_table'] = result_df.to_dict(orient='records')
         return JsonResponse({'status': 'success', 'redirect_url': '/tools/sequence_analysis_detail/'})    

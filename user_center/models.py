@@ -35,6 +35,9 @@ class GeneInfo(models.Model):
     analysis_results = models.JSONField(verbose_name="SequenceAnalyzer", null=True, blank=True)
     penalty_score = models.FloatField(verbose_name="penalty_score", null=True, blank=True)
 
+    # new fields 20241125
+    seq_type = models.CharField(max_length=255, null=True, blank=True)
+    optimization_method = models.CharField(max_length=255, null=True, blank=True)
     def __str__(self):
         return self.gene_name
 
@@ -66,6 +69,7 @@ class Cart(models.Model):
         return f"{self.user}'s shopping cart"
 
 
+# not used????
 class GeneOptimization(models.Model):
     gene = models.ForeignKey(GeneInfo, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
