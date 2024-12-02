@@ -70,62 +70,107 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- Get failed gene information -->
-                <h5 class="text-center">Select Genes that you want to optimize</h5>
-                <table id="gene-table-datatable" class="display" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th></th> <!-- For Select Checkboxes -->
-                            <th>#</th>
-                            <th>GeneName</th>
-                            <th>Vector</th>
-                            <th>Status</th>
-                            <th>Length</th>
-                            <th>GC%</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for gene in gene_list %}
-                        <tr data-gene-id="{{ gene.id }}"> <!-- Use data attribute to store gene ID -->
-                            <td></td> <!-- DataTables will render checkboxes here -->
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ gene.gene_name }}</td>
-                            <td>{{ gene.vector.vector_id }}</td>
-                            <td>
-                                {% if gene.status == 'forbidden' %}
-                                    <span class="badge bg-danger">Forbidden</span>
-                                {% elif gene.status == 'validated' %}
-                                    <span class="badge bg-success text-dark">Validated</span>
-                                {% else %}
-                                    <span class="badge bg-info">Saved</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ gene.original_seq|length }}</td>
-                            <td>{{ gene.original_gc_content|floatformat }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+                <!-- Step 1: Select Genes -->
+                <div class="card mb-4 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">
+                        Step 1: Select Genes
+                    </div>
+                    <div class="card-body">
+                        <h5 class="text-center">Select Genes that you want to optimize</h5>
+                        <table id="gene-table-datatable" class="display" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th></th> <!-- For Select Checkboxes -->
+                                    <th>#</th>
+                                    <th>GeneName</th>
+                                    <th>Vector</th>
+                                    <th>Status</th>
+                                    <th>Length</th>
+                                    <th>GC%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for gene in gene_list %}
+                                <tr data-gene-id="{{ gene.id }}"> <!-- Use data attribute to store gene ID -->
+                                    <td></td> <!-- DataTables will render checkboxes here -->
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ gene.gene_name }}</td>
+                                    <td>{{ gene.vector.vector_id }}</td>
+                                    <td>
+                                        {% if gene.status == 'forbidden' %}
+                                            <span class="badge bg-danger">Forbidden</span>
+                                        {% elif gene.status == 'validated' %}
+                                            <span class="badge bg-success text-dark">Validated</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Saved</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ gene.original_seq|length }}</td>
+                                    <td>{{ gene.original_gc_content|floatformat }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-                <!-- Form for submitting selected genes -->
-                <form id="bulkOptimizationForm" action="{% url 'user_center:bulk_optimization_submit' %}" method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="speciesSelect" class="form-label">Choose a species for All Selected genes.</label>
-                        <select class="form-select" id="speciesSelect" name="species_select">
+                <!-- Step 2: Select Species -->
+                <div class="card mb-4 shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        Step 2: Choose a Species
+                    </div>
+                    <div class="card-body">
+                        <label for="speciesSelect" class="form-label">Choose a species for all selected genes.</label>
+                        <select class="form-select" id="speciesSelect" name="species_select_for_optimization">
                             <option value="" selected>Choose a species</option>
                             {% for species in species_names %}
                                 <option value="{{ species }}">{{ species }}</option>
                             {% endfor %}
                         </select>
                     </div>
+                </div>
+
+                <!-- Step 3: Select Optimization Method -->
+                <div class="card mb-4 shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        Step 3: Choose an Optimization Method
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="optimization_method" id="method1" value="1" checked>
+                            <label class="form-check-label" for="method1">
+                                Method 1: Only Optimize Forbidden Sequences(ForbdSeqOlny)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="optimization_method" id="method2" value="2">
+                            <label class="form-check-label" for="method2">
+                                Method 2: Optimize slightly (No folding Check)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="optimization_method" id="method3" value="3">
+                            <label class="form-check-label" for="method3">
+                                Method 3: Full Optimization (LongGene_Relaxed)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <form id="bulkOptimizationForm" action="{% url 'user_center:bulk_optimization_submit' %}" method="post">
+                    {% csrf_token %}
+                    <!-- Hidden input to store selected genes -->
                     <input type="hidden" id="selectedGenes" name="selected_genes">
-                    <button type="submit" class="btn btn-primary">Submit</button>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
 
 <!-- Bootstrap Toasts for warnings centered -->
 <div class="position-fixed top-50 start-50 translate-middle toast-container" style="z-index: 1055;">
@@ -439,35 +484,59 @@
             order: [[ 1, 'asc' ]],
         });
 
-        // Form submission handling  for bulk optimization
+        // Form submission handling for bulk optimization
         $('#bulkOptimizationForm').on('submit', function(event) {
-            event.preventDefault(); // Prevent the default form submission
+            event.preventDefault(); // 防止默认表单提交
 
-            // Get selected genes IDs
-            var selectedGenes = table.rows({ selected: true }).nodes().to$().map(function() {
+            // 获取选中的基因 ID
+            var selectedGenes = $('#gene-table-datatable').DataTable().rows({ selected: true }).nodes().to$().map(function() {
                 return $(this).data('gene-id');
             }).get();
 
-            // Validate if any gene is selected
+            // 验证是否选择了基因
             if (selectedGenes.length === 0) {
                 var geneToast = new bootstrap.Toast(document.getElementById('geneToast'));
                 geneToast.show();
                 return;
             }
 
-            // Validate species selection
-            if ($('#speciesSelect').val() === "") {
+            // 验证物种选择
+            var selectedSpecies = $('#speciesSelect').val();
+            console.log("Selected species for debug: ", selectedSpecies);
+            if (!selectedSpecies) {
                 var speciesToast = new bootstrap.Toast(document.getElementById('speciesToast'));
                 speciesToast.show();
                 return;
             }
 
-            // Set the hidden input value
-            $('#selectedGenes').val(selectedGenes.join(','));
+            // 验证优化方法选择
+            var selectedMethod = $('input[name="optimization_method"]:checked').val();
+            if (!selectedMethod) {
+                alert('Please select an optimization method.');
+                return;
+            }
 
-            // Submit the form
+            // 设置隐藏字段
+            $('#selectedGenes').val(selectedGenes.join(',')); // 设置选中的基因 ID
+            // Dynamically add optimization method field
+            $('<input>').attr({
+                type: 'hidden',
+                name: 'optimization_method',
+                value: selectedMethod
+            }).appendTo('#bulkOptimizationForm');
+
+            // Dynamically add species field
+            $('<input>').attr({
+                type: 'hidden',
+                name: 'species_select_for_optimization',
+                value: selectedSpecies
+            }).appendTo('#bulkOptimizationForm');
+
+            // 提交表单
             this.submit();
         });
+
+
     });
 </script>
 <script>

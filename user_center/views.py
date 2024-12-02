@@ -561,21 +561,42 @@ def validation_save(request, id):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
 
+
 @login_required
 def bulk_optimization_submit(request):
     '''批量优化基因页面'''
     if request.method == 'POST':
         # 从请求中获取基因ID列表和物种
-        gene_ids = request.POST.get('selected_genes').split(',')
-        print("gene_ids", gene_ids)
-        species_selected = request.POST.get('species_select')
-        print("species_selected", species_selected)
-        
-        # 修改GeneInfo的状态为optimizing
-        GeneInfo.objects.filter(id__in=gene_ids).update(status='pending', species=Species.objects.get(species_name=species_selected))
+        gene_ids = request.POST.get('selected_genes')
+        species_selected = request.POST.get('species_select_for_optimization')
+        optimization_method = request.POST.get('optimization_method')
+
+        print(f"Gene IDs: {gene_ids}")
+        print(f"Species: {species_selected}")
+        print(f"Optimization Method: {optimization_method}")
+
+        # 转换基因ID为列表
+        gene_ids = gene_ids.split(',')
+
+        if species_selected == None:
+            return JsonResponse({'status': 'error', 'message': 'Please select a species for optimization'})
+        # 检查 species 是否存在
+        species_obj = get_object_or_404(Species, species_name=species_selected)
+
+        # 更新 GeneInfo 的状态和其他信息
+        GeneInfo.objects.filter(id__in=gene_ids).update(
+            status='pending', 
+            species=species_obj,
+            optimization_method=optimization_method
+        )
 
         # 提交后重定向到展示页面
         return redirect('user_center:bulk_optimization_display')
+
+    # 如果不是 POST 请求，直接返回错误页面
+    # messages.error(request, "Invalid request method.")
+    return redirect('user_center:bulk_optimization')
+
 
 def condon_optimization_api(request):
     """

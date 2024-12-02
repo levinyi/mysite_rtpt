@@ -169,7 +169,7 @@
                 <div class="card mt-1 mb-2" style="width: auto; height: auto;">
                     <div class="card-body me-2 p-2 d-inline-block" style="width: 158px;height: 35px;"> <!-- Adjust width as needed -->
                         <div class="d-flex justify-content-around p-0">
-                            <a onclick="showToast()" href="#" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Codon Optimization for Selected Items" >
+                            <a onclick="optimizeSelected()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Codon Optimization for Selected Items" >
                                 <i class="bi bi-sliders"></i>
                             </a>
                             <button onclick="bulkdownloadSelectedGenBank()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Download GenBank Files for selected items">
@@ -842,13 +842,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedValues = getSelectedValues();
         if (selectedValues.length > 0) {
             // Example: send data to server
-            // fetch('/optimize', {
-            //     method: 'POST',
-            //     body: JSON.stringify({ ids: selectedValues }),
-            //     headers: { 'Content-Type': 'application/json' }
-            // }).then(response => response.json()).then(data => {
-            //     console.log(data);
-            // });
+            fetch('{% url "user_center:bulk_optimization_submit" %}', {
+                method: 'POST',
+                body: JSON.stringify({ ids: selectedValues }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json()).then(data => {
+                console.log(data);
+            });
             console.log(data);
         } else {
             alert("No items selected");
