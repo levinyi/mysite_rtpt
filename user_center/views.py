@@ -2,6 +2,7 @@ import itertools
 import json, re, os
 import tempfile
 import zipfile
+import uuid
 import pandas as pd
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
@@ -203,10 +204,7 @@ def order_create(request):
 
             # 整合
             df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
-            df['highlights_positions'] = df.apply(
-                lambda row: process_highlights_positions(row),
-                axis=1
-            )
+            df['highlights_positions'] = ''  # 暂时不处理高亮位置
 
             gene_objects = []
 
@@ -235,6 +233,24 @@ def order_create(request):
                         seq_type='AA',  # 标记序列类型
                     )
                 )
+
+            # Capture the current timestamp
+            current_timestamp = timezone.now()
+
+            with transaction.atomic():
+                # Bulk create gene objects without immediately assigning them to a variable with IDs
+                GeneInfo.objects.bulk_create(gene_objects)
+
+                # Retrieve the gene objects from the database with their IDs
+                gene_objects_with_ids = GeneInfo.objects.filter(
+                    user=request.user, 
+                    gene_name__in=df['GeneName'], 
+                    create_date__gte=current_timestamp
+                )
+
+            # Add the gene objects to the cart's genes many-to-many relationship
+            cart.genes.add(*gene_objects_with_ids)
+            
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
 
         # Store the new gene IDs in the session for later use
@@ -254,7 +270,6 @@ def order_create(request):
         species_names_json = json.dumps(species_names)
         customer_vectors = Vector.objects.filter(user=request.user, status="ReadyToUse")
         return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_names_json': species_names_json})
-
 
 
 def clean_and_check_dna_sequence(sequence):
@@ -322,7 +337,7 @@ def clean_and_check_protein_sequence(sequence):
 
 def process_contained_forbidden_list(row):
     # 获取 forbidden_info 中的 forbidden_seq 列表
-    forbidden_seqs = [info['forbidden_seq'] for info in row['forbidden_info']] if row['forbidden_info'] else []
+    forbidden_seqs = [info['forbidden_seq'] for info in row.get('forbidden_info', [])] if row.get('forbidden_info') else []
 
     # 获取 warnings，如果存在的话
     warning_seqs = [each['content'] for each in row['warnings'] if 'content' in each] if row['warnings'] else []
@@ -571,24 +586,33 @@ def bulk_optimization_submit(request):
         species_selected = request.POST.get('species_select_for_optimization')
         optimization_method = request.POST.get('optimization_method')
 
+        optimization_method_dict = {
+            '1': 'FbdSeqOnly',
+            '2': 'NoFoldingCheck',
+            '3': 'LongGene_Relaxed',
+        }
         print(f"Gene IDs: {gene_ids}")
         print(f"Species: {species_selected}")
-        print(f"Optimization Method: {optimization_method}")
+        print(f"Optimization Method: {optimization_method_dict.get(optimization_method)}")
 
         # 转换基因ID为列表
         gene_ids = gene_ids.split(',')
 
         if species_selected == None:
             return JsonResponse({'status': 'error', 'message': 'Please select a species for optimization'})
+        
         # 检查 species 是否存在
         species_obj = get_object_or_404(Species, species_name=species_selected)
 
-        # 更新 GeneInfo 的状态和其他信息
-        GeneInfo.objects.filter(id__in=gene_ids).update(
-            status='pending', 
-            species=species_obj,
-            optimization_method=optimization_method
-        )
+        # Retrieve the genes and update their status, species, and optimization method
+        gene_objects = GeneInfo.objects.filter(id__in=gene_ids)
+
+        for gene in gene_objects:
+            gene.status = 'pending'
+            gene.species = species_obj
+            gene.optimization_method = optimization_method_dict.get(optimization_method)
+            gene.optimization_id = uuid.uuid4()  # Generate a unique ID for optimization
+            gene.save()
 
         # 提交后重定向到展示页面
         return redirect('user_center:bulk_optimization_display')
@@ -597,7 +621,7 @@ def bulk_optimization_submit(request):
     # messages.error(request, "Invalid request method.")
     return redirect('user_center:bulk_optimization')
 
-
+@csrf_exempt
 def condon_optimization_api(request):
     """
     设置一个 API，用于 GET 和 POST 请求，
@@ -630,36 +654,25 @@ def condon_optimization_api(request):
 
     elif request.method == "POST":
         try:
-            # 解析 POST 请求中的数据
-            data = json.loads(request.body.decode('utf-8'))
-            gene_id = data.get('gene_id')
-            gene_status = data.get('status')
-
-            # 更新数据库中的基因状态
-            gene = GeneInfo.objects.get(id=gene_id)
-            gene.status = gene_status
+            # Parse form-encoded data (request.POST)
+            task_id = request.POST.get("gene_id")
+            optimized_seq = request.POST.get("optimized_seq")
+            status = request.POST.get("status")
+            optimization_message = request.POST.get("optimization_message")
+            
+            # Update the gene information
+            gene = GeneInfo.objects.get(optimization_id=task_id)  # assuming task_id maps to gene_id
+            gene.status = status
+            gene.saved_seq = optimized_seq
+            gene.optimization_message = optimization_message
             gene.save()
 
             return JsonResponse({'status': 'success', 'message': 'Gene status updated successfully'})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': f'Failed to update gene status: {str(e)}'}, status=500)
 
-
-    elif request.method == "POST":
-        try:
-            # 解析 POST 请求中的数据
-            data = json.loads(request.body.decode('utf-8'))
-            gene_id = data.get('gene_id')
-            gene_status = data.get('status')
-
-            # 更新数据库中的基因状态
-            gene = GeneInfo.objects.get(id=gene_id)
-            gene.status = gene_status
-            gene.save()
-
-            return JsonResponse({'status': 'success', 'message': 'Gene status updated successfully'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': f'Failed to update gene status: {str(e)}'}, status=500)
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
 
 @login_required
 def bulk_optimization_display(request):
