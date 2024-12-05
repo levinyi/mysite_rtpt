@@ -638,7 +638,7 @@ def condon_optimization_api(request):
             print(f"Filtering genes with status: {status}")
             data = list(
                 gene_list.values(
-                    'id', 'gene_name', 'original_seq', 'status', 'i5nc', 'i3nc',
+                    'optimization_id', 'gene_name', 'original_seq', 'status', 'i5nc', 'i3nc',
                     'vector__vector_id', 'vector__NC5', 'vector__NC3',
                     'forbid_seq', 'modified_gc_content',
                     'species__species_name', 'saved_seq', 'optimization_method', 'seq_type'
