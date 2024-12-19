@@ -28,10 +28,162 @@
     .col-dis {
         width: 7%; /* 第八列：折扣率，设置为10% */
     }
+    .text-bg-purple {
+        background-color: #e4b9f8;
+        color: black;
+    }
 </style>
 {% endblock %}
-
 {% block content %}
+
+<!-- Modal for bulk optimization settings -->
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="bulkOptimizationModal" tabindex="-1" aria-labelledby="bulkOptimizationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkOptimizationModalLabel">Bulk Optimization Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: Select Genes -->
+                <div class="card mb-4 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white">
+                        Step 1: Select Genes that you want to optimize
+                    </div>
+                    <div class="card-body">
+                        <table id="gene-table-datatable" class="display" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th></th> <!-- For Select Checkboxes -->
+                                    <th>#</th>
+                                    <th>GeneName</th>
+                                    <th>SeqType</th>
+                                    <th>Vector</th>
+                                    <th>Sequence Status</th>
+                                    <th>Optimization Status</th>
+                                    <th>Length</th>
+                                    <th>GC%</th>
+                                    <th>Penalty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for group in grouped_shopping_cart %}
+                            {% for gene in group.genes %}
+                                <tr data-gene-id="{{ gene.id }}"> <!-- Use data attribute to store gene ID -->
+                                    <td></td> <!-- DataTables will render checkboxes here -->
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ gene.gene_name }}</td>
+                                    <td>
+                                        {% if gene.seq_type == 'NT' %}
+                                            <span class="badge rounded-pill text-bg-info">NT</span>
+                                        {% else %}
+                                            <span class="badge rounded-pill" style="background-color: #e4b9f8; color: black;">{{ gene.seq_type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ gene.vector.vector_name }}</td>
+                                    <td>
+                                        {% if gene.status == 'forbidden' %}
+                                            <span class="badge rounded-pill" style="background-color: #dc3545;">Forbidden</span>
+                                        {% elif gene.status == 'validated' %}
+                                            <span class="badge rounded-pill" style="background-color: #198754;">Validated</span>
+                                        {% elif gene.status == 'warning' %}
+                                            <span class="badge rounded-pill" style="background-color: #fd7e14;">Warning</span>
+                                        {% elif gene.status == 'error' %}
+                                            <span class="badge rounded-pill" style="background-color: #880808;">Error</span>
+                                        {% else %}
+                                            <span class="badge  rounded-pill bg-secondary">{{ gene.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if gene.optimization_status == 'Pending' %}
+                                            <span class="badge" style="background-color: #6c757d;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Optimizing' %}
+                                            <span class="badge" style="background-color: #0d6efd;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'NotOptimized' %}
+                                            <span class="badge" style="background-color: #ffc107;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Optimized' %}
+                                            <span class="badge" style="background-color: #198754;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'NeedsOptimization' %}
+                                            <span class="badge" style="background-color: #fd7e14">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'OptimizeFailed' %}
+                                            <span class="badge" style="background-color: #dc3545;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Skipped' %}
+                                            <span class="badge" style="background-color: #0dcaf0;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Error' %}
+                                            <span class="badge" style="background-color: #880808;">{{ gene.optimization_status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ gene.optimization_status }}</span>
+                                        {% endif %}
+                                    <td>{{ gene.original_seq|length }}</td>
+                                    <td>{{ gene.original_gc_content|floatformat }}</td>
+                                    <td>{{ gene.penalty_score }}</td>
+                                </tr>
+                            {% endfor %}
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Step 2: Select Species -->
+                <div class="card mb-4 shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        Step 2: Choose a Species
+                    </div>
+                    <div class="card-body">
+                        <label for="speciesSelect" class="form-label">Choose a species for all selected genes.</label>
+                        <select class="form-select" id="speciesSelect" name="species_select_for_optimization">
+                            <option value="" selected>Choose a species</option>
+                            {% for species in species_names %}
+                                <option value="{{ species }}">{{ species }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Step 3: Select Optimization Method -->
+                <div class="card mb-4 shadow-sm border-info">
+                    <div class="card-header bg-info text-white">
+                        Step 3: Choose an Optimization Method
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="optimization_method" id="method1" value="1" checked>
+                            <label class="form-check-label" for="method1">
+                                Method 1: Only Optimize Forbidden Sequences(ForbdSeqOlny)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="optimization_method" id="method2" value="2">
+                            <label class="form-check-label" for="method2">
+                                Method 2: Optimize slightly (No folding Check)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="optimization_method" id="method3" value="3">
+                            <label class="form-check-label" for="method3">
+                                Method 3: Full Optimization (LongGene_Relaxed)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <form id="bulkOptimizationForm" action="{% url 'user_center:bulk_optimization_submit' %}" method="post">
+                    {% csrf_token %}
+                    <!-- Hidden input to store selected genes -->
+                    <input type="hidden" id="selectedGenes" name="selected_genes">
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- main content -->
 <div class="container-fluid main-content">
     <!-- Breadcrumb -->
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
@@ -57,11 +209,11 @@
             <div class="col-md-4">
                 <select class="form-control" id="statusFilter">
                     <option value="all">All Statuses</option>
-                    <option value="saved">Saved</option>
+                    <option value="forbidden">Forbidden</option>
                     <option value="validated">Validated</option>
                     <option value="optimizing">Optimizing</option>
                     <option value="optimized">Optimized</option>
-                    <option value="failed">Failed</option>
+                    <option value="Error">Error</option>
                     <option value="forbidden">Forbidden</option>
                     <!-- 其他状态 -->
                 </select>
@@ -74,10 +226,14 @@
                     <th scope="col"><input type="checkbox" id="selectAllTop" name="gene_id" value="all"></th>
                     <th scope="col">ID</th>
                     <th scope="col">Name</th>
+                    <th scope="col">SeqType</th>
                     <th scope="col">Vector</th>
                     <th scope="col">Species</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Length</th>
+                    <th scope="col">Sequence Status</th>
+                    <th scope="col">Length(AA/NT)</th>
+                    <th scope="col">GC%</th>
+                    <th scope="col">Optimization Status</th>
+                    <th scope="col">Penalty Score</th>
                     <th scope="col">Action</th>
                 </tr>
             </thead>
@@ -87,15 +243,18 @@
                     <td class="table-info" > 
                         <input type="checkbox" class="date-select-checkbox" data-date="{{ group.date }}"> 
                     </td>
-                    <td colspan="7" class="table-info text-start"> {{ group.date }}</td>
+                    <td colspan="11" class="table-info text-start"> {{ group.date }}</td>
                 </tr>
                 {% for gene in group.genes %}
-                <tr data-status="{{ gene.status }}">
+                <tr data-status="{{ gene.status }}" data-optimization-status="{{ gene.optimization_status }}">
                     <td>
                         <!-- 复选框 -->
                         <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}" 
-                            data-length="{{ gene.saved_seq|safe|base_length }}" data-date="{{ group.date }}" data-vector="{{ gene.vector }}">
+                            data-length="{% if gene.seq_type == 'NT' %}{{ gene.saved_seq|safe|base_length }}{% else %}{{ gene.saved_seq|safe|base_length|multiply:3 }}{% endif %}" 
+                            data-date="{{ group.date }}" 
+                            data-vector="{{ gene.vector }}">
                     </td>
+                    
                     <td>{{ forloop.counter }}</td>
                     <td>
                         <!-- 基因名称 -->
@@ -104,28 +263,83 @@
                             {{ gene.gene_name }}
                         </a>
                     </td>
-                    <td>{{ gene.vector }}</td>
+                    <td>
+                        {% if gene.seq_type == 'NT' %}
+                            <span class="badge rounded-pill text-bg-info">NT</span>
+                        {% else %}
+                            <span class="badge rounded-pill text-bg-purple">{{ gene.seq_type }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="">{{ gene.vector }} </span>
+                    </td>
                     <td>{{ gene.species }}</td>
                     <td> 
-                        {% if gene.status == 'saved' %}
-                            <span class="badge bg-secondary">Saved</span>
+                        {% if gene.status == 'forbidden' %}
+                            <span class="badge rounded-pill" style="background-color: #dc3545;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Forbidden sequence, can be optimized">
+                                Forbidden</span>
                         {% elif gene.status == 'validated' %}
-                            <span class="badge bg-primary">Validated</span>
-                        {% elif gene.status == 'optimizing' %}
-                            <span class="badge bg-info">Optimizing</span>
-                        {% elif gene.status == 'optimized' %}
-                            <span class="badge bg-success">Optimized</span>
-                        {% elif gene.status == 'failed' %}
-                            <span class="badge bg-danger">Failed</span>
-                        {% elif gene.status == 'forbidden' %}
-                            <span class="badge bg-warning text-dark">Forbidden</span>
+                            <span class="badge rounded-pill" style="background-color: #198754;" data-bs-toggle="tooltip" data-bs-replacement="top" title="validated sequence, good">
+                                Validated</span>
+                        {% elif gene.status == 'warning' %}
+                            <span class="badge rounded-pill" style="background-color: #fd7e14;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Warning: Better to optimize">
+                                Warning</span>
+                        {% elif gene.status == 'error' %}
+                            <span class="badge rounded-pill" style="background-color: #880808;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Error: Please fix your sequence first">
+                                Error</span>
                         {% else %}
-                            <span class="badge bg-secondary">{{ gene.status }}</span>
+                            <span class="badge bg-secondary rounded-pill">{{ gene.status }}</span>
                         {% endif %}
                     </td>
                     <td>
                         <!-- 基因长度 -->
-                        {{ gene.saved_seq|safe|base_length }}
+                         {% if gene.seq_type == 'NT' %}
+                            {{ gene.saved_seq|safe|base_length }}bp
+                        {% elif gene.seq_type == 'AA' %}
+                            {{ gene.original_seq|safe|base_length }}/{{ gene.original_seq|safe|base_length|multiply:3 }}bp
+                        {% endif %}
+                    </td>
+                    <td>
+                        <!-- GC含量 -->
+                        {% if gene.seq_type == 'AA' and not gene.saved_seq %}
+                            -
+                        {% else %}
+                            {{ gene.modified_gc_content }}%
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if gene.optimization_status == 'Pending' %}
+                            <span class="badge rounded-pill" style="background-color: #6c757d;">{{ gene.optimization_status }}</span>
+                        {% elif gene.optimization_status == 'Optimizing' %}
+                            <span class="badge rounded-pill" style="background-color: #0d6efd;">{{ gene.optimization_status }}</span>
+                        {% elif gene.optimization_status == 'NotOptimized' %}
+                            {% if gene.status == 'warning' %}
+                                <span class="badge rounded-pill" style="background-color: #fd7e14;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Optimization Suggestion: Better to Optimize">
+                                    {{ gene.optimization_status }}</span>
+                            {% else %}
+                                <span class="badge rounded-pill" style="background-color: #ffc107;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Optimization Suggestion: Up to You">
+                                    {{ gene.optimization_status }}</span>
+                            {% endif %}
+                        {% elif gene.optimization_status == 'Optimized' %}
+                            <span class="badge rounded-pill" style="background-color: #198754;">{{ gene.optimization_status }}</span>
+                        {% elif gene.optimization_status == 'NeedsOptimization' %}
+                            <span class="badge rounded-pill" style="background-color: #fd7e14" data-bs-toggle="tooltip" data-bs-replacement="top" title="Must do Optimization first before submission">
+                                {{ gene.optimization_status }}</span>
+                        {% elif gene.optimization_status == 'OptimizeFailed' %}
+                            <span class="badge rounded-pill" style="background-color: #dc3545;">{{ gene.optimization_status }}</span>
+                        {% elif gene.optimization_status == 'Skipped' %}
+                            <span class="badge rounded-pill" style="background-color: #0dcaf0;">{{ gene.optimization_status }}</span>
+                        {% elif gene.optimization_status == 'failed' %}
+                            <span class="badge rounded-pill" style="background-color: #880808;" data-bs-toggle="tooltip" data-bs-replacement="top" title="{{gene.optimization_message}}">
+                                {{ gene.optimization_status }}</span>
+                        {% else %}
+                            <span class="badge rounded-pill" style="background-color: #880808;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Can not optimize unitil you fix your sequence first.">
+                                {{ gene.optimization_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <!-- Penalty Score -->
+                        {{ gene.penalty_score }}
                     </td>
                     <td>
                         {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
@@ -154,7 +368,7 @@
 </div>
 
 <!-- Fixed bottom checkout bar -->
-<div class="container-fluid fixed-bottom" style="background-color: #F9F9F9;">
+<div class="container-fluid fixed-bottom" style="background-color: #f5d0fa;">
     <div class="row mt-3 mb-3">
         <!-- left -->
         <div class="col-lg-5">
@@ -162,25 +376,28 @@
             <div class="d-flex align-items-center justify-content-end">
                 <input type="checkbox" id="selectAllBottom" name="gene_id" value="all">
                 <label class="form-check-label ms-2 me-3" for="selectAllBottom">Select All</label>
-                <button class="btn btn-outline-danger me-3" id="deleteSelectedButton" onclick="deleteSelected()">
-                    <i class="bi bi-trash me-1"></i>Delete Selected 
+                
+                <button class="btn btn-outline-success me-3" id="codonOptimizeButton" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
+                    <i class="bi bi-sliders"></i> Codon Optimize
                 </button>
+                
                 <!-- Card with three buttons -->
                 <div class="card mt-1 mb-2" style="width: auto; height: auto;">
                     <div class="card-body me-2 p-2 d-inline-block" style="width: 158px;height: 35px;"> <!-- Adjust width as needed -->
                         <div class="d-flex justify-content-around p-0">
-                            <a onclick="optimizeSelected()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Codon Optimization for Selected Items" >
-                                <i class="bi bi-sliders"></i>
-                            </a>
+                            
+                            <button onclick="bulkViewSelectedGeneDetails()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="View Details for selected items">
+                                <i class="bi bi-eye"></i>
+                            </button>
                             <button onclick="bulkdownloadSelectedGenBank()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Download GenBank Files for selected items">
                                 <i class="bi bi-cloud-download"></i>
                             </button>
-                            <a onclick="bulkDownloadSelectedExcelInfo()" href="#" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Download detail information for selected items in Excel format">
+                            <button onclick="bulkDownloadSelectedExcelInfo()" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Download detail information for selected items in Excel format">
                                 <i class="bi bi-filetype-xlsx"></i>
-                            </a>
-                            <a onclick="bulkViewSelectedGeneDetails()" href="#" class="btn btn-link p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="View Details for selected items">
-                                <i class="bi bi-eye"></i>
-                            </a>
+                            </button>
+                            <button onclick="deleteSelected()" class="btn btn-link text-danger p-0" data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete selected items">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -210,7 +427,6 @@
         </div>
     </div>
 </div>
-
 
 <!-- Modal for price detail -->
 <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
@@ -400,348 +616,389 @@
         </div>
     </div>
 </div>
-<!-- Toast -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="workingToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="3000">
-        <div class="toast-header">
-            <strong class="me-auto">Notice</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-        <div class="toast-body">
-            Our engineers are still working on it.
-        </div>
-    </div>
-</div>
 
 {% endblock %}
 
-
 {% block javascript %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const priceTable = {
-        '0-99': {
-            '<450': 135,
-            '450-3000': 0.3,
-            '3001-5000': 0.35,
-            '>5001': 0.6
-        },
-        '100-299': {
-            '<450': 112.5,
-            '450-3000': 0.25,
-            '3001-5000': 0.3,
-            '>5001': 0.5
-        },
-        '>300': {
-            '<450': 90,
-            '450-3000': 0.2,
-            '3001-5000': 0.25,
-            '>5001': 0.4
+    document.addEventListener('DOMContentLoaded', () => {
+        const priceTable = {
+            '0-99': {
+                '<450': 135,
+                '450-3000': 0.3,
+                '3001-5000': 0.35,
+                '>5001': 0.6
+            },
+            '100-299': {
+                '<450': 112.5,
+                '450-3000': 0.25,
+                '3001-5000': 0.3,
+                '>5001': 0.5
+            },
+            '>300': {
+                '<450': 90,
+                '450-3000': 0.2,
+                '3001-5000': 0.25,
+                '>5001': 0.4
+            }
+        };
+        
+        function getPriceGroup(totalCounts) {
+            if (totalCounts <= 99) {
+                return priceTable['0-99'];
+            } else if (totalCounts <= 299) {
+                return priceTable['100-299'];
+            } else {
+                return priceTable['>300'];
+            }
         }
-    };
-    
-    function getPriceGroup(totalCounts) {
-        if (totalCounts <= 99) {
-            return priceTable['0-99'];
-        } else if (totalCounts <= 299) {
-            return priceTable['100-299'];
-        } else {
-            return priceTable['>300'];
-        }
-    }
 
-    var lengthGroups = {
-        '<450': { count: 0, length: 0 },
-        '450-3000': { count: 0, length: 0 },
-        '3001-5000': { count: 0, length: 0 },
-        '>5001': { count: 0, length: 0 }
-    };
-
-    var totalBeforeDiscount = 0;
-    var totalAfterDiscount = 0;
-
-    function calculatePricesAndLengths() {
-        // 初始化分类
-        lengthGroups = {
+        var lengthGroups = {
             '<450': { count: 0, length: 0 },
             '450-3000': { count: 0, length: 0 },
             '3001-5000': { count: 0, length: 0 },
             '>5001': { count: 0, length: 0 }
         };
 
-        // 用于统计选中的 vector 类型
-        const selectedVectors = new Set();
+        var totalBeforeDiscount = 0;
+        var totalAfterDiscount = 0;
 
-        // 处理选中的基因复选框
-        $('input.gene-checkbox:checked:visible').each(function() {
-            var length = $(this).data('length');
-            var group = length < 450 ? '<450' : length < 3001 ? '450-3000' : length < 5001 ? '3001-5000' : '>5001';
-            lengthGroups[group].count++;
-            lengthGroups[group].length += length;  
+        function calculatePricesAndLengths() {
+            // 初始化分类
+            lengthGroups = {
+                '<450': { count: 0, length: 0 },
+                '450-3000': { count: 0, length: 0 },
+                '3001-5000': { count: 0, length: 0 },
+                '>5001': { count: 0, length: 0 }
+            };
 
-            // 将 vector 类型添加到集合中
-            var vectorType = $(this).data('vector');
-            if (vectorType) {
-                selectedVectors.add(vectorType);
-            }
-        });
+            // 用于统计选中的 vector 类型
+            const selectedVectors = new Set();
 
-        // 更新表格，但只更新没有手动修改过的单元格
-        updateCellContent('#length-group-450', lengthGroups['<450'].count);
-        updateCellContent('#length-group-450-3000', lengthGroups['450-3000'].length);
-        updateCellContent('#length-group-3001-5000', lengthGroups['3001-5000'].length);
-        updateCellContent('#length-group-5001', lengthGroups['>5001'].length);
-        updateCellContent('#count-group-450', lengthGroups['<450'].count);
-        updateCellContent('#count-group-450-3000', lengthGroups['450-3000'].count);
-        updateCellContent('#count-group-3001-5000', lengthGroups['3001-5000'].count);
-        updateCellContent('#count-group-5001', lengthGroups['>5001'].count);
+            // 处理选中的基因复选框
+            $('input.gene-checkbox:checked:visible').each(function() {
+                var length = $(this).data('length');
+                var group = length < 450 ? '<450' : length < 3001 ? '450-3000' : length < 5001 ? '3001-5000' : '>5001';
+                lengthGroups[group].count++;
+                lengthGroups[group].length += length;  
 
-        // 返回当前的总长度 和总数量
-        totalLength = lengthGroups['<450'].length + lengthGroups['450-3000'].length + lengthGroups['3001-5000'].length + lengthGroups['>5001'].length;
-        totalCounts = lengthGroups['<450'].count + lengthGroups['450-3000'].count + lengthGroups['3001-5000'].count + lengthGroups['>5001'].count;
-        document.querySelector('#total-count').textContent = totalCounts;
-
-        // 将所有选中的 vector 类型显示在某个地方（假设有一个容器 id 为 `vector-list`）
-        document.querySelector('#vector-list').textContent = Array.from(selectedVectors).join(', ');
-
-        return totalLength;
-    }
-
-    // 辅助函数：仅在单元格未被手动修改时更新内容
-    function updateCellContent(selector, value) {
-        const cell = document.querySelector(selector);
-        if (!cell.getAttribute('data-edited')) {  // 仅在未被手动编辑的情况下更新
-            cell.textContent = value;
-        }
-    }
-
-    // 设置监听器，用户手动编辑单元格后进行标记
-    function setupContentEditableListeners() {
-        document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
-            // 在聚焦时也标记单元格为可编辑，确保首次点击即可编辑
-            cell.addEventListener('focus', function() {
-                this.setAttribute('data-edited', 'true');  // 聚焦时立即标记
+                // 将 vector 类型添加到集合中
+                var vectorType = $(this).data('vector');
+                if (vectorType) {
+                    selectedVectors.add(vectorType);
+                }
             });
 
-            // 监听失去焦点时的事件，更新总价
-            cell.addEventListener('blur', function() {
-                updateTotalPrice();  // 手动编辑后重新计算总价
+            // 更新表格，但只更新没有手动修改过的单元格
+            updateCellContent('#length-group-450', lengthGroups['<450'].count);
+            updateCellContent('#length-group-450-3000', lengthGroups['450-3000'].length);
+            updateCellContent('#length-group-3001-5000', lengthGroups['3001-5000'].length);
+            updateCellContent('#length-group-5001', lengthGroups['>5001'].length);
+            updateCellContent('#count-group-450', lengthGroups['<450'].count);
+            updateCellContent('#count-group-450-3000', lengthGroups['450-3000'].count);
+            updateCellContent('#count-group-3001-5000', lengthGroups['3001-5000'].count);
+            updateCellContent('#count-group-5001', lengthGroups['>5001'].count);
+
+            // 返回当前的总长度 和总数量
+            totalLength = lengthGroups['<450'].length + lengthGroups['450-3000'].length + lengthGroups['3001-5000'].length + lengthGroups['>5001'].length;
+            totalCounts = lengthGroups['<450'].count + lengthGroups['450-3000'].count + lengthGroups['3001-5000'].count + lengthGroups['>5001'].count;
+            document.querySelector('#total-count').textContent = totalCounts;
+
+            // 将所有选中的 vector 类型显示在某个地方（假设有一个容器 id 为 `vector-list`）
+            document.querySelector('#vector-list').textContent = Array.from(selectedVectors).join(', ');
+
+            return totalLength;
+        }
+
+        // 辅助函数：仅在单元格未被手动修改时更新内容
+        function updateCellContent(selector, value) {
+            const cell = document.querySelector(selector);
+            if (!cell.getAttribute('data-edited')) {  // 仅在未被手动编辑的情况下更新
+                cell.textContent = value;
+            }
+        }
+
+        // 设置监听器，用户手动编辑单元格后进行标记
+        function setupContentEditableListeners() {
+            document.querySelectorAll('[contenteditable="true"]').forEach(cell => {
+                // 在聚焦时也标记单元格为可编辑，确保首次点击即可编辑
+                cell.addEventListener('focus', function() {
+                    this.setAttribute('data-edited', 'true');  // 聚焦时立即标记
+                });
+
+                // 监听失去焦点时的事件，更新总价
+                cell.addEventListener('blur', function() {
+                    updateTotalPrice();  // 手动编辑后重新计算总价
+                });
             });
-        });
-    }
-
-    function updateFinalTotal() {
-        let geneTotal = 0;
-        let geneDiscountTotal = 0;
-
-        // 获取当前总的基因数量
-        const totalCounts = parseFloat(document.querySelector('#total-count').textContent) || 0;
-
-        // 获取适用的单价表
-        const priceGroup = getPriceGroup(totalCounts);
-
-        // 获取所有的表格行
-        const rows = document.querySelectorAll('#price-detail-table tr');
-        rows.forEach((row, index) => {
-            // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
-            if (index > 2 && row.querySelector('[rowspan="2"]')) {
-                const quantityCell1 = row.querySelector('td:nth-child(4)'); // 第一行数量单元格
-                const unitPriceCell1 = row.querySelector('td:nth-child(5)'); // 第一行单价单元格
-                const totalPriceCell1 = row.querySelector('td:nth-child(6)'); // 第一行总价单元格
-
-                const nextRow = row.nextElementSibling; // 获取第二行
-                const quantityCell2 = nextRow.querySelector('td:nth-child(3)'); // 第二行数量单元格
-                const unitPriceCell2 = nextRow.querySelector('td:nth-child(4)'); // 第二行单价单元格
-                const totalPriceCell2 = nextRow.querySelector('td:nth-child(5)'); // 第二行总价单元格
-
-                const totalCell = row.querySelector('td:nth-child(7)'); // 合计单元格
-                const discountTotalCell = row.querySelector('td:nth-child(8)'); // 优惠后合计单元格
-                const discountRateCell = row.querySelector('td:nth-child(9)'); // 折扣率单元格
-
-                const quantity1 = parseFloat(quantityCell1.textContent) || 0;
-                const lengthCategory1 = lengthCategory(parseFloat(unitPriceCell2.textContent) || 0);  // 根据单价获取长度区间
-                const unitPrice1 = priceGroup[lengthCategory1] || 0;  // 根据数量获取单价
-
-                const quantity2 = parseFloat(quantityCell2.textContent) || 0;
-                const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0;
-
-                // 更新单价
-                unitPriceCell1.textContent = unitPrice1.toFixed(2);
-
-                const totalPrice1 = quantity1 * unitPrice1;
-                const totalPrice2 = quantity2 * unitPrice2;
-
-                // 更新单元格显示总价
-                totalPriceCell1.textContent = totalPrice1.toFixed(2);
-                totalPriceCell2.textContent = totalPrice2.toFixed(2);
-
-                // 计算合计
-                const total = totalPrice1 + totalPrice2;
-                totalCell.textContent = total.toFixed(2);
-
-                // 获取折扣率并计算优惠后总价
-                const discountRate = parseFloat(discountRateCell.textContent) || 1; // 默认折扣率为1
-                const discountTotal = total * discountRate;
-                discountTotalCell.textContent = discountTotal.toFixed(2);
-
-                // 将当前部分的总价和折扣总价累计
-                geneTotal += total;
-                geneDiscountTotal += discountTotal;
-            }
-        });
-
-        let otherTotal = 0;
-        const otherRows = [
-            { selector: '载体构建', index: 15 },
-            { selector: '甘油菌', index: 16 },
-            { selector: '干冰运输', index: 17 }
-        ];
-
-        otherRows.forEach(({ index }) => {
-            const row = rows[index];
-            const quantityCell = row.querySelector('td:nth-child(4)'); // 数量单元格
-            const unitPriceCell = row.querySelector('td:nth-child(5)'); // 单价单价单元格
-            const totalPriceCell = row.querySelector('td:nth-child(6)'); // 总价单元格
-
-            // 计算其他部分的总价
-            const quantity = parseFloat(quantityCell.textContent) || 0;
-            const unitPrice = parseFloat(unitPriceCell.textContent) || 0;
-            const totalPrice = quantity * unitPrice;
-            // 更新单元格显示总价    
-            totalPriceCell.textContent = totalPrice.toFixed(2);
-
-            // 累加到其他部分的总价
-            otherTotal += totalPrice;
-        });
-
-        totalBeforeDiscount = geneTotal + otherTotal;
-        totalAfterDiscount = geneDiscountTotal + otherTotal;
-
-        document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
-        document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
-    }
-    // 辅助函数，用于确定长度区间
-    function lengthCategory(length) {
-        if (length == 50) {
-            return '<450';
-        } else if (length == 150) {
-            return '450-3000';
-        } else if (length == 300) {
-            return '3001-5000';
-        } else {
-            return '>5001';
-        }
-    }
-
-    function updateTotalPrice() {
-        const totalLength = calculatePricesAndLengths(); // 先更新分类
-        // 从可编辑的单元格中获取当前的值
-        const count450 = parseFloat(document.querySelector('#count-group-450').textContent) || 0;
-        const count450_3000 = parseFloat(document.querySelector('#count-group-450-3000').textContent) || 0;
-        const count3001_5000 = parseFloat(document.querySelector('#count-group-3001-5000').textContent) || 0;
-        const count5001 = parseFloat(document.querySelector('#count-group-5001').textContent) || 0;
-
-        // 计算总数
-        const totalCounts = count450 + count450_3000 + count3001_5000 + count5001;
-
-        // 更新页面上显示的总数
-        document.querySelector('#total-count').textContent = totalCounts;
-        // 更新"提供的基因片段数"
-        document.querySelector('#total-count-display').textContent = totalCounts;
-
-        // 更新其他总价等信息
-        updateFinalTotal(); // 再更新总价
-
-        const totalPrice = totalBeforeDiscount || 0;
-
-        // 更新页面显示
-        $('#total-price').text('Total ￥: ≈' + totalPrice.toFixed(2));
-        $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
-        $('#total-length').text('Total ' + totalLength + ' bp');
-    }
-
-    setupContentEditableListeners();  // 设置监听器
-
-    // 监听复选框状态变化，实时更新分类和总价
-    $('input.gene-checkbox').change(function() {
-        updateTotalPrice();
-    });
-
-    // 为可编辑的数量、单价、折扣率单元格添加事件监听器，更新总价
-    $('#price-detail-table').on('input', 'td', function() {
-        updateTotalPrice();
-    });
-
-    // 监听全选复选框
-    $('#selectAllTop, #selectAllBottom').click(function() {
-        const state = this.checked;
-        $('input[name="gene_id"]:not(.modal .gene-checkbox)').each(function() {
-            if (!this.disabled && $(this).closest('tr').css('display') !== 'none') {
-                this.checked = state;
-            }
-        });
-        $('#selectAllTop, #selectAllBottom').prop('checked', state);
-        updateTotalPrice();
-    });
-
-    // 监听日期复选框
-    $('.date-select-checkbox').on('click', function() {
-        const date = $(this).data('date');
-        const isChecked = this.checked;
-        $('.gene-checkbox[data-date="' + date + '"]:visible').each(function() {
-            if (!this.disabled) {
-                this.checked = isChecked;
-            }
-        });
-        updateTotalPrice();
-    });
-
-    // 监听状态筛选器的变化
-    $('#statusFilter').on('change', function() {
-        const selectedStatus = this.value;
-        $('tbody tr[data-status]').each(function() {
-            $(this).toggle(selectedStatus === 'all' || $(this).data('status') === selectedStatus);
-        });
-        updateTotalPrice();
-    });
-
-    // 提交按钮处理
-    $('#checkoutButton').on('click', function() {
-        const selectedGenes = $('input.gene-checkbox:checked').map(function() { return this.value; }).get();
-        const forbidden = $('input.gene-checkbox:checked').closest('tr[data-status="forbidden"]').length > 0;
-
-        if (selectedGenes.length === 0) {
-            alert('Please select at least one item!');
-            return;
         }
 
-        if (forbidden) {
-            alert('Forbidden items cannot be submitted!');
-            return;
+        function updateFinalTotal() {
+            let geneTotal = 0;
+            let geneDiscountTotal = 0;
+
+            // 获取当前总的基因数量
+            const totalCounts = parseFloat(document.querySelector('#total-count').textContent) || 0;
+
+            // 获取适用的单价表
+            const priceGroup = getPriceGroup(totalCounts);
+
+            // 获取所有的表格行
+            const rows = document.querySelectorAll('#price-detail-table tr');
+            rows.forEach((row, index) => {
+                // 只处理含有合并行（rowspan=2）的部分，即每个基因合成项目的主行
+                if (index > 2 && row.querySelector('[rowspan="2"]')) {
+                    const quantityCell1 = row.querySelector('td:nth-child(4)'); // 第一行数量单元格
+                    const unitPriceCell1 = row.querySelector('td:nth-child(5)'); // 第一行单价单元格
+                    const totalPriceCell1 = row.querySelector('td:nth-child(6)'); // 第一行总价单元格
+
+                    const nextRow = row.nextElementSibling; // 获取第二行
+                    const quantityCell2 = nextRow.querySelector('td:nth-child(3)'); // 第二行数量单元格
+                    const unitPriceCell2 = nextRow.querySelector('td:nth-child(4)'); // 第二行单价单元格
+                    const totalPriceCell2 = nextRow.querySelector('td:nth-child(5)'); // 第二行总价单元格
+
+                    const totalCell = row.querySelector('td:nth-child(7)'); // 合计单元格
+                    const discountTotalCell = row.querySelector('td:nth-child(8)'); // 优惠后合计单元格
+                    const discountRateCell = row.querySelector('td:nth-child(9)'); // 折扣率单元格
+
+                    const quantity1 = parseFloat(quantityCell1.textContent) || 0;
+                    const lengthCategory1 = lengthCategory(parseFloat(unitPriceCell2.textContent) || 0);  // 根据单价获取长度区间
+                    const unitPrice1 = priceGroup[lengthCategory1] || 0;  // 根据数量获取单价
+
+                    const quantity2 = parseFloat(quantityCell2.textContent) || 0;
+                    const unitPrice2 = parseFloat(unitPriceCell2.textContent) || 0;
+
+                    // 更新单价
+                    unitPriceCell1.textContent = unitPrice1.toFixed(2);
+
+                    const totalPrice1 = quantity1 * unitPrice1;
+                    const totalPrice2 = quantity2 * unitPrice2;
+
+                    // 更新单元格显示总价
+                    totalPriceCell1.textContent = totalPrice1.toFixed(2);
+                    totalPriceCell2.textContent = totalPrice2.toFixed(2);
+
+                    // 计算合计
+                    const total = totalPrice1 + totalPrice2;
+                    totalCell.textContent = total.toFixed(2);
+
+                    // 获取折扣率并计算优惠后总价
+                    const discountRate = parseFloat(discountRateCell.textContent) || 1; // 默认折扣率为1
+                    const discountTotal = total * discountRate;
+                    discountTotalCell.textContent = discountTotal.toFixed(2);
+
+                    // 将当前部分的总价和折扣总价累计
+                    geneTotal += total;
+                    geneDiscountTotal += discountTotal;
+                }
+            });
+
+            let otherTotal = 0;
+            const otherRows = [
+                { selector: '载体构建', index: 15 },
+                { selector: '甘油菌', index: 16 },
+                { selector: '干冰运输', index: 17 }
+            ];
+
+            otherRows.forEach(({ index }) => {
+                const row = rows[index];
+                const quantityCell = row.querySelector('td:nth-child(4)'); // 数量单元格
+                const unitPriceCell = row.querySelector('td:nth-child(5)'); // 单价单价单元格
+                const totalPriceCell = row.querySelector('td:nth-child(6)'); // 总价单元格
+
+                // 计算其他部分的总价
+                const quantity = parseFloat(quantityCell.textContent) || 0;
+                const unitPrice = parseFloat(unitPriceCell.textContent) || 0;
+                const totalPrice = quantity * unitPrice;
+                // 更新单元格显示总价    
+                totalPriceCell.textContent = totalPrice.toFixed(2);
+
+                // 累加到其他部分的总价
+                otherTotal += totalPrice;
+            });
+
+            totalBeforeDiscount = geneTotal + otherTotal;
+            totalAfterDiscount = geneDiscountTotal + otherTotal;
+
+            document.querySelector('#total-before-discount').textContent = totalBeforeDiscount.toFixed(2);
+            document.querySelector('#total-after-discount').textContent = totalAfterDiscount.toFixed(2);
         }
 
-        const formData = new FormData();
-        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-        selectedGenes.forEach(function(id) { formData.append('gene_ids', id); });
-
-        fetch('{% url "user_center:checkout" %}', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert('Submit successfully!');
-                window.location.href = data.redirect_url;
+        // 辅助函数，用于确定长度区间
+        function lengthCategory(length) {
+            if (length == 50) {
+                return '<450';
+            } else if (length == 150) {
+                return '450-3000';
+            } else if (length == 300) {
+                return '3001-5000';
             } else {
-                alert(data.message);
+                return '>5001';
             }
-        })
-        .catch(error => console.error('Error:', error));
-    });
-});
-</script>
+        }
 
+        function updateTotalPrice() {
+            const totalLength = calculatePricesAndLengths(); // 先更新分类
+            // 从可编辑的单元格中获取当前的值
+            const count450 = parseFloat(document.querySelector('#count-group-450').textContent) || 0;
+            const count450_3000 = parseFloat(document.querySelector('#count-group-450-3000').textContent) || 0;
+            const count3001_5000 = parseFloat(document.querySelector('#count-group-3001-5000').textContent) || 0;
+            const count5001 = parseFloat(document.querySelector('#count-group-5001').textContent) || 0;
+
+            // 计算总数
+            const totalCounts = count450 + count450_3000 + count3001_5000 + count5001;
+
+            // 更新页面上显示的总数
+            document.querySelector('#total-count').textContent = totalCounts;
+            // 更新"提供的基因片段数"
+            document.querySelector('#total-count-display').textContent = totalCounts;
+
+            // 更新其他总价等信息
+            updateFinalTotal(); // 再更新总价
+
+            const totalPrice = totalBeforeDiscount || 0;
+
+            // 更新页面显示
+            $('#total-price').text('Total ￥: ≈' + totalPrice.toFixed(2));
+            $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
+            $('#total-length').text('Total ' + totalLength + ' bp');
+        }
+
+        setupContentEditableListeners();  // 设置监听器
+
+        // 监听复选框状态变化，实时更新分类和总价
+        $('input.gene-checkbox').change(function() {
+            updateTotalPrice();
+        });
+
+        // 为可编辑的数量、单价、折扣率单元格添加事件监听器，更新总价
+        $('#price-detail-table').on('input', 'td', function() {
+            updateTotalPrice();
+        });
+
+        // 监听全选复选框
+        $('#selectAllTop, #selectAllBottom').click(function() {
+            const state = this.checked;
+            $('input[name="gene_id"]:not(.modal .gene-checkbox)').each(function() {
+                if (!this.disabled && $(this).closest('tr').css('display') !== 'none') {
+                    this.checked = state;
+                }
+            });
+            $('#selectAllTop, #selectAllBottom').prop('checked', state);
+            updateTotalPrice();
+        });
+
+        // 监听日期复选框
+        $('.date-select-checkbox').on('click', function() {
+            const date = $(this).data('date');
+            const isChecked = this.checked;
+            $('.gene-checkbox[data-date="' + date + '"]:visible').each(function() {
+                if (!this.disabled) {
+                    this.checked = isChecked;
+                }
+            });
+            updateTotalPrice();
+        });
+
+        // 监听状态筛选器的变化
+        $('#statusFilter').on('change', function() {
+            const selectedStatus = this.value;
+            $('tbody tr[data-status]').each(function() {
+                $(this).toggle(selectedStatus === 'all' || $(this).data('status') === selectedStatus);
+            });
+            updateTotalPrice();
+        });
+
+        // 提交按钮处理
+        $('#checkoutButton').on('click', function () {
+            const selectedGenes = $('input.gene-checkbox:checked').map(function () {
+                return this.value;
+            }).get();
+
+            if (selectedGenes.length === 0) {
+                alert('Please select at least one item!');
+                return;
+            }
+
+            // 遍历选中基因的状态
+            let hasForbidden = false;
+            let hasNeedsOptimization = false;
+            let hasOptimizing = false;
+            let hasOptimizeFailed = false;
+            let hasError = false;
+
+            $('input.gene-checkbox:checked').each(function () {
+                const row = $(this).closest('tr');
+                const sequenceStatus = row.data('status'); // 序列状态
+                const optimizationStatus = row.data('optimization-status'); // 优化状态
+
+                if (sequenceStatus === 'forbidden' && optimizationStatus !== 'Optimized') {
+                    hasForbidden = true;
+                }
+                if (optimizationStatus === 'NeedsOptimization') {
+                    hasNeedsOptimization = true;
+                }
+                if (optimizationStatus === 'Optimizing') {
+                    hasOptimizing = true;
+                }
+                if (optimizationStatus === 'OptimizeFailed') {
+                    hasOptimizeFailed = true;
+                }
+                if (sequenceStatus === 'error') {
+                    hasError = true;
+                }
+            });
+
+            // 判断逻辑
+            if (hasForbidden) {
+                alert('Forbidden items must be optimized before submission.');
+                return;
+            }
+
+            if (hasNeedsOptimization) {
+                alert('Some items are marked for optimization. Please wait for optimization to complete.');
+                return;
+            }
+
+            if (hasOptimizing) {
+                alert('Some items are still optimizing. Please wait for the optimization to finish.');
+                return;
+            }
+
+            if (hasOptimizeFailed) {
+                alert('Some items failed to optimize. Please retry optimization before submission.');
+                return;
+            }
+
+            if (hasError) {
+                alert('Some items have errors and cannot be submitted. Please fix the issues.');
+                return;
+            }
+
+            // 提交逻辑
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            selectedGenes.forEach(function (id) {
+                formData.append('gene_ids', id);
+            });
+
+            fetch('{% url "user_center:checkout" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.status === 'success') {
+                    alert('Submit successfully!');
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch((error) => console.error('Error:', error));
+        });
+    });
+</script>
 <script>
     // 删除单个基因
     function del_gene(the, gene_id) {
@@ -837,23 +1094,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return selectedValues;
     }
-    // 优化选中的基因
-    function optimizeSelected() {
-        const selectedValues = getSelectedValues();
-        if (selectedValues.length > 0) {
-            // Example: send data to server
-            fetch('{% url "user_center:bulk_optimization_submit" %}', {
-                method: 'POST',
-                body: JSON.stringify({ ids: selectedValues }),
-                headers: { 'Content-Type': 'application/json' }
-            }).then(response => response.json()).then(data => {
-                console.log(data);
-            });
-            console.log(data);
-        } else {
-            alert("No items selected");
-        }
-    }
+
     // 下载GenBank格式文件
     function bulkdownloadSelectedGenBank() {
         const selectedValues = getSelectedValues();
@@ -956,10 +1197,164 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 </script>
 <script>
-    function showToast() {
-        var toastEl = document.getElementById('workingToast');
-        var toast = new bootstrap.Toast(toastEl);
-        toast.show();
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    // Custom selectAll button
+    const table = $('#gene-table-datatable').DataTable({
+        dom: 'Bfrtip',
+        buttons: [
+            {
+                text: 'Select All',
+                action: function (e, dt, node, config) {
+                    // 根据按钮文本判断当前状态
+                    if (node.text() === 'Select All') {
+                        // 全选非 Error 行
+                        dt.rows().deselect();
+                        dt.rows().every(function (rowIdx) {
+                            const rowData = this.data();
+                            const parser = new DOMParser();
+                            const parsedDoc = parser.parseFromString(rowData[6], 'text/html');
+                            const optimizationStatus = parsedDoc.body.textContent.trim();
+                            if (optimizationStatus !== 'Error') {
+                                dt.row(rowIdx).select();
+                            }
+                        });
+                        node.text('Deselect All');
+                    } else {
+                        // 取消所有选择
+                        dt.rows().deselect();
+                        node.text('Select All');
+                    }
+                }
+            }
+        ],
+        columnDefs: [{
+            orderable: false,
+            className: 'select-checkbox',
+            targets: 0
+        }],
+        select: {
+            style: 'multi',  // 确保多选模式
+            selector: 'td:first-child'
+        },
+        pageLength: 5,
+        order: [[1, 'asc']],
+        createdRow: function (row, data, dataIndex) {
+            // 检查当前行是否为Error状态
+            const parser = new DOMParser();
+            const parsedDoc = parser.parseFromString(data[6], 'text/html');
+            const optimizationStatus = parsedDoc.body.textContent.trim();
+
+            if (optimizationStatus === 'Error') {
+                // 移除select-checkbox类，清空该单元格
+                $('td:eq(0)', row).removeClass('select-checkbox').empty();
+            }
+        }
+    });
+    // 使用 user-select 事件在用户尝试选择行时拦截
+    table.on('user-select', function (e, dt, type, cell, originalEvent) {
+        // 确保事件是由选择行触发的
+        if (type === 'row') {
+            // 获取当前行数据
+            const rowData = dt.row(cell.index().row).data();
+            // rowData是一个数组，对应表格列的数据顺序
+            // 根据你的表格定义，Optimization Status位于列索引6
+            const parser = new DOMParser();
+            const parsedDoc = parser.parseFromString(rowData[6], 'text/html');
+            const optimizationStatus = parsedDoc.body.textContent.trim();
+
+            // 如果状态为Error，则阻止该行被选中
+            if (optimizationStatus === 'Error') {
+                e.preventDefault();
+            }
+        }
+    });
+    // 将DataTable中所有行及其gene-id保存起来，以便后续筛选使用
+    const allRows = [];
+    table.rows().every(function (rowIdx, tableLoop, rowLoop) {
+        const rowNode = this.node();
+        const geneId = $(rowNode).data('gene-id');
+        const rowData = this.data(); // 每行的表格数据（数组格式）
+        allRows.push({ geneId: geneId, data: rowData });
+    });
+
+    // 当点击 Codon Optimization 按钮时，根据选择情况动态展示
+    document.getElementById('codonOptimizeButton').addEventListener('click', function () {
+        const selectedGeneIds = $('input.gene-checkbox:checked').map(function () {
+            return $(this).val();
+        }).get();
+
+        table.clear();  // 清空原有数据
+
+        let rowsToAdd;
+        if (selectedGeneIds.length === 0) {
+            // 未选中任何基因时：显示所有
+            rowsToAdd = allRows; 
+        } else {
+            // 已选中部分基因时：只显示选中基因
+            rowsToAdd = allRows.filter(r => selectedGeneIds.includes(String(r.geneId)));
+        }
+
+        // 按行添加，并为每个添加的行增加 data-gene-id 属性
+        rowsToAdd.forEach(r => {
+            const rowNode = table.row.add(r.data).draw(false).node();
+            $(rowNode).attr('data-gene-id', r.geneId);
+        });
+
+        table.draw();
+    });
+
+    // 表单提交逻辑
+    $('#bulkOptimizationForm').on('submit', function (event) {
+        event.preventDefault();
+
+        // 从DataTables获取当前显示（过滤后）的行节点
+        // 获取选中的基因 ID
+        var selectedGenes = $('#gene-table-datatable').DataTable().rows({ selected: true }).nodes().to$().map(function() {
+            return $(this).data('gene-id');
+        }).get();
+        console.log('Selected genes:', selectedGenes);
+
+        if (selectedGenes.length === 0) {
+            alert('Please select at least one gene.');
+            return;
+        }
+
+        // 验证物种选择
+        const selectedSpecies = $('#speciesSelect').val();
+        if (!selectedSpecies) {
+            alert('Please choose a species.');
+            return;
+        }
+
+        // 验证优化方法选择
+        const selectedMethod = $('input[name="optimization_method"]:checked').val();
+        if (!selectedMethod) {
+            alert('Please select an optimization method.');
+            return;
+        }
+
+        // 设置隐藏字段
+        $('#selectedGenes').val(selectedGenes.join(','));
+        console.log('Selected genes:', selectedGenes);
+
+        // 动态添加优化方法字段
+        $('<input>').attr({
+            type: 'hidden',
+            name: 'optimization_method',
+            value: selectedMethod
+        }).appendTo(this);
+
+        // 动态添加物种字段
+        $('<input>').attr({
+            type: 'hidden',
+            name: 'species_select_for_optimization',
+            value: selectedSpecies
+        }).appendTo(this);
+
+        // 提交表单
+        this.submit();
+    });
+});
+
 </script>
 {% endblock %}

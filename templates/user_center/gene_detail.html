@@ -83,10 +83,13 @@
                                     <th></th> <!-- For Select Checkboxes -->
                                     <th>#</th>
                                     <th>GeneName</th>
+                                    <th>SeqType</th>
                                     <th>Vector</th>
-                                    <th>Status</th>
+                                    <th>Sequence Status</th>
+                                    <th>Optimization Status</th>
                                     <th>Length</th>
                                     <th>GC%</th>
+                                    <th>Penalty</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -95,18 +98,46 @@
                                     <td></td> <!-- DataTables will render checkboxes here -->
                                     <td>{{ forloop.counter }}</td>
                                     <td>{{ gene.gene_name }}</td>
-                                    <td>{{ gene.vector.vector_id }}</td>
+                                    <td>
+                                        {% if gene.seq_type == 'NT' %}
+                                            <span class="badge rounded-pill text-bg-info">NT</span>
+                                        {% else %}
+                                            <span class="badge rounded-pill" style="background-color: #e4b9f8; color: black;">{{ gene.seq_type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ gene.vector.vector_name }}</td>
                                     <td>
                                         {% if gene.status == 'forbidden' %}
                                             <span class="badge bg-danger">Forbidden</span>
                                         {% elif gene.status == 'validated' %}
                                             <span class="badge bg-success text-dark">Validated</span>
                                         {% else %}
-                                            <span class="badge bg-info">Saved</span>
+                                            <span class="badge bg-info">{{ gene.status }}</span>
                                         {% endif %}
                                     </td>
+                                    <td>
+                                        {% if gene.optimization_status == 'Pending' %}
+                                            <span class="badge" style="background-color: #6c757d;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Optimizing' %}
+                                            <span class="badge" style="background-color: #0d6efd;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'NotOptimized' %}
+                                            <span class="badge" style="background-color: #ffc107;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Optimized' %}
+                                            <span class="badge" style="background-color: #198754;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'NeedsOptimization' %}
+                                            <span class="badge" style="background-color: #fd7e14">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'OptimizeFailed' %}
+                                            <span class="badge" style="background-color: #dc3545;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Skipped' %}
+                                            <span class="badge" style="background-color: #0dcaf0;">{{ gene.optimization_status }}</span>
+                                        {% elif gene.optimization_status == 'Error' %}
+                                            <span class="badge" style="background-color: #880808;">{{ gene.optimization_status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ gene.optimization_status }}</span>
+                                        {% endif %}
                                     <td>{{ gene.original_seq|length }}</td>
                                     <td>{{ gene.original_gc_content|floatformat }}</td>
+                                    <td>{{ gene.penalty_score }}</td>
                                 </tr>
                             {% endfor %}
                             </tbody>
@@ -164,13 +195,13 @@
                     <input type="hidden" id="selectedGenes" name="selected_genes">
                     <div class="text-center">
                         <button type="submit" class="btn btn-primary">Submit</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
-
 
 <!-- Bootstrap Toasts for warnings centered -->
 <div class="position-fixed top-50 start-50 translate-middle toast-container" style="z-index: 1055;">
@@ -259,10 +290,9 @@
         <div class="accordion mb-3" id="accordion{{ forloop.counter }}">
             <div class="card accordion-item">
                 <div class="accordion-header" id="heading{{ forloop.counter }}">
-                    <button class="accordion-button text-white  
-                        {% if gene.status == 'forbidden' %} bg-danger {% elif gene.penalty_score > 50 %} bg-warning {% else %} bg-success {% endif %}" 
-                    type="button" 
-                    data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                    <button class="accordion-button text-white 
+                        {% if gene.status == 'error' %} bg-danger {% elif gene.status == 'forbidden' %} bg-danger {% elif gene.penalty_score > 50 %} bg-warning {% else %} bg-success {% endif %}" 
+                        type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
                         <div class="col-4 text-start">
                             {{ forloop.counter }}. Item Name: {{ gene.gene_name }} 
                         </div>
@@ -278,6 +308,8 @@
                         </div>
                     </button>
                 </div>
+                <!-- 在这里区分AA和NT -->
+                {% if gene.seq_type == 'NT' %}
                 <div id="collapse{{ forloop.counter }}" class="accordion-collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordion{{ forloop.counter }}">
                     <div class="card-body">
                         <!-- Sequence box -->
@@ -290,10 +322,10 @@
                                 <!-- sequences content here -->
                                 <div class="card">
                                     <div {% if gene.status != 'saved' %} style="display:none" {% endif %} class="card-body text-truncate first_col_trun" id="sequence-truncate">
-                                        {{ gene.original_seq|highlight_sequence_with_offset:gene.original_highlights|safe }}
+                                        {% highlight_sequence_with_offset gene.original_seq gene.original_highlights gene.i5nc %}
                                     </div>
                                     <div {% if gene.status == 'saved' %} style="display:none" {% endif %} class="card-body monospace-text first_col_full" id="sequence">
-                                        {{ gene.original_seq|highlight_sequence_with_offset:gene.original_highlights|safe }}
+                                        {% highlight_sequence_with_offset gene.original_seq gene.original_highlights gene.i5nc %}
                                     </div>
                                 </div>
                             </div>
@@ -422,11 +454,48 @@
                         </div>
                     </div>
                 </div>
+                {% elif gene.seq_type == 'AA' %}
+                <div id="collapse{{ forloop.counter }}" class="accordion-collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordion{{ forloop.counter }}">
+                    <div class="card-body">
+                        <!-- Sequence box -->
+                        <div class="row">
+                            <!-- First Column Original sequences -->
+                            <div class="col-md-5 col-12">
+                                <p class="monospace-text">Original sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="Raw AA sequence"></i> : Length {{gene.original_seq|length}} bp.</p>
+                                <!-- sequences content here -->
+                                <div class="card">
+                                    <div class="card-body monospace-text first_col_full" id="sequence">
+                                        {{ gene.original_seq|highlight_sequence_no_offset:gene.original_highlights|safe }}
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Second Column Edited sequences -->
+                            <div class="col-md-5 col-12">
+                                <p class="monospace-text">Edited sequences <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top" 
+                                    title="A 20 bp upstream vector sequence and a 20 bp downstream vector sequence are shown in grey. 
+                                    This only provides a view for insertion site, which is not counted for charging"></i> : Length {{gene.saved_seq|length}} bp. Overall GC content {{ gene.modified_gc_content|floatformat }}%</p>
+                                <div class="card">
+                                    {% if gene.saved_seq %}
+                                    {{ gene.saved_seq|highlight_sequence_no_offset:gene.modified_highlights|safe }}
+                                    {% else %}
+                                        <div class="action-inner">
+                                            <i class="bi bi-exclamation-circle"></i>
+                                            <p class="action-text">Sequence is not optimized, please optimize first.</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
 </div>
+
 <!-- bottom buttons -->
 <div class="container fixed-bottom">
     <div class="col text-center">
@@ -440,105 +509,14 @@
         <i class="bi bi-bar-chart-line me-2"></i>Load All Codon Usage Charts</button>
     </div>
 </div>
+
+
 {% endblock %}
 
 {% block javascript %}
 <script src="{% static 'species/amino_acid_data.js' %}"></script>
 <script src="{% static 'species/species_data.js' %}"></script>
 
-<script>
-    // Bulk Optimization Modal
-    $(document).ready(function() {
-        var selectAllState = false;
-
-        // Custom selectAll button
-        $.fn.dataTable.ext.buttons.selectAll = {
-            text: 'Select All',
-            action: function (e, dt, node, config) {
-                if (selectAllState) {
-                    dt.rows({ search: 'applied' }).deselect();
-                    node.text('Select All');
-                } else {
-                    dt.rows({ search: 'applied' }).select();
-                    node.text('Deselect All');
-                }
-                selectAllState = !selectAllState;
-            }
-        };
-
-        var table = $('#gene-table-datatable').DataTable({
-            dom: 'Bfrtip',
-            buttons: [
-                {
-                    extend: 'selectAll',
-                }
-            ],
-            select: {
-                style: 'multi+shift'
-            },
-            columnDefs: [{
-                orderable: false,
-                className: 'select-checkbox',
-                targets: 0
-            }],
-            order: [[ 1, 'asc' ]],
-        });
-
-        // Form submission handling for bulk optimization
-        $('#bulkOptimizationForm').on('submit', function(event) {
-            event.preventDefault(); // 防止默认表单提交
-
-            // 获取选中的基因 ID
-            var selectedGenes = $('#gene-table-datatable').DataTable().rows({ selected: true }).nodes().to$().map(function() {
-                return $(this).data('gene-id');
-            }).get();
-
-            // 验证是否选择了基因
-            if (selectedGenes.length === 0) {
-                var geneToast = new bootstrap.Toast(document.getElementById('geneToast'));
-                geneToast.show();
-                return;
-            }
-
-            // 验证物种选择
-            var selectedSpecies = $('#speciesSelect').val();
-            console.log("Selected species for debug: ", selectedSpecies);
-            if (!selectedSpecies) {
-                var speciesToast = new bootstrap.Toast(document.getElementById('speciesToast'));
-                speciesToast.show();
-                return;
-            }
-
-            // 验证优化方法选择
-            var selectedMethod = $('input[name="optimization_method"]:checked').val();
-            if (!selectedMethod) {
-                alert('Please select an optimization method.');
-                return;
-            }
-
-            // 设置隐藏字段
-            $('#selectedGenes').val(selectedGenes.join(',')); // 设置选中的基因 ID
-            // Dynamically add optimization method field
-            $('<input>').attr({
-                type: 'hidden',
-                name: 'optimization_method',
-                value: selectedMethod
-            }).appendTo('#bulkOptimizationForm');
-
-            // Dynamically add species field
-            $('<input>').attr({
-                type: 'hidden',
-                name: 'species_select_for_optimization',
-                value: selectedSpecies
-            }).appendTo('#bulkOptimizationForm');
-
-            // 提交表单
-            this.submit();
-        });
-
-
-    });
-</script>
 <script>
     function getTagTextByHTML(html) {
         var tagged_seq = '';
@@ -1368,6 +1346,128 @@
         });
     }
 </script>
+<script>
+    // Bulk Optimization Modal
+    $(document).ready(function() {
+        // DataTable initialization
+        var table = $('#gene-table-datatable').DataTable({
+            dom: 'Bfrtip',
+            buttons: [{
+                text: 'Select All',
+                action: function (e, dt, node, config) {
+                    // 根据按钮文本判断当前状态
+                    if (node.text() === 'Select All') {
+                        // 全选非 Error 行
+                        dt.rows().deselect();
+                        dt.rows().every(function (rowIdx) {
+                            const rowData = this.data();
+                            const parser = new DOMParser();
+                            const parsedDoc = parser.parseFromString(rowData[6], 'text/html');
+                            const optimizationStatus = parsedDoc.body.textContent.trim();
+                            if (optimizationStatus !== 'Error') {
+                                dt.row(rowIdx).select();
+                            }
+                        });
+                        node.text('Deselect All');
+                    } else {
+                        // 取消所有选择
+                        dt.rows().deselect();
+                        node.text('Select All');
+                    }
+                }
+            }],
+            select: {
+                style: 'multi+shift'
+            },
+            columnDefs: [{
+                orderable: false,
+                className: 'select-checkbox',
+                targets: 0
+            }],
+            order: [[ 1, 'asc' ]],
+            createdRow: function (row, data, dataIndex) {
+                // 检查当前行是否为Error状态
+                const parser = new DOMParser();
+                const parsedDoc = parser.parseFromString(data[6], 'text/html');
+                const optimizationStatus = parsedDoc.body.textContent.trim();
 
+                if (optimizationStatus === 'Error') {
+                    // 移除select-checkbox类，清空该单元格
+                    $('td:eq(0)', row).removeClass('select-checkbox').empty();
+                }
+            }
+        });
+        // 使用 user-select 事件在用户尝试选择行时拦截
+        table.on('user-select', function (e, dt, type, cell, originalEvent) {
+            // 确保事件是由选择行触发的
+            if (type === 'row') {
+                // 获取当前行数据
+                const rowData = dt.row(cell.index().row).data();
+                // rowData是一个数组，对应表格列的数据顺序
+                // 根据你的表格定义，Optimization Status位于列索引6
+                const parser = new DOMParser();
+                const parsedDoc = parser.parseFromString(rowData[6], 'text/html');
+                const optimizationStatus = parsedDoc.body.textContent.trim();
+
+                // 如果状态为Error，则阻止该行被选中
+                if (optimizationStatus === 'Error') {
+                    e.preventDefault();
+                }
+            }
+        });
+
+        // Form submission handling for bulk optimization
+        $('#bulkOptimizationForm').on('submit', function(event) {
+            event.preventDefault(); // 防止默认表单提交
+
+            // 获取选中的基因 ID
+            var selectedGenes = $('#gene-table-datatable').DataTable().rows({ selected: true }).nodes().to$().map(function() {
+                return $(this).data('gene-id');
+            }).get();
+
+            // 验证是否选择了基因
+            if (selectedGenes.length === 0) {
+                var geneToast = new bootstrap.Toast(document.getElementById('geneToast'));
+                geneToast.show();
+                return;
+            }
+
+            // 验证物种选择
+            var selectedSpecies = $('#speciesSelect').val();
+            console.log("Selected species for debug: ", selectedSpecies);
+            if (!selectedSpecies) {
+                var speciesToast = new bootstrap.Toast(document.getElementById('speciesToast'));
+                speciesToast.show();
+                return;
+            }
+
+            // 验证优化方法选择
+            var selectedMethod = $('input[name="optimization_method"]:checked').val();
+            if (!selectedMethod) {
+                alert('Please select an optimization method.');
+                return;
+            }
+
+            // 设置隐藏字段
+            $('#selectedGenes').val(selectedGenes.join(',')); // 设置选中的基因 ID
+            // Dynamically add optimization method field
+            $('<input>').attr({
+                type: 'hidden',
+                name: 'optimization_method',
+                value: selectedMethod
+            }).appendTo('#bulkOptimizationForm');
+
+            // Dynamically add species field
+            $('<input>').attr({
+                type: 'hidden',
+                name: 'species_select_for_optimization',
+                value: selectedSpecies
+            }).appendTo('#bulkOptimizationForm');
+
+            // 提交表单
+            this.submit();
+        });
+    });
+</script>
 {% endblock %}
 

@@ -199,12 +199,14 @@
 
         hot1 = new Handsontable(container1, {
             // 配置
-            colHeaders: ['Gene Name', 'Sequence'],
+            colHeaders: ['Gene Name', 'Sequence', 'i5 Non-coding', 'i3 Non-coding'],
             rowHeaders: true,
-            colWidths: [300, 600],  // 设置每列的宽度
+            colWidths: [200, 600, 150, 150],  // 设置每列的宽度
             columns: [
                 { data: 'GeneName', validator: geneNameValidator },
                 { data: 'Sequence', validator: sequenceValidator },
+                { data: 'i5NC', validator: sequenceValidator },
+                { data: 'i3NC', validator: sequenceValidator },
             ],
             height: 'auto',
             width: 'auto',
@@ -332,7 +334,8 @@
                 alert(data.message);
             } else {
                 // 跳转到载体分析页面
-                window.location.href = '/user_center/gene_detail/';
+                // window.location.href = '/user_center/gene_detail/';
+                window.location.href = '/user_center/view_cart/';
             }
         })
         .catch((error) => {
@@ -395,11 +398,12 @@
                 // 当收到状态为 'info' 的响应时显示弹窗
                 // alert(data.message);
                 // 当收到状态为info的响应时跳转到指定页面
-                window.location.href = '/user_center/submit_notification/';
+                // window.location.href = '/user_center/submit_notification/';
+                window.location.href = '/user_center/view_cart/';
                 
             } else {
                 // 跳转到载体分析页面
-                window.location.href = '/user_center/gene_detail/';
+                window.location.href = '/user_center/view_cart/';
             }
         })
         .catch((error) => {

@@ -4,6 +4,7 @@ import tempfile
 import zipfile
 import uuid
 import pandas as pd
+import numpy as np
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
 from django.http import HttpResponse, JsonResponse
@@ -16,7 +17,7 @@ from django.conf import settings
 
 from product.models import GeneSynEnzymeCutSite, Species, Vector
 from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
-from tools.scripts.ParsingGenBank import addFeaturesToGeneBank
+from tools.scripts.ParsingGenBank import addFeaturesToGeneBank, addMultipleFeaturesToGeneBank
 from tools.scripts.penalty_score_predict import predict_new_data_from_df
 from .models import Cart, GeneInfo, GeneOptimization, OrderInfo
 from .utils.render_to_pdf import render_to_pdf
@@ -65,66 +66,46 @@ def order_create(request):
         # Get or create a shopping cart for the user
         cart, created = Cart.objects.get_or_create(user=request.user)
 
-        response_message = ""
         new_gene_ids_for_session = []  # 用于存储新创建的基因的id, 用于session
 
-        # 处理基因表格，根据列数判断是AA序列还是NT序列，NT序列只有两列，AA序列有6列
-        if len(df.columns) == 2:
-            # print("Start processing NT sequence")
-            df.columns = ['GeneName', 'OriginalSeq']  # 重命名列名，方便后续处理
-            ###############################################################################################################################
-            # 去掉换行符和空格
-            df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
-            df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row["OriginalSeq"]}{vector.id20.lower()}', axis=1)
+        # 处理基因表格，根据列数判断是AA序列还是NT序列，NT序列只有4列，AA序列有6列
+        if len(df.columns) == 4:
+            print("Start processing NT sequence")
+            df.columns = ['GeneName', 'OriginalSeq', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
+            # 如果i5nc和i3nc为空，填充为''
+            df['i5nc'] = df['i5nc'].fillna('')
+            df['i3nc'] = df['i3nc'].fillna('')
             
-            ###############################################################################################################################
+            df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
+            df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row.get("i5nc",'')}{row["OriginalSeq"]}{row.get("i3nc","")}{vector.id20.lower()}', axis=1)
             # 计算GC含量, 将序列转换为大写后计算GC含量
             df['original_gc_content'] = df['OriginalSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
             df['modified_gc_content'] = df['CombinedSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
 
-            ###############################################################################################################################
             # 清理序列并检查是否包含非法碱基
-            df['CombinedSeq'], df['warnings'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
+            df['CombinedSeq'], df['Error'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
 
             ##########################################################################################################################
-            # Forbidden Check : 检测序列中是否包含禁止序列，有则记录其起始和终止位置和序列,
-            # 从酶切位点数据库中获取禁止序列，每个禁止序列都有一个适用范围，即起始和终止位置
-            # 然后应用到每个基因序列中，如果基因序列中包含禁止序列，则记录其起始和终止位置
+            # Forbidden Check List
             forbidden_list_objects = GeneSynEnzymeCutSite.objects.all()
             built_in_forbidden_list = [obj.enzyme_seq for obj in forbidden_list_objects]
-
             df['forbidden_info'] = df.apply(
-                lambda row: check_forbidden_seq(row['CombinedSeq'], built_in_forbidden_list),
-                axis=1
-            )
-
-            # 检查forbidden 修改status
-            df['status'] = df.apply(
-                lambda row: 'forbidden' if row['forbidden_info'] or row['warnings'] else 'validated', 
-                axis=1
+                lambda row: check_forbidden_seq(row['CombinedSeq'], built_in_forbidden_list), axis=1
             )
 
             ###############################################################################################################################
             # Repeats Finder. sequence 和 gene_id 是查找repeats时必须的字段, 给这两列重新赋值，不需要重命名。
             df['gene_id'] = df['GeneName']
             df['sequence'] = df['CombinedSeq']
-            # print("df: \n", df)
             data_json = convert_gene_table_to_RepeatsFinder_Format(df)
-            # print("data_json: \n", data_json)
             result_df = process_gene_table_results(data_json)
 
-            # 调用模型去预测
             model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_12.pkl')
             weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_12.npy')
-            predicted_data = predict_new_data_from_df(
-                result_df, 
-                model_path=model_path, 
-                scaler=None, 
-                weights_path=weights_path
-            )
-            # 将结果合并到原始数据中
-            df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')
+            predicted_data = predict_new_data_from_df(result_df, model_path=model_path, scaler=None, weights_path=weights_path)
             
+            # 将结果合并到原始数据中
+            df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')            
             ###############################################################################################################################
             # 整合  把forbidden seq，warnings，stop codons的content加到 FoundForbiddenSequence中，在header中展示。
             df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
@@ -137,15 +118,25 @@ def order_create(request):
 
             # 最后把CombinedSeq赋值给saved_seq
             df['saved_seq'] = df['CombinedSeq']  # 有必要写到这里吗？
+            df['warnings'] = df.apply(deal_repeats_warnings, axis=1)
+            df['status'] = df.apply(process_status, axis=1)
+            print("df: \n", df[['warnings', 'contained_forbidden_list', 'status', 'forbidden_info', 'highlights_positions', 'Error']])
             
             gene_objects = []
-
             for _, row in df.iterrows():
                 gene_id = row['gene_id']
 
                 # 查找与当前行 gene_id 对应的分析结果
                 analysis_results = data_json.get(gene_id, {})
-
+                # 标记优化状态, 要根据序列状态来判断，如果是forbidden，就是NeedToOptimize，如果是validated，就是NotOptimized
+                if row['status'] == 'forbidden':
+                    optimization_status = 'NeedsOptimization'
+                elif row['status'] == 'error':
+                    optimization_status = 'Error'
+                elif row['status'] == 'warning':
+                    optimization_status = 'NotOptimized'
+                else:
+                    optimization_status = 'NotOptimized'
                 # 创建 GeneInfo 对象，存储分析结果
                 gene_objects.append(
                     GeneInfo(
@@ -168,6 +159,8 @@ def order_create(request):
                         modified_highlights=row.get('highlights_positions', []),
                         penalty_score=row.get('total_penalty_score', None),
                         seq_type='NT',  # 标记序列类型
+                        optimization_status=optimization_status, # 标记优化状态
+
                         # 存储从 data_json 匹配到的分析结果
                         analysis_results=analysis_results  # 假设你有一个 JSONField 或 TextField 存储分析结果
                     )
@@ -193,50 +186,54 @@ def order_create(request):
             # Extend the new_gene_ids_for_session with the IDs of the retrieved objects
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
         else:
-            # print("Processing AA sequence")
+            print("Processing AA sequence")
 
             df.columns = ['GeneName', 'OriginalSeq', 'Species', 'ForbiddenSeqs', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
             df['protein_sequence'] = df['OriginalSeq']
             df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","")  # 去掉换行符和空格
             
             # 检测非氨基酸字符
-            df['OriginalSeq'], df['warnings'] = zip(*df['protein_sequence'].apply(clean_and_check_protein_sequence))
-
-            # 整合
+            df['OriginalSeq'], df['Error'] = zip(*df['protein_sequence'].apply(clean_and_check_protein_sequence))
+            df['warnings'] = ''
+            print("df: \n", df)
             df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
-            df['highlights_positions'] = ''  # 暂时不处理高亮位置
+            df['highlights_positions'] = df.apply(process_highlights_positions, axis=1)
+
+            df['status'] = df.apply(process_status, axis=1)
 
             gene_objects = []
 
             for _, row in df.iterrows():
                 gene_id = row['GeneName']
 
-                # 创建 GeneInfo 对象，存储分析结果
+                # 创建 Species 对象
+                species = Species.objects.get(species_name=row.get('Species', None))
+                optimization_status = 'Error' if row['status'] == 'error' else 'NeedsOptimization'
+                # 创建 GeneInfo 对象，存储分析结
                 gene_objects.append(
                     GeneInfo(
                         user=request.user,
                         gene_name=gene_id,
                         original_seq=row['OriginalSeq'],
                         vector=vector,
-                        species=row.get('Species', None),
+                        species=species,
                         status=row.get('status', 'validated'),  # check if status is valid 
                         forbid_seq=row.get('forbidden_check_list', ''),
-                        combined_seq=row['protein_sequence'],
+                        combined_seq='',
                         i5nc=row.get('i5nc', ''),
                         i3nc=row.get('i3nc', ''),
-                        saved_seq=row.get('protein_sequence', ''),
+                        saved_seq='',
                         forbidden_check_list=row.get('forbidden_check_list', ''),
                         contained_forbidden_list=row.get('contained_forbidden_list', ''),
                         original_highlights=row.get('highlights_positions', []),
-                        modified_highlights=row.get('highlights_positions', []),
+                        modified_highlights='',
                         penalty_score=row.get('total_penalty_score', None),
-                        seq_type='AA',  # 标记序列类型
+                        optimization_status=optimization_status,
+                        seq_type='AA',
                     )
                 )
 
-            # Capture the current timestamp
             current_timestamp = timezone.now()
-
             with transaction.atomic():
                 # Bulk create gene objects without immediately assigning them to a variable with IDs
                 GeneInfo.objects.bulk_create(gene_objects)
@@ -250,16 +247,12 @@ def order_create(request):
 
             # Add the gene objects to the cart's genes many-to-many relationship
             cart.genes.add(*gene_objects_with_ids)
-            
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
 
         # Store the new gene IDs in the session for later use
         request.session['new_gene_ids'] = new_gene_ids_for_session
-
-        if response_message:
-            return JsonResponse({'status': 'info', 'message': response_message})
-        else:
-            return JsonResponse({'status': 'success', 'message': 'Data saved successfully'})
+        
+        return JsonResponse({'status': 'success', 'message': 'Data saved successfully'})
     else:
         company_vectors = Vector.objects.filter(user=None)
         species_list = Species.objects.all()
@@ -293,7 +286,6 @@ def clean_and_check_dna_sequence(sequence):
     
     return cleaned_sequence, None
 
-
 def clean_and_check_protein_sequence(sequence):    
     # 1. 删除空格、换行符等无关字符
     cleaned_sequence = sequence.replace(' ', '').replace('\n', '').replace('\t', '')
@@ -312,7 +304,7 @@ def clean_and_check_protein_sequence(sequence):
     # 使用正则表达式匹配连续的非标准氨基酸字符
     for match in re.finditer(r'[^ACDEFGHIKLMNPQRSTVWY]+', sequence_to_check):
         start = match.start()
-        end = match.end() - 1  # 结束位置需要减1，因为是闭区间
+        end = match.end()
         content = match.group()
         non_standard_amino_acids_info.append({'start': start, 'end': end, 'content': content})
     
@@ -334,19 +326,13 @@ def clean_and_check_protein_sequence(sequence):
     # 如果有终止密码子，添加它到处理后的序列
     return cleaned_sequence if has_terminal_stop else cleaned_sequence, None
 
-
 def process_contained_forbidden_list(row):
     # 获取 forbidden_info 中的 forbidden_seq 列表
     forbidden_seqs = [info['forbidden_seq'] for info in row.get('forbidden_info', [])] if row.get('forbidden_info') else []
 
-    # 获取 warnings，如果存在的话
-    warning_seqs = [each['content'] for each in row['warnings'] if 'content' in each] if row['warnings'] else []
-
-    # 合并 forbidden_seqs 和 warning_seqs
-    contained_forbidden_list = forbidden_seqs + warning_seqs #+ stop_codons
+    contained_forbidden_list = forbidden_seqs
 
     return contained_forbidden_list
-
 
 def process_highlights_positions(row):
     '''处理高亮位置'''
@@ -358,6 +344,8 @@ def process_highlights_positions(row):
     # 遍历每种分析类型以处理 start 和 end 位置
     for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT']:
         # 分割该类型的字符串值
+        if analysis_type not in row:
+            continue
         analysis_data = row[analysis_type].split('|')
         
         # 找到 start 和 end 的值
@@ -383,24 +371,64 @@ def process_highlights_positions(row):
                 })
 
     # 处理 forbidden_info 和 warnings 字段
-    if row['forbidden_info']:
+    if 'forbidden_info' in row:
         for info in row['forbidden_info']:
             highlights_positions.append({
                 'start': info['start'],
                 'end': info['end'],
-                'type': 'bg-danger',
+                'type': 'bg-info',
             })
 
-    if row['warnings']:
-        for warning in row['warnings']:
+    if 'Error' in row and row['Error']:  # 有Error列, qie有值的话，遍历Error列，添加到highlights_positions
+        for error in row['Error']:
             highlights_positions.append({
-                'start': warning['start'],
-                'end': warning['end'],
+                'start': error['start'],
+                'end': error['end'],
                 'type': 'bg-danger',
             })
-
     return highlights_positions
 
+def deal_repeats_warnings(row):
+    '''在LongRepeats，Homopolymers，W12S12Motifs，HighGC，LowGC，DoubleNT中查询，
+    只要任意一个有值，warnings就为True
+    '''
+    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT']:
+        if analysis_type in row and row[analysis_type]:
+            return True
+
+# 定义安全判断是否有值的函数
+def has_value(value):
+    if isinstance(value, (list, dict, set, np.ndarray)):  # 判断列表、字典、集合、数组
+        return len(value) > 0  # 长度大于0即为有效
+    elif isinstance(value, pd.Series):  # 如果是Pandas Series，使用any判断是否有值
+        return value.any()
+    elif pd.isna(value):  # 如果是None或NaN，返回False
+        return False
+    elif isinstance(value, str):  # 对字符串去空格后判断
+        return bool(value.strip())
+    return True  # 其他情况默认视为有值
+
+# 定义状态处理函数
+def process_status(row):
+    forbidden = has_value(row.get('contained_forbidden_list'))
+    error = has_value(row.get('Error'))
+    warning = has_value(row.get('warnings'))
+    print("forbidden: ", forbidden, "error: ", error, "warning: ", warning)
+    # 根据组合规则确定 status
+    if forbidden and error and warning:
+        return 'error'
+    elif forbidden and error:
+        return 'error'
+    elif forbidden:
+        return 'forbidden'
+    elif error and warning:
+        return 'error'
+    elif error:
+        return 'error'
+    elif warning:
+        return 'warning'
+    else:
+        return 'validated'
 
 # checked
 def submit_notification(request):
@@ -409,7 +437,6 @@ def submit_notification(request):
         return render(request, 'user_center/aa_sequence_submit_success.html')
     else:
         return render(request, 'user_center/aa_sequence_submit_success.html')
-
 
 @login_required
 def gene_detail(request):
@@ -458,7 +485,7 @@ def gene_data_api(request):
 
     data = gene_list.values('id', 'gene_name', 'original_seq', 'status', 'forbid_seq', 'vector__vector_id','modified_gc_content')
     return JsonResponse({'data': list(data)}, safe=False)
-        
+
 
 @login_required
 def save_species(request):
@@ -485,11 +512,6 @@ def gene_edit(request, gene_id):
         species_list = Species.objects.all()
         species_names = sorted([species.species_name for species in species_list])
         return render(request, 'user_center/gene_detail.html', {'gene_list': gene_list, 'species_names': species_names})
-
-@login_required
-def protein_edit(request, gene_id):
-    gene_list = GeneInfo.objects.filter(user=request.user, status__in=['optimizing', 'optimized', 'failed'])
-    return render(request, 'user_center/protein_detail.html', {'gene_list': gene_list})
 
 
 def handle_gene_saving(gene_object, edited_seq):
@@ -531,7 +553,7 @@ def gene_validation(request):
         user = request.user
         data = json.loads(request.body.decode('utf-8'))
         edited_seq = data.get("sequence") # 换个变量名，好区分
-        gene_id = data.get("gene_id")  # 应该换成gene_id，
+        gene_id = data.get("gene_id")  # 应该换成 gene_id，
 
         gene_object = GeneInfo.objects.get(user=user, id=gene_id)
         combined_seq = gene_object.combined_seq     # 不带格式有小写 {iu20}.lower() + seq + {id20}.lower(), 可以直接比较
@@ -539,18 +561,31 @@ def gene_validation(request):
         if combined_seq == edited_seq:
             return JsonResponse({'status': 'error', 'message': 'No changes made.'})
 
+        # 这里需要重新处理
         tagged_seq, seq_status, forbidden_check_list, contained_forbidden_list, \
             modified_gc_content, modified_highlights = process_sequence_get_highlight_position(edited_seq, gene_object.forbid_seq)
 
         if seq_status in ['Protein', 'Invalid Protein']:
             return JsonResponse({'status': 'error', 'message': 'Squence is not allowed. Your sequence may has '+ seq_status + ' sequence.'})
+        
+        if seq_status == 'forbidden':
+            optimization_status = 'NeedsOptimization'
+        elif seq_status == 'error':
+            optimization_status = 'Error'
+        elif seq_status == 'warning':
+            optimization_status = 'NotOptimized'
+        else:
+            optimization_status = 'NotOptimized'
+        
         gene_object.status = seq_status
         gene_object.saved_seq = tagged_seq
         gene_object.forbidden_check_list = forbidden_check_list
         gene_object.contained_forbidden_list = contained_forbidden_list
         gene_object.combined_seq = edited_seq
+        gene_object.original_seq = edited_seq
         gene_object.modified_highlights = modified_highlights
         gene_object.modified_gc_content = modified_gc_content
+        gene_object.optimization_status = optimization_status
         gene_object.save()
         return JsonResponse({'status': 'success', 'message': 'Validation process finished', 'new_seq': tagged_seq, 'seq_status': seq_status})
     except Vector.DoesNotExist:
@@ -608,17 +643,14 @@ def bulk_optimization_submit(request):
         gene_objects = GeneInfo.objects.filter(id__in=gene_ids)
 
         for gene in gene_objects:
-            gene.status = 'pending'
+            gene.optimization_status = 'Pending'
             gene.species = species_obj
             gene.optimization_method = optimization_method_dict.get(optimization_method)
             gene.optimization_id = uuid.uuid4()  # Generate a unique ID for optimization
             gene.save()
 
-        # 提交后重定向到展示页面
         return redirect('user_center:bulk_optimization_display')
 
-    # 如果不是 POST 请求，直接返回错误页面
-    # messages.error(request, "Invalid request method.")
     return redirect('user_center:bulk_optimization')
 
 @csrf_exempt
@@ -631,10 +663,12 @@ def condon_optimization_api(request):
     if request.method == "GET":
         try:
             # 获取查询参数中的 status 值，默认为 'pending'
-            status = request.GET.get('status', 'pending')
-
-            # 根据 status 过滤基因数据
-            gene_list = GeneInfo.objects.filter(status=status)
+            status = request.GET.get('status', 'Pending')
+            if status == 'pending':
+                status = 'Pending'
+            print("status: ", status)
+            # 根据 optimization_status 为Pending来过滤基因数据
+            gene_list = GeneInfo.objects.filter(optimization_status=status)
             print(f"Filtering genes with status: {status}")
             data = list(
                 gene_list.values(
@@ -660,11 +694,23 @@ def condon_optimization_api(request):
             status = request.POST.get("status")
             optimization_message = request.POST.get("optimization_message")
             
+            status_mapping = {
+                'completed': 'Optimized',
+                'failed': 'failed',
+                'processing': 'Optimizing',
+            }
+                
             # Update the gene information
             gene = GeneInfo.objects.get(optimization_id=task_id)  # assuming task_id maps to gene_id
-            gene.status = status
-            gene.saved_seq = optimized_seq
-            gene.optimization_message = optimization_message
+            if status_mapping.get(status) == 'failed':
+                gene.optimization_status = 'failed'
+                gene.optimization_message = optimization_message
+            else:
+                gene.optimization_status = status_mapping.get(status, 'Optimizing')
+                gene.saved_seq = optimized_seq
+                gene.modified_gc_content = round((optimized_seq.upper().count('G') + optimized_seq.upper().count('C')) / len(optimized_seq) * 100, 2)
+                # penalty_score = calculate_penalty_score(optimized_seq)
+                # gene.penalty_score = penalty_score
             gene.save()
 
             return JsonResponse({'status': 'success', 'message': 'Gene status updated successfully'})
@@ -701,9 +747,13 @@ def view_cart(request):
             key=lambda x: timezone.localtime(x.create_date).strftime('%Y-%m-%d %H:%M')
         )
     ]
+    # 获取所有物种的名称
+    species_list = Species.objects.all()
+    species_names = sorted([species.species_name for species in species_list])
 
     context = {
         'grouped_shopping_cart': grouped_shopping_cart,
+        'species_names': species_names,
     }
     return render(request, 'user_center/shoppingCart_view.html', context)
 
@@ -726,25 +776,58 @@ def gene_delete(request):
     else:
         return render(request, 'user_center/manage_order_create.html')
 
+def is_dna_or_protein(sequence):
+    # 将序列转换成大写以统一处理
+    sequence = sequence.upper()
+
+    # 定义DNA和氨基酸的字符集
+    dna_bases = set('ACGT')
+    amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+
+    # 检查是否所有字符都是DNA碱基
+    if all(base in dna_bases for base in sequence):
+        return "DNA"
+    
+    # 检查是否所有字符都是氨基酸
+    elif all(aa in amino_acids for aa in sequence):
+        return "Protein"
+
+    else:
+        # 如果有不匹配的字符，无法确定类型
+        return "Unknown"
 
 @login_required
 def cart_genbank_download(request, gene_id):
-    '''下载购物车中的基因的genbank文件'''
+    '''单个下载购物车中的基因的genbank文件， '''
     try:
         gene = GeneInfo.objects.get(user=request.user, id=gene_id)
     except GeneInfo.DoesNotExist:
         return HttpResponse("Gene not found", status=404)
-    
-    sequence = re.sub(r'<[^>]*>', '', gene.saved_seq)
-    # 删除序列前后的小写字母
-    sequence = re.sub(r'^[a-z]+|[a-z]+$', '', sequence)
+
+    i5nc = gene.i5nc
+    i3nc = gene.i3nc
+    sequence = gene.saved_seq
+    # 检查sequence是否为AA序列
+    if is_dna_or_protein(sequence) != 'DNA':
+        return HttpResponse("Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.", status=400)
+        # return JsonResponse({'status': 'error', 'message': 'Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.'}, status=400)
+    new_sequences = [i5nc, sequence, i3nc]
+    new_feature_names = ['i5NC', gene.gene_name, 'i3NC']
 
     vector = gene.vector
     if vector.vector_gb and os.path.exists(vector.vector_gb.path):
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file: # 确保文件使用后自动删除，减少空间占用
-            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', new_feature_name=gene)
-            
+            # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', new_feature_name=gene)
+            # 这里换成addMultipleFeaturesToGeneBank
+            addMultipleFeaturesToGeneBank(
+                genebank_file=vector_genbank_file_path, 
+                output_file=temp_file.name, 
+                new_sequences=new_sequences, 
+                new_feature_names=new_feature_names, 
+                start_feature_label='iU20', 
+                end_feature_label='iD20'
+            )
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
             response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
@@ -756,19 +839,58 @@ def cart_genbank_download(request, gene_id):
 @require_POST
 def generate_genbank(request):
     '''API :生成带有新特征的genbank文件'''
+    ''' GenBank API JSON 数据格式如下:
+    {
+        "Plasmid_GZID": "plasmid_id",
+        "features": [
+            {
+                "sequence": "ATGCGTAA",
+                "name": "Feature_1"
+            },
+            {
+                "sequence": "GGTACCTT",
+                "name": "Feature_2"
+            },
+            {
+                "sequence": "TACCGGTA",
+                "name": "Feature_3"
+            }
+        ],
+        "start_feature_label": "iU20",
+        "end_feature_label": "iD20"
+    }
+    '''
     if request.method == 'POST':
-        print("Request method: ", request.method)
-        # 获取参数
-        plasmid_gzid = request.POST.get('Plasmid_GZID')
-        nt_sequence = request.POST.get('NT_Sequence')
-        start_feature_label = request.POST.get('start_feature_label', 'iU20')  # 默认值
-        end_feature_label = request.POST.get('end_feature_label', 'iD20')  # 默认值
-        new_feature_name = request.POST.get('new_feature_name')
+        # 尝试解析JSON数据
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
+        
+        # 获取请求中的参数
+        plasmid_gzid = data.get('Plasmid_GZID')
+        features = data.get('features', [])
+        start_feature_label = data.get('start_feature_label', 'iU20')  # 默认值
+        end_feature_label = data.get('end_feature_label', 'iD20')  # 默认值
 
         # 验证参数完整性
-        if not plasmid_gzid or not nt_sequence or not new_feature_name:
-            return JsonResponse({"error": "Missing required parameters"}, status=400)
+        if not plasmid_gzid or not features:
+            return JsonResponse({"error": "Missing required parameters (Plasmid_GZID or features)"}, status=400)
 
+        # 提取特征序列和名称
+        new_sequences = []
+        new_feature_names = []
+        for f in features:
+            seq = f.get('sequence')
+            fname = f.get('name')
+            # 只添加非空序列的特征
+            if seq.strip():  # 去掉首尾空白后判断是否为空
+                new_sequences.append(seq.strip())
+                new_feature_names.append(fname)
+        
+        if not new_sequences:
+            return JsonResponse({"error": "No valid (non-empty) feature sequences provided"}, status=400)
+        
         # 验证Plasmid GZID是否有对应的genbank文件
         try:
             vector = Vector.objects.get(vector_id=plasmid_gzid)
@@ -778,18 +900,31 @@ def generate_genbank(request):
         if vector.vector_gb and os.path.exists(vector.vector_gb.path):
             vector_genbank_file_path = vector.vector_gb.path  # 获取文件路径
             print(vector_genbank_file_path)
-            # 清理输入序列
-            sequence = re.sub(r'<[^>]*>', '', nt_sequence)
-            sequence = re.sub(r'^[a-z]+|[a-z]+$', '', sequence)
+
+            # 对输入序列进行清理（如果有需要的话，这里主要看业务逻辑）
+            # 不过此处new_sequences通常是用户直接传入的真实序列，所以可能不需要复杂的清理
+            # 如果需要对序列进行简单清理，比如去除HTML标签和小写字符：
+            new_sequences = [re.sub(r'<[^>]*>', '', seq) for seq in new_sequences]
+            new_sequences = [re.sub(r'^[a-z]+|[a-z]+$', '', seq) for seq in new_sequences]
 
             # 生成带有新特征的GenBank文件
             with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file:
-                addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, start_feature_label, end_feature_label, new_feature_name=new_feature_name)
-                
+                addMultipleFeaturesToGeneBank(
+                    genebank_file=vector_genbank_file_path, 
+                    output_file=temp_file.name, 
+                    new_sequences=new_sequences, 
+                    new_feature_names=new_feature_names, 
+                    start_feature_label=start_feature_label, 
+                    end_feature_label=end_feature_label
+                )
                 # 返回生成的文件
                 temp_file.seek(0)
+
+                # 文件名可以根据需求自定义，这里只取中间的名称作为参考
+                output_filename = f"{plasmid_gzid}-{new_feature_names[1]}.gb"
                 response = HttpResponse(temp_file.read(), content_type='application/genbank')
-                response['Content-Disposition'] = f'attachment; filename="{plasmid_gzid}-{new_feature_name}.gb"'
+                response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+
                 return response
         else:
             return JsonResponse({"error": "No vector GenBank file found"}, status=404)
@@ -799,14 +934,15 @@ def generate_genbank(request):
 
 @require_POST
 @login_required
-def bulk_download_genbank(request):
+def bulk_download_genbank_v1(request):
     '''批量下载购物车中的基因的genbank文件'''
+    # 注意：AA 序列是不能生成genbank文件的，要检查序列类型
     try:
         data = json.loads(request.body)
         gene_ids = data.get('gene_ids', [])
         if not gene_ids:
             return JsonResponse({"error": "No genes selected"}, status=400)
-
+        print("gene_ids: ", gene_ids)
         temp_zip = tempfile.NamedTemporaryFile(delete=False)
         with zipfile.ZipFile(temp_zip, 'w') as zf:
             for gene_id in gene_ids:
@@ -819,6 +955,61 @@ def bulk_download_genbank(request):
                         vector_genbank_file_path = vector.vector_gb.path
                         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
                             addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', gene)
+                            temp_file.seek(0)
+                            genbank_content = temp_file.read()
+                            genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
+                            zf.writestr(genbank_filename, genbank_content)
+                            temp_file.close()
+                            os.remove(temp_file.name)
+                    else:
+                        zf.writestr(f"Error-{gene_id}.txt", "No vector GenBank file found")
+                except GeneInfo.DoesNotExist:
+                    zf.writestr(f"Error-{gene_id}.txt", "Gene not found")
+
+        temp_zip.seek(0)
+        response = HttpResponse(temp_zip.read(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="RootPath-Online-Submission.zip"'
+        temp_zip.close()
+        os.remove(temp_zip.name)
+        return response
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@require_POST
+@login_required
+def bulk_download_genbank(request):
+    '''批量下载购物车中的基因的genbank文件'''
+    # 注意：AA 序列是不能生成genbank文件的，要检查序列类型
+    try:
+        data = json.loads(request.body)
+        gene_ids = data.get('gene_ids', [])
+        if not gene_ids:
+            return JsonResponse({"error": "No genes selected"}, status=400)
+        
+        temp_zip = tempfile.NamedTemporaryFile(delete=False)
+        with zipfile.ZipFile(temp_zip, 'w') as zf:
+            for gene_id in gene_ids:
+                try:
+                    gene = GeneInfo.objects.get(user=request.user, id=gene_id)
+                    sequence = gene.saved_seq
+                    if is_dna_or_protein(sequence) != 'DNA':
+                        zf.writestr(f"Error-{gene_id}.{gene.gene_name}.txt", "Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.")
+                        continue
+                    i5nc = gene.i5nc
+                    i3nc = gene.i3nc
+
+                    vector = gene.vector
+                    if vector.vector_gb:
+                        vector_genbank_file_path = vector.vector_gb.path
+                        with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
+                            addMultipleFeaturesToGeneBank(
+                                genebank_file=vector_genbank_file_path, 
+                                output_file=temp_file.name, 
+                                new_sequences=[i5nc, sequence, i3nc], 
+                                new_feature_names=['i5NC', gene.gene_name, 'i3NC'], 
+                                start_feature_label='iU20', 
+                                end_feature_label='iD20'
+                            )
                             temp_file.seek(0)
                             genbank_content = temp_file.read()
                             genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
@@ -1090,6 +1281,8 @@ def calculate_gc_content(sequence):
     sequence = sequence.upper().replace(" ", "")
     gc_count = sequence.count('G') + sequence.count('C')
     gc_content = (gc_count / len(sequence)) * 100
+    # 取两位小数
+    gc_content = round(gc_content, 2)
     return gc_content
 
 def check_regional_gc_content(sequence, window_size=20, threshold_low=20, threshold_high=80):

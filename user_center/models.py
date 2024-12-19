@@ -46,6 +46,7 @@ class GeneInfo(models.Model):
     def __str__(self):
         return self.gene_name
 
+
 class OrderInfo(models.Model):
     def user_directory_path(instance, filename):
         # 文件将被上传到 MEDIA_ROOT/user_<id>/vector_file/<filename>

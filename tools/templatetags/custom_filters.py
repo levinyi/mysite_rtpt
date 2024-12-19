@@ -1,8 +1,7 @@
 import re
 from django import template
 import os
-import json
-from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -32,13 +31,20 @@ def get_previous(value, arg):
     # used in shopping cart html
     return value[arg - 1] if arg > 0 else None
 
+@register.simple_tag
+def highlight_sequence_with_offset(sequence, highlights, i5nc):
+    """
+    针对 original_seq 的高亮，位移前移i5nc的长度
+    """
+    offset = len(i5nc) + 20
+    return highlight_sequence(sequence, highlights, offset)
 
-@register.filter
-def highlight_sequence_with_offset(sequence, highlights):
-    """
-    针对 original_seq 的高亮，位移前移 20bp
-    """
-    return highlight_sequence(sequence, highlights, 20)
+# @register.filter
+# def highlight_sequence_with_offset(sequence, highlights):
+#     """
+#     针对 original_seq 的高亮，位移前移i5nc的长度
+#     """
+#     return highlight_sequence(sequence, highlights, offset)
 
 @register.filter
 def highlight_sequence_no_offset(sequence, highlights):
@@ -58,6 +64,7 @@ def highlight_sequence(sequence, highlights, offset):
     tags = []
     if highlights is None:
         return sequence
+    
     for highlight in highlights:
         tags.append((highlight['start'] - offset, 'start', highlight['type']))
         tags.append((highlight['end'] - offset, 'end', highlight['type']))
@@ -66,7 +73,8 @@ def highlight_sequence(sequence, highlights, offset):
 
     tag_map = {
         'text-warning': ('<i class="text-warning">', '</i>'),
-        'bg-danger': ('<span class="bg-danger">', '</span>')
+        'bg-danger': ('<span class="bg-danger">', '</span>'),
+        'bg-info': ('<span class="bg-info">', '</span>')
     }
 
     result = []
@@ -108,7 +116,7 @@ def highlight_sequence(sequence, highlights, offset):
     while tag_stack:
         close_tag(tag_stack.pop())
 
-    return ''.join(result)
+    return mark_safe(''.join(result))
 
 @register.filter
 def percentage_of(value, total):
@@ -138,3 +146,13 @@ def base_length(seq):
     seq = re.sub(r'^[a-z]+', '', seq)  # 去掉开头的小写序列
     seq = re.sub(r'[a-z]+$', '', seq)
     return len(seq.replace(' ', ''))  # 去掉空格计算长度
+
+@register.filter
+def multiply(value, factor):
+    """
+    过滤器：将值乘以指定的因子。
+    """
+    try:
+        return int(value) * int(factor)
+    except (ValueError, TypeError):
+        return value

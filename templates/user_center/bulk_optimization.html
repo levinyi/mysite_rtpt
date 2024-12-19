@@ -17,55 +17,8 @@
         </ol>
     </nav>
     <div class="row pt-5">
-        <table class="table table-striped table-hover table-bordered" style="text-align:center">
-            <thead>
-                <tr>
-                    <th scope="col">status</th>
-                    <th scope="col">gene name</th>
-                    <th scope="col">Vector</th>
-                    <th scope="col">Species</th>
-                    <th scope="col">Start time</th>
-                    <th scope="col">End time</th>
-                    <th scope="col">Download</th>
-                    <th scope="col">Delete</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for gene in gene_list %}
-                <tr>
-                    <td>
-                        {% if gene.status == "completed" %}
-                            <span class="badge bg-success">completed</span>
-                        {% elif gene.status == "running" %}
-                            <span class="badge bg-warning">running</span>
-                        {% elif gene.status == "pending" %}
-                            <span class="badge bg-info">pending</span>
-                        {% else %}
-                            <span class="badge bg-danger">failed</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ gene.gene.gene_name }}</td>
-                    <td>{{ gene.vector.vector_name }}</td>
-                    <td>{{ gene.species }}</td>
-                    <td>{{ gene.start_time|date:"Y-m-d H:i" }}</td>
-                    <td>{{ gene.end_time|date:"Y-m-d H:i" }}</td>
-                    {% if gene.status == "completed" %}
-                        <td><a href="#">
-                            <i class="bi bi-download"></i>
-                        </a></td>
-                    {% else %}
-                        <td></td>
-                    {% endif %}
-                    <td>
-                        <a class="" href="#"><i class="bi bi-trash text-danger"></i></a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <span class="h1">Optimization request submitted successfully!</span>
+        <P class="text-muted">You can check the status of the optimization request in the <a href="{% url 'user_center:view_cart' %}">shopping cart</a></P>
     </div>
-    <nav aria-label="Page navigation example">
-        <ul class='pagination'>{{ page_string }}</ul>
-    </nav>
 </div>
 {% endblock %}

@@ -35,17 +35,24 @@
                             <th scope="col">Sequence</th>
                             <th scope="col">Species</th>
                             <th scope="col">GC</th>
+                            <th scope="col">Length</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for gene_info in order.gene_infos.all %}
                         <tr>
                             <td>{{ forloop.counter }}</td>
-                            <td>{{ gene_info.gene_name }}</td>
+                            <td>
+                                <a data-bs-toggle="tooltip" data-bs-replacement="top" title="See Details" 
+                                    href="{% url 'user_center:gene_edit' gene_info.id %}" class="text-decoration-none">
+                                    {{ gene_info.gene_name }}
+                                </a>
+                            </td>
                             <td>{{ gene_info.vector.vector_name }}</td>
-                            <td class="text-truncate" style="max-width: 150px;">{{ gene_info.combined_seq }}</td>
+                            <td class="text-truncate" style="max-width: 150px;">{{ gene_info.saved_seq }}</td>
                             <td>{{ gene_info.species.species_name }}</td>
                             <td>{{ gene_info.modified_gc_content|floatformat:0 }}%</td>
+                            <td>{{ gene_info.saved_seq|length }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
