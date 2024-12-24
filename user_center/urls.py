@@ -46,4 +46,5 @@ urlpatterns = [
     # api
     path('api/generate-genbank/', views.generate_genbank, name='generate_genbank'),
     path('test/', views.test, name='test'),
+    path('test_django_send/', views.test_django_send, name='test_django_send'),
 ]

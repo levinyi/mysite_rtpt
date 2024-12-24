@@ -22,6 +22,8 @@ from tools.scripts.penalty_score_predict import predict_new_data_from_df
 from .models import Cart, GeneInfo, GeneOptimization, OrderInfo
 from .utils.render_to_pdf import render_to_pdf
 from urllib.parse import quote
+from django.core.mail import send_mail
+from decouple import config
 
 # Create your views here.
 @login_required(login_url='/account/login/')
@@ -77,7 +79,7 @@ def order_create(request):
             df['i3nc'] = df['i3nc'].fillna('')
             
             df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
-            df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row.get("i5nc",'')}{row["OriginalSeq"]}{row.get("i3nc","")}{vector.id20.lower()}', axis=1)
+            df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row.get("i5nc","")}{row["OriginalSeq"]}{row.get("i3nc","")}{vector.id20.lower()}', axis=1)
             # 计算GC含量, 将序列转换为大写后计算GC含量
             df['original_gc_content'] = df['OriginalSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
             df['modified_gc_content'] = df['CombinedSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
@@ -931,50 +933,6 @@ def generate_genbank(request):
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-
-@require_POST
-@login_required
-def bulk_download_genbank_v1(request):
-    '''批量下载购物车中的基因的genbank文件'''
-    # 注意：AA 序列是不能生成genbank文件的，要检查序列类型
-    try:
-        data = json.loads(request.body)
-        gene_ids = data.get('gene_ids', [])
-        if not gene_ids:
-            return JsonResponse({"error": "No genes selected"}, status=400)
-        print("gene_ids: ", gene_ids)
-        temp_zip = tempfile.NamedTemporaryFile(delete=False)
-        with zipfile.ZipFile(temp_zip, 'w') as zf:
-            for gene_id in gene_ids:
-                try:
-                    gene = GeneInfo.objects.get(user=request.user, id=gene_id)
-                    sequence = re.sub(r'<[^>]*>', '', gene.saved_seq)
-                    sequence = re.sub(r'^[a-z]+|[a-z]+$', '', sequence)
-                    vector = gene.vector
-                    if vector.vector_gb:
-                        vector_genbank_file_path = vector.vector_gb.path
-                        with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
-                            addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', gene)
-                            temp_file.seek(0)
-                            genbank_content = temp_file.read()
-                            genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
-                            zf.writestr(genbank_filename, genbank_content)
-                            temp_file.close()
-                            os.remove(temp_file.name)
-                    else:
-                        zf.writestr(f"Error-{gene_id}.txt", "No vector GenBank file found")
-                except GeneInfo.DoesNotExist:
-                    zf.writestr(f"Error-{gene_id}.txt", "Gene not found")
-
-        temp_zip.seek(0)
-        response = HttpResponse(temp_zip.read(), content_type='application/zip')
-        response['Content-Disposition'] = 'attachment; filename="RootPath-Online-Submission.zip"'
-        temp_zip.close()
-        os.remove(temp_zip.name)
-        return response
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
 @require_POST
 @login_required
 def bulk_download_genbank(request):
@@ -1004,7 +962,7 @@ def bulk_download_genbank(request):
                         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
                             addMultipleFeaturesToGeneBank(
                                 genebank_file=vector_genbank_file_path, 
-                                output_file=temp_file.name, 
+                                output_file=temp_file.name,
                                 new_sequences=[i5nc, sequence, i3nc], 
                                 new_feature_names=['i5NC', gene.gene_name, 'i3NC'], 
                                 start_feature_label='iU20', 
@@ -1562,3 +1520,15 @@ def vector_download(request, vector_id, file_type, is_admin=False):
 
 def test(request):
     return render(request, 'user_center/test.html')
+
+def test_django_send(request):
+    '''测试Django发送邮件'''
+    if request.method == 'GET':
+        send_mail(
+            subject='Django 测试邮件',
+            message='这是从 Django 发的测试邮件正文。',
+            from_email=config('EMAIL_HOST_USER'),
+            recipient_list=['dushiyi@rootpath.com.cn'],
+            fail_silently=False
+        )
+        return HttpResponse('Email sent successfully')
