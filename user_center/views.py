@@ -119,7 +119,7 @@ def order_create(request):
             )
 
             # 最后把CombinedSeq赋值给saved_seq
-            df['saved_seq'] = df['CombinedSeq']  # 有必要写到这里吗？
+            df['saved_seq'] = df['OriginalSeq']  # 有必要写到这里吗？
             df['warnings'] = df.apply(deal_repeats_warnings, axis=1)
             df['status'] = df.apply(process_status, axis=1)
             print("df: \n", df[['warnings', 'contained_forbidden_list', 'status', 'forbidden_info', 'highlights_positions', 'Error']])
@@ -812,7 +812,7 @@ def cart_genbank_download(request, gene_id):
     # 检查sequence是否为AA序列
     if is_dna_or_protein(sequence) != 'DNA':
         return HttpResponse("Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.", status=400)
-        # return JsonResponse({'status': 'error', 'message': 'Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.'}, status=400)
+
     new_sequences = [i5nc, sequence, i3nc]
     new_feature_names = ['i5NC', gene.gene_name, 'i3NC']
 
@@ -832,7 +832,8 @@ def cart_genbank_download(request, gene_id):
             )
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
-            response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
+            # response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
+            response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}.gb"'
             return response
     else:
         return HttpResponse("No vector genbank file found", status=404)
@@ -949,7 +950,7 @@ def bulk_download_genbank(request):
             for gene_id in gene_ids:
                 try:
                     gene = GeneInfo.objects.get(user=request.user, id=gene_id)
-                    sequence = gene.saved_seq
+                    sequence = gene.original_seq
                     if is_dna_or_protein(sequence) != 'DNA':
                         zf.writestr(f"Error-{gene_id}.{gene.gene_name}.txt", "Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.")
                         continue
@@ -970,7 +971,7 @@ def bulk_download_genbank(request):
                             )
                             temp_file.seek(0)
                             genbank_content = temp_file.read()
-                            genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"
+                            genbank_filename = f"RootPath-{vector.vector_name}-{gene.gene_name}.gb"
                             zf.writestr(genbank_filename, genbank_content)
                             temp_file.close()
                             os.remove(temp_file.name)
