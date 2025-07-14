@@ -198,21 +198,40 @@
         xhr.responseType = 'blob'; // 重要：设置响应类型为 blob，便于处理二进制文件（如 ZIP）
 
         xhr.onload = function () {
-            if (xhr.status === 200) {
+            // 尝试读取 response 的内容类型
+            const contentType = xhr.getResponseHeader('Content-Type');
+
+            if (xhr.status === 200 && contentType.includes('application/zip')) {
                 const blob = xhr.response;
                 const downloadUrl = URL.createObjectURL(blob);
 
                 const a = document.createElement('a');
                 a.href = downloadUrl;
-                a.download = 'results.zip'; // 更新为 ZIP 文件的下载名称
+                a.download = 'results.zip';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
 
-                URL.revokeObjectURL(downloadUrl); // 释放内存
+                URL.revokeObjectURL(downloadUrl);
                 showModalStatus('File is ready! Download starting...');
+            } else if (contentType.includes('application/json')) {
+                // Blob 转文本，再解析 JSON
+                const reader = new FileReader();
+                reader.onload = function () {
+                    const json = JSON.parse(reader.result);
+                    let msg = json.message || 'Unknown error occurred.';
+
+                    // 如果有重复项示例，也展示
+                    if (json.duplicates && Array.isArray(json.duplicates)) {
+                        msg += '\nExamples:\n';
+                        msg += json.duplicates.map(item => `(${item.Name}, ${item.Enzyme})`).join('\n');
+                    }
+
+                    showModalStatus(msg, true);
+                };
+                reader.readAsText(xhr.response);
             } else {
-                showModalStatus('Data submission failed. Please try again.', true);
+                showModalStatus('Unexpected response format. Please try again.', true);
             }
         };
 

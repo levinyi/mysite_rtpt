@@ -15,6 +15,10 @@ urlpatterns = [
     # 3 enzyme split site.
     path('SplitEnzymeSite/', views.SplitEnzymeSite, name='SplitEnzymeSite'),
 
+    # 4
+    path('Seq2AA/', views.Seq2AA, name='Seq2AA'),
+
     # test
     path('test/', views.test, name='test'),
+    path('test_analyze_sequence/', views.test_analyze_sequence, name='test_analyze_sequence'),
 ]

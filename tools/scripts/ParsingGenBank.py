@@ -115,6 +115,8 @@ def addMultipleFeaturesToGeneBank(genebank_file, output_file, new_sequences, new
 
     if len(new_sequences) != len(new_feature_names):
         raise ValueError("new_sequences 与 new_feature_names 的长度必须一致")
+    
+    # print("new_sequences: ", new_sequences)
 
     record = readGenBank(genebank_file)
 
@@ -124,20 +126,29 @@ def addMultipleFeaturesToGeneBank(genebank_file, output_file, new_sequences, new
     # 寻找指定label的特征位置
     for feature in record.features:
         labels = feature.qualifiers.get("label", [])
+        # print("labels: ", labels)
         if start_feature_label in labels:
+            # print(f"start_feature_label: {start_feature_label}")
             start_pos = feature.location.end
+            # print(f"start_pos: {feature.location.start}, {feature.location.end}")
         elif end_feature_label in labels:
+            # print(f"end_feature_label: {end_feature_label}")
             end_pos = feature.location.start
+            # print(f"end_pos: {feature.location.start}, {feature.location.end}")
+    # print(f"I found start pos and end pos here: \n compare which is bigger\nfeature: {feature}, labels: {labels}, start_pos: {start_pos}, end_pos: {end_pos}")
 
     if start_pos is None or end_pos is None:
         raise ValueError("无法在GenBank文件中找到指定的起始或终止特征")
 
     # 将多个新特征序列拼接为一个大序列
-    full_new_seq = "".join(new_sequences)
+    full_new_seq = "".join([seq for seq in new_sequences if seq is not None])
+    # print("full_new_seq: ", full_new_seq)
     full_new_seq_length = len(full_new_seq)
 
     # 替换原序列中的指定片段
+    # print("Before modification:", record.seq)
     record.seq = record.seq[:start_pos] + Seq(full_new_seq) + record.seq[end_pos:]
+    # print("After modification:", record.seq)
 
     # 调整已有特征位置
     modify_locations(record.features, start_pos, end_pos, full_new_seq_length)
@@ -145,6 +156,8 @@ def addMultipleFeaturesToGeneBank(genebank_file, output_file, new_sequences, new
     # 添加新特征
     offset = 0
     for seq, name in zip(new_sequences, new_feature_names):
+        if not seq:  # 如果序列为空，跳过
+            continue
         seq_len = len(seq)
         new_feature = SeqFeature(
             FeatureLocation(start_pos + offset, start_pos + offset + seq_len),

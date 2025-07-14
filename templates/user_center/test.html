@@ -3,6 +3,7 @@
 {% load custom_filters %}
 {% block title %}Edit sequences{% endblock %}
 {% block extra_head %}
+
 <style>
     body {
         font-family: monospace;
@@ -15,36 +16,37 @@
         line-height: 1.4;
     }
 </style>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/handsontable/styles/ht-theme-main.min.css">
 {% endblock %}
 {% block content %}
-<div class="row">
-    <div class="col-md-5 col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title">Sequence Display</h5>
-            </div>
-            <div class="card-body">
-                <pre>
-1    ATGGCTGAACGACGGCAACACAGAAGCTTTGCATTCCAACCTACTGGAGCTTTACCACCGT    60
-1     P  D  M  F  Q  G  K  K  E  N  W  A  P  D  Y  K  L  L  D  V      20 
-61   CGACAGCAAGAAACCAGGAAGATATTCCGAACCCAACACTGCGGACTATTAACATGGGGCT    120
-21    L  Q  S  G  R  L  E  T  Q  G  G  X  P  D  Y  K  L  L  D  V      40
-                </pre>
-            </div>
-        </div>
-    </div>
-</div>
-<table>
-    <tr>
-        <td>1</td>
-        <td>ATG</td><td>GCT</td><td>GAA</td><td>CGA</td><td>CGG</td><td>CAA</td><td>CAC</td><td>AGA</td><td>AGC</td><td>TTT</td><td>GCA</td>
-        <td>60</td>
-    </tr>
-    <tr>
-        <td></td>
-        <td>P</td><td>D</td><td>M</td><td>F</td><td>Q</td><td>G</td><td>K</td><td>K</td><td>E</td><td>N</td><td>W</td>
-        <td>20</td>
-    </tr>
-</table>
+  <div id="hot"></div>
 {% endblock %}
+{% block javascript %}
+  <!-- 引入Handsontable JS from CDN-->
+    <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+    
+  <script>
+    // 简单初始化
+    const container = document.getElementById('hot');
+    const hot = new Handsontable(container, {
+      data: [
+        ['', ''],
+        ['', '']
+      ],
+      rowHeaders: true,
+      colHeaders: true,
+      // 注意：旧版本8.x及之前多用 copyPaste: true
+      // 新版本9.x及之后可能要用 clipboard: true，或额外引入 Clipboard 插件
+      copyPaste: true,
+      // 试试看 contextMenu: true，也经常用来测试剪贴板功能
+      contextMenu: true,
+      licenseKey: 'non-commercial-and-evaluation'
+    });
 
+    // 测一下 afterValidate
+    hot.addHook('afterValidate', function(isValid, value, row, prop, source){
+      console.log('[afterValidate]', isValid, value, row, prop, source);
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "account/base_entrance.html" %}
+{% load static %}
+{% load widget_tweaks %}
+{% load allauth i18n %}
+{% block head_title %}
+    {% trans "Signup" %}
+{% endblock head_title %}
+{% block content %}
+    <div class="container mt-3">
+        <div class="row justify-content-center">
+            <div class="col-md-5">
+                {% element h1 %}
+                    {% trans "Sign Up" %}
+                {% endelement %}
+                {% setvar link %}
+                    <a href="{{ login_url }}">
+                    {% endsetvar %}
+                    {% setvar end_link %}
+                    </a>
+                {% endsetvar %}
+                <p>{% blocktranslate %}Already have an account? Then please {{ link }}sign in{{ end_link }}.{% endblocktranslate %}</p>
+                
+                <div class="card shadow-sm">
+                    <div class="text-center mt-3">
+                        <img src="{% static 'images/favicon.png' %}" alt="Logo" class="img-fluid rounded-circle shadow" style="width: 70px; height: 70px; object-fit: cover;">
+                    </div>
+                    <div class="card-body">
+                        {% if not SOCIALACCOUNT_ONLY %}
+                            {% url 'account_signup' as action_url %}
+                            <form method="post" action="{{ action_url }}" class="form">
+                                {% csrf_token %}          
+                                          
+                                <!-- 通用错误提示（包括非字段错误，如密码不一致等） -->
+                                {% if form.errors %}
+                                    <div class="alert alert-danger">
+                                        <p>{{ form.errors }}</p>
+                                    </div>
+                                {% endif %}
+
+                                <!-- 循环输出字段，保证每个字段都有 form-floating 容器 -->
+                                {% for field in form %}
+                                    <div class="form-floating mb-3">
+                                        {% if field.name == 'password1' %}
+                                            {{ field|add_class:"form-control"|attr:"placeholder: " }}
+                                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                            <p> {{ field.help_text }}</p>
+                                        {% else %}
+                                            {{ field|add_class:"form-control"|attr:"placeholder: " }}
+                                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        {% endif %}
+                                        <!-- 错误提示 -->
+                                        {% if field.errors %}
+                                            <div class="invalid-feedback">
+                                                {% for error in field.errors %}
+                                                    <p>{{ error }}</p>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                <!-- redirect_field & 提交按钮 -->
+                                {{ redirect_field }}
+                                
+                                <div class="d-flex justify-content-center">
+                                    <button type="submit" class="btn btn-primary">
+                                        {% trans "Sign Up" %}
+                                    </button>
+                                </div>
+                            </form>
+                        {% endif %}
+                        {% if SOCIALACCOUNT_ENABLED %}
+                            {% include "socialaccount/snippets/login.html" with page_layout="entrance" %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

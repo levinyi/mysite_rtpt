@@ -32,7 +32,8 @@
 			</a>
 		</li>
 		<li>
-			<a href="{% url 'account:settings' %}" class="nav-link link-body-emphasis {% if request.path == '/account/settings/' %}active{% endif %}">
+			{% comment %} <a href="{% url 'account:settings' %}" class="nav-link link-body-emphasis {% if request.path == '/account/settings/' %}active{% endif %}"> {% endcomment %}
+			<a href="#" class="nav-link link-body-emphasis {% if request.path == '/account/settings/' %}active{% endif %}">
 				<i class="bi bi-gear me-2"></i>
 				<span class="link-text">Settings</span>
 			</a>

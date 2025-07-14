@@ -42,7 +42,7 @@ urlpatterns = [
     path('save_user_avatar/', views.save_user_avatar, name='save_user_avatar'),
 
     # species management
-    path('species_manage_old/', views.species_manage_old, name='species_manage_old'),
+    # path('species_manage_old/', views.species_manage_old, name='species_manage_old'),
     path('species_manage/', views.species_manage, name='species_manage'),
     path('species_data_api/', views.species_data_api, name='species_data_api'),
 ]

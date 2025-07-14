@@ -84,9 +84,9 @@ class DNARepeatsFinder:
         return round((length - min_len + 1) / 2 , 1)
     
     def calculate_local_gc_penalty_score(self, gc_content, min_GC_threshold=None, max_GC_threshold=None):
-        if min_GC_threshold is not None and gc_content < min_GC_threshold:
+        if min_GC_threshold is not None and gc_content <= min_GC_threshold:
             penalty_score = round(abs(min_GC_threshold - gc_content + 1) /10, 1)
-        elif max_GC_threshold is not None and gc_content > max_GC_threshold:
+        elif max_GC_threshold is not None and gc_content >= max_GC_threshold:
             penalty_score = round(abs(gc_content - max_GC_threshold + 1) /10, 1)
         else:
             # 表示不在范围内
@@ -124,7 +124,6 @@ class DNARepeatsFinder:
         # 合并重复序列
         repeats = []
         for repeat in repeats_temp:
-            # print(repeat)
             if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
                 old_end = repeats[-1]['end']
                 new_end = max(old_end, repeat['end'])
@@ -186,7 +185,6 @@ class DNARepeatsFinder:
                 potential_repeats[seq].append(start_index)
         
         merged_repeats = self.merge_potential_repeats(potential_repeats)
-        # print("merged_repeats", merged_repeats)
         # 转换为最终输出格式
         for seq, positions in merged_repeats.items():
             # 根据序列去重新找到起始位置和结束位置
@@ -362,18 +360,22 @@ class DNARepeatsFinder:
     # 7) Local GC Content by Window
     def find_high_gc_content(self, index=None, window_size=30, max_GC_content=80):
         s, sa, lcp = self._get_sequence_data(index)
+        # print(f"Sequence: {s}")  # 输出序列
 
         n = len(s)
         if n < window_size:
             gc_content = GC(s) * 100
-            if gc_content > max_GC_content:
+            # print(f"GC Content for entire sequence: {gc_content}")  # 输出整个序列的GC含量
+            if gc_content >= max_GC_content:
+                penalty_score = self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content)
+                # print(f"Penalty Score for entire sequence: {penalty_score}")  # 输出惩罚分数
                 return [{
                     'length': n,
                     'sequence': s,
                     'start': 0,
                     'end': n - 1,
                     'gc_content': gc_content,
-                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content),
+                    'penalty_score': penalty_score,
                 }]
             return []
 
@@ -381,17 +383,20 @@ class DNARepeatsFinder:
 
         for i in range(n - window_size + 1):
             window = s[i:i + window_size]
-            gc_content = GC(window)*100
-            if gc_content > max_GC_content:
+            gc_content = GC(window) * 100
+            if gc_content >= max_GC_content:
+                penalty_score = self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content)
+                # print(f"Window {i}-{i + window_size - 1}: {window}, GC Content: {gc_content} Penalty Score for window {i}-{i + window_size - 1}: {penalty_score}")
                 high_gc_contents_temp.append({
                     'sequence': window,
                     'start': i,
                     'end': i + window_size - 1,
                     'gc_content': gc_content,
-                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content),
+                    'penalty_score': penalty_score,
                 })
 
         high_gc_contents = self.merge_gc_windows(high_gc_contents_temp, s, 'highGC', min_GC_content=None, max_GC_content=max_GC_content)
+        # print(f"Merged High GC Contents: {high_gc_contents}")  # 输出合并后的高GC窗口
 
         return high_gc_contents
     
@@ -402,7 +407,7 @@ class DNARepeatsFinder:
         if n < window_size:
             # 将整个序列作为一个窗口
             gc_content = GC(s)*100
-            if gc_content < min_GC_content:
+            if gc_content <= min_GC_content:
                 return [{
                     'length': n,
                     'sequence': s,
@@ -412,7 +417,6 @@ class DNARepeatsFinder:
                     'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), min_GC_content, min_GC_content),
                 }]
             return []
-        
 
         low_gc_contents_temp = []
 
@@ -440,7 +444,7 @@ class DNARepeatsFinder:
                 new_end = max(old_end, gc_content['end'])
                 gc_contents[-1]['end'] = new_end
                 gc_contents[-1]['sequence'] = sequence[gc_contents[-1]['start']:new_end + 1]
-                gc_contents[-1]['penalty_score'] += gc_content['penalty_score']
+                gc_contents[-1]['penalty_score'] += gc_content['penalty_score']  # 累加惩罚分数
             else:
                 gc_contents.append(gc_content)
 
@@ -448,10 +452,7 @@ class DNARepeatsFinder:
             gc_content['seqType'] = gc_type
             gc_content['length'] = len(gc_content['sequence'])
             gc_content['gc_content'] = GC(gc_content['sequence'])*100
-            if gc_type == 'lowGC':
-                gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(float(gc_content['gc_content']), min_GC_content, max_GC_content)
-            elif gc_type == 'highGC':
-                gc_content['penalty_score'] = self.calculate_local_gc_penalty_score(float(gc_content['gc_content']), min_GC_content, max_GC_content)
+            # 不再重新计算 penalty_score
         return gc_contents
 
     # 8) Dinucleotide Repeats
@@ -514,7 +515,7 @@ def convert_gene_table_to_RepeatsFinder_Format(gene_table, long_repeats_min_len=
             'W12S12Motifs': finder_dataset.find_WS_motifs(index=index, min_W_length=min_w_length, min_S_length=min_s_length),
             'highGC': finder_dataset.find_high_gc_content(index=index, window_size=window_size, max_GC_content=max_gc_content),
             'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=window_size, min_GC_content=min_gc_content),
-            'LCC': finder_dataset.get_lcc(index=index),
+            # 'LCC': finder_dataset.get_lcc(index=index),
             'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=12),
             'length': len(finder_dataset._get_sequence_data(index)[0])
         }
@@ -547,10 +548,16 @@ def calculate_total_penalty_score(feature_list):
     # 定义函数来计算每个特征的总 penalty score
     return sum(item.get('penalty_score', 0) for item in feature_list)
 
+# --- 新增：统计各特征总长度 ---
+def calculate_total_feature_length(feature_list):
+    """累加每条特征的长度字段；若列表为空返回 0。"""
+    return sum(item.get("length", 0) for item in feature_list)
+
 # 数据处理函数，返回处理后的 DataFrame
 def process_gene_table_results(data):
     records = []
     for gene, details in data.items():
+        # 1) 各特征惩罚分
         long_repeats_penalty = calculate_total_penalty_score(details.get("LongRepeats", []))
         homopolymers_penalty = calculate_total_penalty_score(details.get("Homopolymers", []))
         w12s12motifs_penalty = calculate_total_penalty_score(details.get("W12S12Motifs", []))
@@ -558,10 +565,18 @@ def process_gene_table_results(data):
         lowGC_penalty = calculate_total_penalty_score(details.get("lowGC", []))
         doubleNT_penalty = calculate_total_penalty_score(details.get("doubleNT", []))
 
+        # 2) 各特征总长度  ←←← 新增
+        long_repeats_len = calculate_total_feature_length(details.get("LongRepeats", []))
+        homopolymers_len = calculate_total_feature_length(details.get("Homopolymers", []))
+        w12s12motifs_len = calculate_total_feature_length(details.get("W12S12Motifs", []))
+        highGC_len = calculate_total_feature_length(details.get("highGC", []))
+        lowGC_len = calculate_total_feature_length(details.get("lowGC", []))
+        doubleNT_len = calculate_total_feature_length(details.get("doubleNT", []))
+
         record = {
             "GeneName": gene,
             "Total_Length": details.get("length"),
-            "LCC": details.get("LCC"),
+            # "LCC": details.get("LCC"),
             "LongRepeats": format_feature_data(details.get("LongRepeats", []), ["sequence", "start", "end", "length", "gc_content"]),
             "LongRepeats_penalty_score": long_repeats_penalty,
             "Homopolymers": format_feature_data(details.get("Homopolymers", []), ["sequence", "start", "end", "length"]),
@@ -574,6 +589,13 @@ def process_gene_table_results(data):
             "LowGC_penalty_score": lowGC_penalty,
             "DoubleNT": format_feature_data(details.get("doubleNT", []), ["sequence", "start", "end", "length", "gc_content"]),
             "DoubleNT_penalty_score": doubleNT_penalty,
+            # ------------- ★ 新增的总长度列 ★ -------------
+            "LongRepeats_total_length": long_repeats_len,
+            "Homopolymers_total_length": homopolymers_len,
+            "W12S12Motifs_total_length": w12s12motifs_len,
+            "HighGC_total_length": highGC_len,
+            "LowGC_total_length": lowGC_len,
+            "DoubleNT_total_length": doubleNT_len,
         }
         records.append(record)
 
@@ -598,13 +620,9 @@ if __name__ == '__main__':
 
     # 处理数据并获取结果 DataFrame
     result_df = process_gene_table_results(data)
-    # print(result_df)
     # 合并原始表格
     df = gene_table.merge(result_df, on='GeneName', how='left')
-    # print(df)
     # 删除不需要的列
     df.drop(['gene_id', 'sequence'], axis=1, inplace=True)
     # 保存结果
     output_file = input_file.replace('.xlsx', '_output.txt').replace('.csv', '_output.txt')
-
-    # result_df.to_csv(output_file, sep="\t", index=False)

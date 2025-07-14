@@ -17,16 +17,17 @@ from django.conf import settings
 
 from product.models import GeneSynEnzymeCutSite, Species, Vector
 from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
-from tools.scripts.ParsingGenBank import addFeaturesToGeneBank, addMultipleFeaturesToGeneBank
-from tools.scripts.penalty_score_predict import predict_new_data_from_df
+from tools.scripts.ParsingGenBank import addMultipleFeaturesToGeneBank
+# from tools.scripts.penalty_score_predict import predict_new_data_from_df
 from .models import Cart, GeneInfo, GeneOptimization, OrderInfo
 from .utils.render_to_pdf import render_to_pdf
 from urllib.parse import quote
 from django.core.mail import send_mail
 from decouple import config
+from Bio import SeqIO
 
 # Create your views here.
-@login_required(login_url='/account/login/')
+@login_required()
 def dashboard(request):
     # 如果没有shopping cart，创建一个
     production_order = OrderInfo.objects.filter(user=request.user, status='Created')
@@ -72,7 +73,7 @@ def order_create(request):
 
         # 处理基因表格，根据列数判断是AA序列还是NT序列，NT序列只有4列，AA序列有6列
         if len(df.columns) == 4:
-            print("Start processing NT sequence")
+            # print("Start processing NT sequence")
             df.columns = ['GeneName', 'OriginalSeq', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
             # 如果i5nc和i3nc为空，填充为''
             df['i5nc'] = df['i5nc'].fillna('')
@@ -104,7 +105,7 @@ def order_create(request):
 
             model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_12.pkl')
             weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_12.npy')
-            predicted_data = predict_new_data_from_df(result_df, model_path=model_path, scaler=None, weights_path=weights_path)
+            # predicted_data = predict_new_data_from_df(result_df, model_path=model_path, scaler=None, weights_path=weights_path)
             
             # 将结果合并到原始数据中
             df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')            
@@ -122,7 +123,7 @@ def order_create(request):
             df['saved_seq'] = df['OriginalSeq']  # 有必要写到这里吗？
             df['warnings'] = df.apply(deal_repeats_warnings, axis=1)
             df['status'] = df.apply(process_status, axis=1)
-            print("df: \n", df[['warnings', 'contained_forbidden_list', 'status', 'forbidden_info', 'highlights_positions', 'Error']])
+            # print("df: \n", df[['warnings', 'contained_forbidden_list', 'status', 'forbidden_info', 'highlights_positions', 'Error']])
             
             gene_objects = []
             for _, row in df.iterrows():
@@ -188,7 +189,7 @@ def order_create(request):
             # Extend the new_gene_ids_for_session with the IDs of the retrieved objects
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
         else:
-            print("Processing AA sequence")
+            # print("Processing AA sequence")
 
             df.columns = ['GeneName', 'OriginalSeq', 'Species', 'ForbiddenSeqs', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
             df['protein_sequence'] = df['OriginalSeq']
@@ -197,7 +198,7 @@ def order_create(request):
             # 检测非氨基酸字符
             df['OriginalSeq'], df['Error'] = zip(*df['protein_sequence'].apply(clean_and_check_protein_sequence))
             df['warnings'] = ''
-            print("df: \n", df)
+            # print("df: \n", df)
             df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
             df['highlights_positions'] = df.apply(process_highlights_positions, axis=1)
 
@@ -415,7 +416,7 @@ def process_status(row):
     forbidden = has_value(row.get('contained_forbidden_list'))
     error = has_value(row.get('Error'))
     warning = has_value(row.get('warnings'))
-    print("forbidden: ", forbidden, "error: ", error, "warning: ", warning)
+    # print("forbidden: ", forbidden, "error: ", error, "warning: ", warning)
     # 根据组合规则确定 status
     if forbidden and error and warning:
         return 'error'
@@ -628,9 +629,9 @@ def bulk_optimization_submit(request):
             '2': 'NoFoldingCheck',
             '3': 'LongGene_Relaxed',
         }
-        print(f"Gene IDs: {gene_ids}")
-        print(f"Species: {species_selected}")
-        print(f"Optimization Method: {optimization_method_dict.get(optimization_method)}")
+        # print(f"Gene IDs: {gene_ids}")
+        # print(f"Species: {species_selected}")
+        # print(f"Optimization Method: {optimization_method_dict.get(optimization_method)}")
 
         # 转换基因ID为列表
         gene_ids = gene_ids.split(',')
@@ -668,10 +669,8 @@ def condon_optimization_api(request):
             status = request.GET.get('status', 'Pending')
             if status == 'pending':
                 status = 'Pending'
-            print("status: ", status)
             # 根据 optimization_status 为Pending来过滤基因数据
             gene_list = GeneInfo.objects.filter(optimization_status=status)
-            print(f"Filtering genes with status: {status}")
             data = list(
                 gene_list.values(
                     'optimization_id', 'gene_name', 'original_seq', 'status', 'i5nc', 'i3nc',
@@ -687,7 +686,6 @@ def condon_optimization_api(request):
             return JsonResponse({'status': 'success', 'response': response_data}, safe=False)
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': f'Failed to fetch genes: {str(e)}'}, status=500)
-
     elif request.method == "POST":
         try:
             # Parse form-encoded data (request.POST)
@@ -814,6 +812,7 @@ def cart_genbank_download(request, gene_id):
         return HttpResponse("Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.", status=400)
 
     new_sequences = [i5nc, sequence, i3nc]
+    # print(new_sequences)
     new_feature_names = ['i5NC', gene.gene_name, 'i3NC']
 
     vector = gene.vector
@@ -821,7 +820,6 @@ def cart_genbank_download(request, gene_id):
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file: # 确保文件使用后自动删除，减少空间占用
             # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', new_feature_name=gene)
-            # 这里换成addMultipleFeaturesToGeneBank
             addMultipleFeaturesToGeneBank(
                 genebank_file=vector_genbank_file_path, 
                 output_file=temp_file.name, 
@@ -840,7 +838,7 @@ def cart_genbank_download(request, gene_id):
 
 @csrf_exempt
 @require_POST
-def generate_genbank(request):
+def generate_genbank_delete_if_not_used(request):
     '''API :生成带有新特征的genbank文件'''
     ''' GenBank API JSON 数据格式如下:
     {
@@ -860,11 +858,13 @@ def generate_genbank(request):
             }
         ],
         "start_feature_label": "iU20",
-        "end_feature_label": "iD20"
+        "end_feature_label": "iD20",
+        "filename": "output.gb"
     }
     '''
     if request.method == 'POST':
         # 尝试解析JSON数据
+        # print("Raw request body: ", request.body.decode('utf-8'))
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
@@ -875,7 +875,7 @@ def generate_genbank(request):
         features = data.get('features', [])
         start_feature_label = data.get('start_feature_label', 'iU20')  # 默认值
         end_feature_label = data.get('end_feature_label', 'iD20')  # 默认值
-
+        # print(f"Plasmid_GZID: {plasmid_gzid}, Features: {features}, Start Feature Label: {start_feature_label}, End Feature Label: {end_feature_label}")
         # 验证参数完整性
         if not plasmid_gzid or not features:
             return JsonResponse({"error": "Missing required parameters (Plasmid_GZID or features)"}, status=400)
@@ -884,25 +884,27 @@ def generate_genbank(request):
         new_sequences = []
         new_feature_names = []
         for f in features:
-            seq = f.get('sequence')
-            fname = f.get('name')
+            seq = f.get('sequence', '').strip()
+            fname = f.get('name', '').strip()
+            seq = re.sub(r'<[^>]*>', '', seq)  # 去除HTML标签
             # 只添加非空序列的特征
-            if seq.strip():  # 去掉首尾空白后判断是否为空
-                new_sequences.append(seq.strip())
+            if seq:
+                new_sequences.append(seq)
                 new_feature_names.append(fname)
         
-        if not new_sequences:
-            return JsonResponse({"error": "No valid (non-empty) feature sequences provided"}, status=400)
+        # 检查是否有有效的特征序列, 如果没有，返回错误
+        if not any(new_sequences):
+            return JsonResponse({"error": "All provided feature sequences are empty"}, status=400)
         
         # 验证Plasmid GZID是否有对应的genbank文件
         try:
-            vector = Vector.objects.get(vector_id=plasmid_gzid)
+            vector = Vector.objects.get(vector_id=plasmid_gzid, )
         except Vector.DoesNotExist:
             return JsonResponse({"error": "No vector GenBank file found"}, status=404)
 
         if vector.vector_gb and os.path.exists(vector.vector_gb.path):
             vector_genbank_file_path = vector.vector_gb.path  # 获取文件路径
-            print(vector_genbank_file_path)
+            # print(vector_genbank_file_path)
 
             # 对输入序列进行清理（如果有需要的话，这里主要看业务逻辑）
             # 不过此处new_sequences通常是用户直接传入的真实序列，所以可能不需要复杂的清理
@@ -920,14 +922,121 @@ def generate_genbank(request):
                     start_feature_label=start_feature_label, 
                     end_feature_label=end_feature_label
                 )
-                # 返回生成的文件
+                # 确保所有数据写入文件
+                temp_file.flush()
+
+                # 读取生成的GenBank文件并返回给用户
                 temp_file.seek(0)
+                record = SeqIO.read(temp_file, 'genbank')
+                plasmid_sequence = str(record.seq)
 
-                # 文件名可以根据需求自定义，这里只取中间的名称作为参考
-                output_filename = f"{plasmid_gzid}-{new_feature_names[1]}.gb"
-                response = HttpResponse(temp_file.read(), content_type='application/genbank')
+                # 重置文件指针，并读取全部内容
+                temp_file.seek(0)
+                gb_content = temp_file.read()
+
+                # 构建响应
+                exclude_features=['Upstream of CDS', 'Downstream of CDS', 'i5NC', 'i3NC']
+                filtered_features = [name for name in new_feature_names if name not in exclude_features]
+                feature_count = len(filtered_features)
+                
+                # 文件名处理逻辑
+                if feature_count == 1:
+                    feature_part = filtered_features[0]
+                elif feature_count == 2:
+                    feature_part = f"{filtered_features[0]}_and_{filtered_features[1]}"
+                elif feature_count >= 3:
+                    feature_part = f"{filtered_features[0]}_plus_{feature_count - 1}_features"
+                else:
+                    feature_part = "unknown_features"  # 如果过滤后没有剩余的 feature，使用默认名称
+                output_filename = f"{plasmid_gzid}-{feature_part}.gb"
+                
+                response = HttpResponse(gb_content, content_type='application/genbank')
                 response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+                response['X-GenBank-Sequence'] = json.dumps(plasmid_sequence)
+                return response
+        else:
+            return JsonResponse({"error": "No vector GenBank file found"}, status=404)
+    else:
+        return JsonResponse({"error": "Method not allowed"}, status=405)
 
+
+@csrf_exempt
+@require_POST
+def generate_genbank(request):
+    if request.method == 'POST':
+        # print("Raw request body: ", request.body.decode('utf-8'))
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
+        
+        plasmid_gzid = data.get('Plasmid_GZID')
+        features = data.get('features', [])
+        start_feature_label = data.get('start_feature_label', 'iU20')
+        end_feature_label = data.get('end_feature_label', 'iD20')
+        user_filename = data.get('filename', None)  # 用户提供的文件名
+        
+        if not plasmid_gzid or not features:
+            return JsonResponse({"error": "Missing required parameters (Plasmid_GZID or features)"}, status=400)
+
+        new_sequences = []
+        new_feature_names = []
+        for f in features:
+            seq = f.get('sequence', '').strip()
+            fname = f.get('name', '').strip()
+            seq = re.sub(r'<[^>]*>', '', seq)
+            if seq:
+                new_sequences.append(seq)
+                new_feature_names.append(fname)
+        
+        if not any(new_sequences):
+            return JsonResponse({"error": "All provided feature sequences are empty"}, status=400)
+        
+        try:
+            vector = Vector.objects.get(vector_id=plasmid_gzid)
+        except Vector.DoesNotExist:
+            return JsonResponse({"error": "No vector GenBank file found"}, status=404)
+
+        if vector.vector_gb and os.path.exists(vector.vector_gb.path):
+            vector_genbank_file_path = vector.vector_gb.path
+
+            new_sequences = [re.sub(r'<[^>]*>', '', seq) for seq in new_sequences]
+
+            with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file:
+                addMultipleFeaturesToGeneBank(
+                    genebank_file=vector_genbank_file_path, 
+                    output_file=temp_file.name, 
+                    new_sequences=new_sequences, 
+                    new_feature_names=new_feature_names, 
+                    start_feature_label=start_feature_label, 
+                    end_feature_label=end_feature_label
+                )
+                temp_file.flush()
+                temp_file.seek(0)
+                record = SeqIO.read(temp_file, 'genbank')
+                plasmid_sequence = str(record.seq)
+                temp_file.seek(0)
+                gb_content = temp_file.read()
+                
+                if user_filename:
+                    output_filename = user_filename
+                else:
+                    exclude_features = ['Upstream of CDS', 'Downstream of CDS', 'i5NC', 'i3NC']
+                    filtered_features = [name for name in new_feature_names if name not in exclude_features]
+                    feature_count = len(filtered_features)
+                    if feature_count == 1:
+                        feature_part = filtered_features[0]
+                    elif feature_count == 2:
+                        feature_part = f"{filtered_features[0]}_and_{filtered_features[1]}"
+                    elif feature_count >= 3:
+                        feature_part = f"{filtered_features[0]}_plus_{feature_count - 1}_features"
+                    else:
+                        feature_part = "unknown_features"
+                    output_filename = f"{plasmid_gzid}-{feature_part}.gb"
+                
+                response = HttpResponse(gb_content, content_type='application/genbank')
+                response['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+                response['X-GenBank-Sequence'] = json.dumps(plasmid_sequence)
                 return response
         else:
             return JsonResponse({"error": "No vector GenBank file found"}, status=404)

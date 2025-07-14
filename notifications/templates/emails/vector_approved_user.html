@@ -1,0 +1,12 @@
+<html>
+<body>
+  <h1>您的 Vector 已通过审核！</h1>
+  <p> 我们已经审核您上传的 Vector 文件，您的文件已经通过审核，现在可以在我们的网站上查看您的文件。</p>
+  <p> Vector 名称：{{ vector.vector_name }}</p>
+  <p> 赋予新的 Vector ID：{{ vector.vector_id }}</p>
+  <p> Vector 上传时间：{{ vector.created_at }}</p>
+  <p> Vector 审核状态：{{ vector.status }}</p>
+  <p> Vector 详情：</p>
+  <p> <a href="{{ vector.url }}">点击查看您的 Vector 文件</a></p>
+
+</body>

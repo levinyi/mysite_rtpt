@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 import os
 from pathlib import Path
 from decouple import config
+from django.utils.translation import gettext_lazy as _ # 语言翻译
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,7 +32,6 @@ CORS_ORIGIN_ALLOW_ALL = True
 CSRF_TRUSTED_ORIGINS = ['https://www.rootpath.com.cn']
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -39,27 +39,35 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'account',
+    'django.contrib.sites',  # 添加这个是为了使用django-allauth
+    'user_account.apps.AccountConfig',  
     'product',
     'user_center',
-    'widget_tweaks',
+    'widget_tweaks',  # 用于在模板中修改表单字段, 比如添加class
     'tools',
-    'notice',
     'import_export',  # pip install django-import-export
-    # 'algoliasearch_django',  # pip install algoliasearch-django
+    'notifications',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.github',
+    'allauth.socialaccount.providers.weixin',
+    'allauth.socialaccount.providers.feishu',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    'django.middleware.locale.LocaleMiddleware',  # 放在 SessionMiddleware 之后
+    'django.middleware.common.CommonMiddleware',  # 放在 LocaleMiddleware 之后
     'mysite.middleware.DynamicCsrfTrustedOriginsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.locale.LocaleMiddleware',  # 语言中间件
+    'allauth.account.middleware.AccountMiddleware',  # allauth中间件
 ]
+
 
 ROOT_URLCONF = 'mysite.urls'
 
@@ -76,6 +84,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'mysite.context_processors.user_context',  # 自定义context_processor, 用于在模板中获取当前登录用户
+                'django.template.context_processors.i18n',  # 确保启用 i18n 上下文处理器
             ],
         },
     },
@@ -119,14 +128,22 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en-us'  # 默认语言
 
-TIME_ZONE = 'Asia/Shanghai'
+TIME_ZONE = 'Asia/Shanghai'  # 默认时区
 
-USE_I18N = True
+USE_I18N = True  # 启用国际化
+USE_L10N = True  # 启用本地化
+USE_TZ = True  # 启用时区支持
 
-USE_TZ = True
-
+LANGUAGES = [
+    ('en', _('English')),
+    ('zh-hans', _('简体中文')),
+]
+# 设置语言文件路径
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+]
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
@@ -142,8 +159,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-LOGIN_URL = '/account/login/'
+LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
 
 # 邮件配置
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -156,14 +175,44 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 SERVER_EMAIL = config('SERVER_EMAIL')
 BASE_URL = config('BASE_URL')
 
-# 使用 Secure cookie
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
-
-# # 使用 Algolia 搜索
-# ALGOLIA = {
-#     'APPLICATION_ID': 'PBCEPI7FYW',
-#     'API_KEY': 'c95065b555b79ef144444c3681edef22',
-# }
-
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000 # 上传文件最大字段数
+
+# Celery 配置
+# 使用Redis作为消息代理
+CELERY_BROKER_URL = config('CELERY_BROKER_URL')
+# 使用Redis作为结果存储
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
+
+# 是否必须验证邮箱，常见选项有:
+# "mandatory": 用户注册后，必须先点邮箱验证链接才能登录
+# "optional":  用户可以不验证就登录，但会提示验证
+# "none":      不启用邮件验证
+ACCOUNT_EMAIL_VERIFICATION = "none"
+
+# 是否必须填写邮箱
+ACCOUNT_EMAIL_REQUIRED = True
+
+# 注册时是否要求用户名(若你只想用邮箱当登录名，可以设成 False)
+ACCOUNT_USERNAME_REQUIRED = False
+
+# 当用户只用邮箱登录时，把邮箱设为唯一
+ACCOUNT_UNIQUE_EMAIL = True
+
+# 登录时使用的字段(如果只想用 email)
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"  # 允许用户名或者邮箱登录
+
+# 如果你希望在用户注册时就自动登录，可以开启
+ACCOUNT_LOGIN_ON_SIGNUP = True
+
+# 是否在注册时立即发送确认邮件(默认True)
+ACCOUNT_EMAIL_CONFIRMATION_HMAC = True
+
+# 其他常用配置(可以根据自己需求加)
+ACCOUNT_SESSION_REMEMBER = True
+# allauth 配置
+SITE_ID = 1
+AUTHENTICATION_BACKENDS = [
+    # allauth 需要同时包含这两个后端
+    'django.contrib.auth.backends.ModelBackend', 
+    'allauth.account.auth_backends.AuthenticationBackend',
+]

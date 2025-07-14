@@ -3,11 +3,6 @@ version: '3'
 services:
   web:
     image: levindu11/mysite_rtpt:latest
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 500M
     command: >
       sh -c "
       while ! timeout 1 bash -c 'cat < /dev/null > /dev/tcp/db/3306'; do
@@ -28,6 +23,7 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - redis
 
   db:
     image: mysql:8.0
@@ -53,6 +49,36 @@ services:
       - static_data:/app/staticfiles
     depends_on:
       - web
+
+  redis:
+    image: redis:latest
+    # 这里映射6379端口仅仅是为了本地排查、调试时使用。生产可不映射。
+    ports:
+      - "6379:6379"
+
+  celery:
+    # Celery 也可以使用同一个镜像，因为包含了同一份 Django 代码
+    image: levindu11/mysite_rtpt:latest
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    volumes:
+      - .:/code
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    command: celery -A mysite worker -l info
+    # 这里的 command 覆盖了镜像默认的启动命令，专门用来启动 Celery worker
+
+  celery-beat:
+    image: levindu11/mysite_rtpt:latest
+    depends_on:
+      - redis
+      - db
+    env_file:
+      - .env
+    command: celery -A mysite beat -l info
 
 volumes:
   mysql_data:

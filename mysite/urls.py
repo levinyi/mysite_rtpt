@@ -15,23 +15,25 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic import TemplateView
-
-import data_process.views
-from .views import HomeView
 from django.conf.urls.static import static
 from django.conf import settings
+from .views import HomeView
+from django.conf.urls.i18n import i18n_patterns
+from django.views.i18n import set_language
+from . import views
 
 urlpatterns = [
+    path('switch_language/', views.switch_language, name='switch_language'),  # 如果你需要这个自定义语言切换视图
+    path('set_language/', set_language, name='set_language'),  # 设置语言
     path('admin/', admin.site.urls),
-    # path('', TemplateView.as_view(template_name='home.html'), name='home'),
     path('', HomeView.as_view(), name='home'),
-    path('account/', include('account.urls', namespace='account')),
+    path('accounts/', include('allauth.urls')),  # 登录和注册使用的是 allauth
+    path('user_account/', include('user_account.urls', namespace='user_account')),
     path('product/', include('product.urls', namespace='product')),
-    path('user_center/', include('user_center.urls', namespace=' ')),
+    path('user_center/', include('user_center.urls', namespace='user_center')),
     path('tools/', include('tools.urls', namespace='tools')),
     path('super_manage/', include('super_manage.urls', namespace='super_manage')),
-    path('data_process/request_genes', data_process.views.request_genes, name='request_genes'),
-    path('data_process/upload_genes', data_process.views.upload_genes, name='upload_genes'),
-    path('notice/', include('notice.urls', namespace='notice')),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+# 添加静态和媒体文件路由（不要包含在 i18n_patterns 中）
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

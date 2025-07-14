@@ -1,8 +1,8 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
-django==4.1
+django
 # gunicorn==20.1.0
-pillow==9.4.0
+pillow
 mysqlclient
 python-decouple
 django-widget-tweaks
@@ -15,7 +15,10 @@ biopython
 django-allauth
 openpyxl
 # 08-05-2024
-python-pptx 
+# python-pptx 
 jinja2
 joblib
-sklearn
+scikit-learn
+celery
+redis
+xlsxwriter

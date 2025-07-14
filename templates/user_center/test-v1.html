@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %}Edit sequences{% endblock %}
+{% block extra_head %}
+<style>
+    body {
+        font-family: monospace;
+        background: #ffffff;
+        color: #000000;
+        margin: 20px;
+        font-size: 21px;
+    }
+    pre {
+        line-height: 1.4;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-5 col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">Sequence Display</h5>
+            </div>
+            <div class="card-body">
+                <pre>
+1    ATGGCTGAACGACGGCAACACAGAAGCTTTGCATTCCAACCTACTGGAGCTTTACCACCGT    60
+1     P  D  M  F  Q  G  K  K  E  N  W  A  P  D  Y  K  L  L  D  V      20 
+61   CGACAGCAAGAAACCAGGAAGATATTCCGAACCCAACACTGCGGACTATTAACATGGGGCT    120
+21    L  Q  S  G  R  L  E  T  Q  G  G  X  P  D  Y  K  L  L  D  V      40
+                </pre>
+            </div>
+        </div>
+    </div>
+</div>
+<table>
+    <tr>
+        <td>1</td>
+        <td>ATG</td><td>GCT</td><td>GAA</td><td>CGA</td><td>CGG</td><td>CAA</td><td>CAC</td><td>AGA</td><td>AGC</td><td>TTT</td><td>GCA</td>
+        <td>60</td>
+    </tr>
+    <tr>
+        <td></td>
+        <td>P</td><td>D</td><td>M</td><td>F</td><td>Q</td><td>G</td><td>K</td><td>K</td><td>E</td><td>N</td><td>W</td>
+        <td>20</td>
+    </tr>
+</table>
+{% endblock %}
+

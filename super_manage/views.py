@@ -16,14 +16,14 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 import numpy as np
 import pandas as pd
-from account.models import UserProfile
+# from account.models import UserProfile
 from product.models import Species, Vector
 from user_center.models import OrderInfo
 from user_center.views import \
     vector_download as uc_vector_download, \
     vector_delete as uc_vector_delete
 
-from account.views import is_secondary_admin
+# from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
 from user_center.utils.pagination import Pagination
 # from tools.scripts.ParsingGenBankOld import readGenBank
@@ -44,7 +44,7 @@ def custom_user_passes_test(test_func):
     return decorator
 
 # 使用自定义装饰器
-is_secondary_admin_required = custom_user_passes_test(is_secondary_admin)
+# is_secondary_admin_required = custom_user_passes_test(is_secondary_admin)
 
 
 def get_table_context(table_name, status=None, start=0):
@@ -116,14 +116,14 @@ def get_table_context(table_name, status=None, start=0):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_GET
 def vector_download(request, vector_id, file_type):
     return uc_vector_download(request, vector_id, file_type, True)
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_POST
 def vector_upload(request):
     vector_file = request.FILES.get('vector_file', default=None)
@@ -142,7 +142,7 @@ def vector_upload(request):
     })
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_delete(request):
     vector_id = request.GET.get('vector_id', default=None)
     vector = Vector.objects.get(id=vector_id)
@@ -157,33 +157,9 @@ def vector_delete(request):
 
 
 
-@csrf_exempt  # 使用此装饰器来禁用 CSRF 保护，如果你在 AJAX 请求中已提供 CSRF token，则不需要这个装饰器
-def vector_update_field(request):
-    if request.method == 'POST':
-        vector_id = request.POST.get('vector_id')
-        field = request.POST.get('field')
-        value = request.POST.get('value')
-        
-        # 检查是否提供了 vector_id 和字段
-        if not vector_id or not field:
-            return JsonResponse({'status': 'error', 'message': 'Missing vector ID or field name'})
-
-        # 获取相应的 vector 实例
-        vector = Vector.objects.get(id=vector_id)
-        
-        # 检查并更新字段
-        if hasattr(vector, field):
-            setattr(vector, field, value)
-            vector.save()
-            return JsonResponse({'status': 'success', 'message': 'Field updated successfully'})
-        else:
-            return JsonResponse({'status': 'error', 'message': 'Invalid field name'})
-    
-    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
-
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_POST
 def upload_report(request):
     file = request.FILES.get('file', default=None)
@@ -203,7 +179,7 @@ def upload_report(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_GET
 def delete_report(request):
     order_id = request.GET.get('id', default=None)
@@ -219,7 +195,7 @@ def delete_report(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def download_report(request, order_id):
     order = OrderInfo.objects.get(id=order_id)
     file = order.report_file
@@ -237,7 +213,7 @@ def download_report(request, order_id):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_GET
 def get_rows(request):
     status = request.GET.get('status')
@@ -251,7 +227,7 @@ def get_rows(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_GET
 def change_url(request):
     row_id = request.GET.get('id')
@@ -264,7 +240,7 @@ def change_url(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_POST
 def submit_vector_data(request):
     post_data = request.body
@@ -283,7 +259,7 @@ def submit_vector_data(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @require_GET
 def change_status(request):
     row_id = request.GET.get('id')
@@ -321,7 +297,7 @@ def change_status(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def order_manage_old(request):
     order_list = OrderInfo.objects.all()
     page_object = Pagination(request, order_list, page_size=10)
@@ -332,12 +308,12 @@ def order_manage_old(request):
     return render(request, 'super_manage/order_manage_old.html', context)
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def order_manage(request):
     return render(request, 'super_manage/order_manage.html')
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def order_data_api(request):
     order_list = OrderInfo.objects.select_related('user', 'user__userprofile').annotate(
         gene_infos_count=Count('gene_infos')
@@ -371,7 +347,7 @@ def generate_REQID(index, order_time):
     return f"R{last_two_digits_year}{formatted_time[4:]}{index:02}"
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def order_to_reqins(request, order_id):
     """把订单信息转换成REQIN格式"""
     order = OrderInfo.objects.get(id=order_id)
@@ -474,13 +450,13 @@ def order_to_reqins(request, order_id):
 
 # not used
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_manage_zxl(request):
     return render(request, 'super_manage/vector_manage.html', get_table_context("vector"))
 
 # building now
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_manage_old(request):
     search_query = request.GET.get('search_query', '')
     if search_query:
@@ -511,24 +487,51 @@ def vector_manage_old(request):
     return render(request, 'super_manage/vector_manage_dsy.html', context)
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_manage(request):
     return render(request, 'super_manage/vector_manage.html')
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_data_api(request):
+    '''获取所有的vector数据,展示在前端表格中'''
     vector_list = Vector.objects.values(
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20', 
         'status','user__username', 'vector_file', 'vector_png', 'vector_gb'
     )
     return JsonResponse({'data': list(vector_list)})
 
-@login_required
-@is_secondary_admin_required
-def vector_delete(request):
+
+@csrf_exempt  # 使用此装饰器来禁用 CSRF 保护，如果你在 AJAX 请求中已提供 CSRF token，则不需要这个装饰器
+def vector_update_field(request):
     if request.method == 'POST':
-        vector_id = request.POST.get('gene_id')
+        vector_id = request.POST.get('vector_id')
+        field = request.POST.get('field')
+        value = request.POST.get('value')
+        
+        # 检查是否提供了 vector_id 和字段
+        if not vector_id or not field:
+            return JsonResponse({'status': 'error', 'message': 'Missing vector ID or field name'})
+
+        # 获取相应的 vector 实例
+        vector = Vector.objects.get(id=vector_id)
+        
+        # 检查并更新字段
+        if hasattr(vector, field):
+            setattr(vector, field, value)
+            vector.save()
+            return JsonResponse({'status': 'success', 'message': 'Field updated successfully'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Invalid field name'})
+    
+    return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+@login_required
+# @is_secondary_admin_required
+def vector_delete(request):
+    '''删除vector文件'''
+    if request.method == 'POST':
+        vector_id = request.POST.get('vector_id')
         vector = Vector.objects.get(id=vector_id)
     
         if vector.vector_file:
@@ -550,7 +553,7 @@ def vector_delete(request):
 
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 @csrf_exempt
 def vector_upload_file(request):
     '''for customer's vector file, vector_png and vector_gb files.'''
@@ -605,8 +608,9 @@ def vector_upload_file(request):
         return JsonResponse({'status': 'success', 'message': 'File uploaded Successfully'})
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_edit_item(request):
+    '''编辑vector的状态， 将vector的状态改为ReadyToUse'''
     if request.method == 'POST':
         vector_id = request.POST.get('vector_id')
         new_status = request.POST.get('new_status')
@@ -623,7 +627,7 @@ def vector_edit_item(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request'})
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def vector_add_item(request):
     '''添加新的vector 从CSV文件上传'''
     if request.method == 'POST':
@@ -668,7 +672,7 @@ def vector_add_item(request):
     return JsonResponse({"message": "Invalid request", "status": "error"}, status=400)
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def user_manage_old(request): 
     user_list = UserProfile.objects.all().order_by('-register_time')
     page_object = Pagination(request, user_list, page_size=15)
@@ -679,26 +683,26 @@ def user_manage_old(request):
     return render(request, 'super_manage/user_manage.html', context)
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def user_manage(request):
     return render(request, 'super_manage/user_manage.html')
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def user_data_api(request):
     user_list = UserProfile.objects.select_related('user').values(
         'user__id', 'user__username', 'email', 'first_name', 'last_name', 'department', 'phone', 'company', 'shipping_address', 'photo', 'register_time', 'is_verify')
     return JsonResponse({'data': list(user_list)})
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def view_user_profile(request, user_id):
     user = User.objects.get(id=user_id)
     userprofile = UserProfile.objects.get(user=user_id)
     return render(request, 'super_manage/user_profile.html', {"user": user, "userprofile": userprofile})
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def save_user_profile(request, user_id):
     if request.method == 'POST':
         user = User.objects.get(id=user_id)
@@ -723,20 +727,13 @@ def save_user_avatar(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request'})
 
 @login_required
-@is_secondary_admin_required
-def species_manage_old(request):
-    '''这种适合纯模版的'''
-    species_list = Species.objects.all()
-    return render(request, 'super_manage/species_codon_manage_old.html', {'species_list': species_list})
-
-@login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def species_manage(request):
     '''这种适合纯模版的'''
     return render(request, 'super_manage/species_codon_manage.html')
 
 @login_required
-@is_secondary_admin_required
+# @is_secondary_admin_required
 def species_data_api(request):
     species_list = Species.objects.values('id', 'species_name', 'species_note', 'species_codon_file')
     return JsonResponse({'data': list(species_list)})

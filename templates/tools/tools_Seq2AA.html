@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a class="text-decoration-none" href="{% url 'tools:tools_list' %}">在线工具</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ tools_name }}</li>
+        </ol>
+    </nav>
+    <div class="row pt-3 mt-3 form-control">
+        <div class="col">
+            <h3 class="panel-title">Tools of {{ tools_name }} Usage</h3>
+            <ul> Translates a DNA sequence into an amino acid sequence using the standard genetic code. </ul>
+            <ul> Non-standard codons are translated as 'X'.</ul>
+            <ul> Warning: If DNA sequence length is not a multiple of 3 may result in incomplete translation. </ul>
+        </div>
+    </div>
+
+    <div class="row pt-3 mt-3 form-control">
+        <div class="tab-pane" id="nt_sequence" role="tabpanel" aria-labelledby="nt_sequence_tab">   
+            <p class="mt-3">Input your DNA sequences in the first column, and the corresponding amino acid sequences will be instantly displayed in the second column. The code utilizes the Handsontable library to create an interactive table where users can input nucleotide sequences. Upon entering or editing a DNA sequence, the system automatically calculates and updates the corresponding amino acid sequence in real-time, providing a seamless and dynamic representation of the genetic code.</p>
+            <div id="excelTable" class="mt-3">
+                <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block javascript %}
+<script>
+    // 初始化 Handsontable 表格
+    const container = document.querySelector('#excelTable');
+    const hot = new Handsontable(container, {
+        colHeaders: ['NT Sequence*', 'AA Sequence'],
+        rowHeaders: true,
+        colWidths: [500, 500],  // 设置每列的宽度
+        columns: [
+            { data: 'NTSeq' },
+            { data: 'AASeq', readOnly: true },
+        ],
+        height: 'auto',
+        width: 'auto',
+        licenseKey: 'non-commercial-and-evaluation', // for non-commercial use only
+        afterChange: function (changes, source) {
+            // console.log('After change event:', changes, source); // 添加日志
+
+            if (source === 'CopyPaste.paste' || source === 'edit') {
+                // 捕获表格内容变化事件
+                changes.forEach(([row, prop, oldValue, newValue]) => {
+                    // console.log('Change details:', row, prop, oldValue, newValue); // 添加日志
+                    if (prop === 'NTSeq') {
+                        // 如果是 NTSeq 列发生变化，进行计算并更新 AASeq 列
+                        const aminoAcidSequence = calculateAminoAcidSequence(newValue);
+                        // console.log('Calculated AA Sequence:', aminoAcidSequence); // 添加日志
+
+                        // 使用 setDataAtRowProp 方法更新数据
+                        hot.setDataAtRowProp(row, 'AASeq', aminoAcidSequence);
+                    }
+                });
+            }
+        }
+    });
+
+    function calculateAminoAcidSequence(dnaSequence) {
+        const gencode = {
+            'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
+            'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
+            'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
+            'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',
+            'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
+            'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
+            'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
+            'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
+            'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
+            'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
+            'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
+            'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
+            'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
+            'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
+            'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
+            'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
+        };
+
+        if (dnaSequence.length % 3 !== 0) {
+            console.warn("Warning: DNA sequence length is not a multiple of 3. This may result in incomplete translation.");
+        }
+
+        const aminoAcidSequence = Array.from({ length: dnaSequence.length / 3 }, (_, i) => {
+            const codon = dnaSequence.slice(i * 3, i * 3 + 3).toUpperCase();
+            return gencode[codon] || 'X';
+        }).join('');
+
+        return aminoAcidSequence;
+    }
+</script>
+{% endblock %}

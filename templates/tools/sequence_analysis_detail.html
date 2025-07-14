@@ -2,6 +2,29 @@
 {% load static %}
 
 {% block extra_head %}
+<style>
+    /* 进度条照旧使用 Flex 布局 */
+    .progress {
+        overflow: hidden;        /* 不让 min-width 段溢出条容器 */
+        height: 1.25rem;         /* 稍微高一点，数字更清晰 */
+    }
+    
+    /* 通用：让数字在条中水平居中 */
+    .progress-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: .75rem;       /* 数字不要太大，避免拥挤 */
+        line-height: 1.25rem;
+    }
+    
+    /* 关键：如果段太窄，给它最小宽度 */
+    .progress-bar.too-narrow {
+        min-width: 30px;         /* 你可以改成 24–40px 之间的任意值 */
+    }
+</style>
+    
 {% endblock %}
 
 {% block content %}
@@ -10,44 +33,62 @@
     <div class="row">
         <div class="col-md-8">
             <h2>Sequence Analysis Results</h2>
-            <p>Total Genes: {{ gene_table|length }}</p>
+            <p class="mb-0">
+                Total Genes: {{ gene_table|length }}
+                <i class="bi bi-question-circle-fill ms-1 text-muted"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="right"
+                   title="Total penalty score of each sequence is the sum of all feature-specific penalty scores. 
+                          Green: score = 0; Yellow: 0 < score ≤ 28; Red: score > 28.">
+                </i>
+              </p>
         </div>
         <div class="col-md-4 text-end">
             <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i> Download CSV</a>
         </div>
-        <div class="col-12">
-            <div class="progress mb-4">
-                <div class="progress-bar bg-success" role="progressbar" style="width: {{ green_percentage }}%" aria-valuenow="{{ green_percentage }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="col-12 mt-2">
+            <div class="progress">
+                {# 绿色段 #}
+                <div class="progress-bar bg-success position-relative
+                            {% if green_percentage < 3 %}too-narrow{% endif %}"
+                     role="progressbar"
+                     style="width: {{ green_percentage }}%"
+                     aria-valuenow="{{ green_percentage }}" aria-valuemin="0" aria-valuemax="100">
                     <span class="text-dark">{{ green_count }}</span>
                 </div>
-                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ yellow_percentage }}%" aria-valuenow="{{ yellow_percentage }}" aria-valuemin="0" aria-valuemax="100">
+            
+                {# 黄色段 #}
+                <div class="progress-bar bg-warning position-relative
+                            {% if yellow_percentage < 3 %}too-narrow{% endif %}"
+                     role="progressbar"
+                     style="width: {{ yellow_percentage }}%"
+                     aria-valuenow="{{ yellow_percentage }}" aria-valuemin="0" aria-valuemax="100">
                     <span class="text-dark">{{ yellow_count }}</span>
                 </div>
-                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ red_percentage }}%" aria-valuenow="{{ red_percentage }}" aria-valuemin="0" aria-valuemax="100">
+            
+                {# 红色段 #}
+                <div class="progress-bar bg-danger position-relative
+                            {% if red_percentage < 3 %}too-narrow{% endif %}"
+                     role="progressbar"
+                     style="width: {{ red_percentage }}%"
+                     aria-valuenow="{{ red_percentage }}" aria-valuemin="0" aria-valuemax="100">
                     <span class="text-light">{{ red_count }}</span>
                 </div>
             </div>
         </div>
-        <div class="col-12">
-            <div class="alert alert-warning" role="alert">
-                <p>Total penalty score of each sequence was calculated based on the sum of the penalty scores of each feature.
-                The sequences with a total penalty score less than 100 are marked as green, 
-                between 100 and 300 are marked as yellow, and greater than 300 are marked as red.</p>
-            </div>
-        </div>
     </div>
     <!-- Gene Table -->
-    <div class="row">
+    <div class="row mt-3">
         {% for g in gene_table %}
-        <div class="col-12 mb-3">
+        <div class="col-12 mb-2">
             <!-- Gene Card -->
             <div class="card">
-                <div class="card-header {% if g.total_penalty_score < 100 %}bg-success{% elif g.total_penalty_score < 300 %}bg-warning{% elif g.total_penalty_score >= 300 %}bg-danger{% endif %}">
+                <div class="card-header {% if g.total_penalty_score == 0 %}bg-success{% elif g.total_penalty_score <= 28 %}bg-warning{% elif g.total_penalty_score > 28 %}bg-danger{% endif %}">
                     <div class="row">
                         <div class="col-6 text-start">
                             Gene ID: {{ g.gene_id }}
                         </div>
-                        <div class="col-6 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score <100; yellow:100<score<300; red:score>300">
+                        <div class="col-6 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score is 0; yellow:0<score<28; red:score>28">
                             Total Penalty Score: {{ g.total_penalty_score }}
                         </div>
                     </div>
@@ -129,41 +170,47 @@
             });
         }
 
-        // 其他代码： 处理序列高亮显示等
         document.querySelectorAll('.sequence-highlighter').forEach(function(item) {
             item.addEventListener('mouseenter', function() {
-                // 提取序列部分，考虑到可能有分号分隔的多个序列
+                // 1) Get the full text in this <li>
                 const fullText = this.textContent.trim();
-                console.log('Full Text:', fullText);  // 打印完整文本 Check W12S12 motif: sequence: TTTTTTTTTTTTTTAA | start: 458 | end: 473 | length: 16; sequence: CGCGCGCGCGCGCGCGCGCGCGCG | start: 386 | end: 409 | length: 24. score: 9.0.
-                // 序列是分散的，需要提取序列部分
-                const targetSequencePart = fullText.split(':')[2].split(',')[0];  // 提取序列部分
-                const targetSequences = targetSequencePart.split('|');  // 处理可能的多序列情况
-                const targetId = this.getAttribute('data-target');
-                const targetElement = document.querySelector(targetId);
-
-                console.log('Target Sequences:', targetSequences);  // 打印目标序列
-                console.log('Target ID:', targetId);  // 打印目标元素的ID
-
-                if (targetElement) {
-                    // console.log('Original Text:', targetElement.textContent);  // 打印原始文本
-                    let highlightedText = targetElement.textContent;
-                    targetSequences.forEach(sequence => {
-                        const regex = new RegExp(sequence, 'g');  // 创建正则表达式，全局匹配目标序列
-                        highlightedText = highlightedText.replace(regex, 
-                            `<span class="bg-warning text-dark">${sequence}</span>`);  // 替换文本以高亮显示
-                    });
-                    
-                    // console.log('Highlighted Text:', highlightedText);  // 打印替换后的高亮文本
-                    targetElement.innerHTML = highlightedText;  // 更新HTML内容
+                // console.log('Full Text:', fullText);
+ 
+                // 2) Extract substring(s) that appear after "sequence:" and before the next '|' character
+                //    This RegExp looks for "sequence:" followed by any non-'|' characters. 'g' for multiple matches.
+                const regex = /sequence:\s*([^|]+)/gi;
+                let match;
+                const extractedSeqs = [];
+                while ((match = regex.exec(fullText)) !== null) {
+                    const seq = match[1].trim();
+                    if (seq) extractedSeqs.push(seq);
                 }
+                // console.log('Extracted Sequences:', extractedSeqs);
+ 
+                // 3) Get the target element, whose ID is in data-target
+                const targetId = this.getAttribute('data-target');
+                const targetElement = document.querySelector(targetId);
+                if (!targetElement) return;
+ 
+                // 4) Highlight the extracted sequences inside the target element
+                let highlightedText = targetElement.textContent;
+                extractedSeqs.forEach(sequence => {
+                    // case-insensitive global matching
+                    const re = new RegExp(sequence, 'gi');
+                    highlightedText = highlightedText.replace(
+                        re,
+                        '<span class="bg-warning text-dark">$&</span>'
+                    );
+                });
+                targetElement.innerHTML = highlightedText;
             });
-
+ 
             item.addEventListener('mouseleave', function() {
+                // restore original text
                 const targetId = this.getAttribute('data-target');
                 const targetElement = document.querySelector(targetId);
                 if (targetElement) {
-                    targetElement.innerHTML = targetElement.textContent; // 移除高亮，恢复原始文本
-                    // console.log('Text after Mouse Leave:', targetElement.textContent); // 打印鼠标离开后的文本
+                    targetElement.innerHTML = targetElement.textContent;
                 }
             });
         });
@@ -171,7 +218,7 @@
 
     // 注册 beforeunload 事件监听器
     window.addEventListener('beforeunload', function (e) {
-        console.log("allowUnload: ", allowUnload); // 打印当前的 allowUnload 值
+        // console.log("allowUnload: ", allowUnload); // 打印当前的 allowUnload 值
         if (!allowUnload) return;  // 如果标志为false，不显示警告
         var confirmationMessage = 'Are you sure you want to leave this page?';
         (e || window.event).returnValue = confirmationMessage; // Gecko and Trident

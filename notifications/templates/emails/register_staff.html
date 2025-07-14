@@ -1,0 +1,10 @@
+<!-- notifications/templates/emails/register_user.html -->
+<html>
+<body>
+  <h1>新用户注册{{ user.username }}！</h1>
+  <p>注册邮箱：{{ user.email }}</p>
+  <p>注册时间：{{ user.userprofile.register_time }}</p>
+  <p>手机号码：{{ user.userprofile.phone }}</p>
+  <p>公司：{{ user.userprofile.company }}</p>
+</body>
+</html>
