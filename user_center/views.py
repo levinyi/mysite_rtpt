@@ -103,10 +103,14 @@ def order_create(request):
             data_json = convert_gene_table_to_RepeatsFinder_Format(df)
             result_df = process_gene_table_results(data_json)
 
-            model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_12.pkl')
-            weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_12.npy')
+            # model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_12.pkl')
+            # weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_12.npy')
             # predicted_data = predict_new_data_from_df(result_df, model_path=model_path, scaler=None, weights_path=weights_path)
-            
+            feature_columns = [
+                'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score','LongRepeats_penalty_score', 
+                'Homopolymers_penalty_score', 'DoubleNT_penalty_score'
+            ]
+            result_df['total_penalty_score'] = sum(result_df[col] for col in feature_columns).round(2)
             # 将结果合并到原始数据中
             df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')            
             ###############################################################################################################################

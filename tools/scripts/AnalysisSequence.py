@@ -550,8 +550,22 @@ def calculate_total_penalty_score(feature_list):
 
 # --- 新增：统计各特征总长度 ---
 def calculate_total_feature_length(feature_list):
-    """累加每条特征的长度字段；若列表为空返回 0。"""
-    return sum(item.get("length", 0) for item in feature_list)
+    """
+    计算一个特征列表的总长度。
+    - 若 item["start"] 是列表，则 repeats = len(item["start"])；
+      否则 repeats = 1。
+    - 总长度 = repeats × item["length"]（缺失时按 0）。
+    """
+    total_len = 0
+    for item in feature_list:
+        base_len = item.get("length", 0) or 0
+
+        starts = item.get("start", [])
+        repeats = len(starts) if isinstance(starts, list) and starts else 1
+
+        total_len += base_len * repeats
+
+    return total_len
 
 # 数据处理函数，返回处理后的 DataFrame
 def process_gene_table_results(data):
@@ -613,16 +627,17 @@ if __name__ == '__main__':
     else:
         raise ValueError("Invalid file format. Please provide a .csv or .xlsx file")
     
-    gene_table['gene_id'] = gene_table['GeneName']
-    gene_table['sequence'] = gene_table['FullSeqREAL']
+    # gene_table['gene_id'] = gene_table['GeneName']
+    # gene_table['sequence'] = gene_table['FullSeqREAL']
 
     data = convert_gene_table_to_RepeatsFinder_Format(gene_table)
-
+    print(data)
     # 处理数据并获取结果 DataFrame
     result_df = process_gene_table_results(data)
+    print(result_df[['GeneName', 'Total_Length', 'LongRepeats_total_length', 'LongRepeats',]])
     # 合并原始表格
-    df = gene_table.merge(result_df, on='GeneName', how='left')
-    # 删除不需要的列
-    df.drop(['gene_id', 'sequence'], axis=1, inplace=True)
-    # 保存结果
-    output_file = input_file.replace('.xlsx', '_output.txt').replace('.csv', '_output.txt')
+    # df = gene_table.merge(result_df, on='gene_id', how='left')
+    # # 删除不需要的列
+    # df.drop(['gene_id', 'sequence'], axis=1, inplace=True)
+    # # 保存结果
+    # output_file = input_file.replace('.xlsx', '_output.txt').replace('.csv', '_output.txt')

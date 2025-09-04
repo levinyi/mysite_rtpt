@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mini Gene Extractor{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="text-center mb-5">
+        <h2>Mini Gene Extractor</h2>
+        <p class="lead text-muted">
+            This tool constructs a mini-gene fragment based on the HGVSc and HGVSp information you provide.
+        </p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <form id="miniGeneForm" method="POST" enctype="multipart/form-data" action="{% url 'tools:MiniGeneExtractor' %}">
+                {% csrf_token %}
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Step 1: Provide Mutation Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="genomeVersion" class="form-label"><strong>Genome Version</strong></label>
+                            <select class="form-select" id="genomeVersion" name="genomeVersion">
+                                <option value="hg38" selected>hg38 (Default)</option>
+                                <option value="hg19">hg19</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="form-label"><strong>Mutation Information</strong></label>
+                            <ul class="nav nav-pills nav-fill mb-3" id="inputTypeTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="text-input-tab" data-bs-toggle="tab" data-bs-target="#text-input" type="button" role="tab" aria-controls="text-input" aria-selected="true">
+                                        <i class="bi bi-keyboard me-2"></i>Text Input
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="file-upload-tab" data-bs-toggle="tab" data-bs-target="#file-upload" type="button" role="tab" aria-controls="file-upload" aria-selected="false">
+                                        <i class="bi bi-file-earmark-arrow-up me-2"></i>File Upload
+                                    </button>
+                                </li>
+                            </ul>
+                            <div class="tab-content" id="inputTypeTabContent">
+                                <div class="tab-pane fade show active" id="text-input" role="tabpanel" aria-labelledby="text-input-tab">
+                                    <input type="hidden" name="input_type" value="text">
+                                    <textarea class="form-control" id="mutationText" name="mutation_text" rows="8" placeholder="Enter mutation information here, one per line. Both HGVSc and HGVSp are required. For example:&#10;ENST00000262960.9:c.1108C>G,ENSP00000262960.8:p.Pro370Ala"></textarea>
+                                    <div class="mt-2">
+                                        <a href="#" id="example-link" class="text-decoration-none small">
+                                            <i class="bi bi-lightbulb"></i>
+                                            Click here to use an example
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade" id="file-upload" role="tabpanel" aria-labelledby="file-upload-tab">
+                                    <input type="hidden" name="input_type" value="file" disabled>
+                                    <div class="card text-center p-3 border-dashed">
+                                        <div class="card-body">
+                                            <i class="bi bi-cloud-upload fs-1 text-muted"></i>
+                                            <p class="card-text mt-2">Please upload an Excel (.xlsx) or CSV (.csv) file. The file must contain columns named <strong>'HGVSc'</strong> and <strong>'HGVSp'</strong>.</p>
+                                            <input class="form-control" type="file" id="mutationFile" name="mutation_file" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Step 2: Customize Options</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="windowSize" class="form-label"><strong>Flanking sequence length (AA)</strong></label>
+                            <input type="number" class="form-control" id="windowSize" name="window_size" value="14" min="1">
+                            <div class="form-text">The number of amino acids before and after the mutation site. Default is 14 for a 29AA total length.</div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="gsPadding" name="gs_padding" checked>
+                                    <label class="form-check-label" for="gsPadding">Pad with GS linker</label>
+                                    <div class="form-text mt-1">Adds 'GS' sequences to both ends of the mini-gene to act as flexible linkers.</div>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="segmentMinigene" name="segment_minigene" checked>
+                                    <label class="form-check-label" for="segmentMinigene">Segment mutated mini-gene</label>
+                                    <div class="form-text mt-1">Breaks down the mutated mini-gene into overlapping smaller segments (e.g., 9-mers).</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        <i class="bi bi-play-circle me-2"></i>
+                        Submit for Analysis
+                    </button>
+                </div>
+            </form>
+
+            <!-- Results Section -->
+            <div id="results-section" class="mt-5">
+                <h4 class="mb-3">Analysis Results</h4>
+                <div id="resultsCard" class="card shadow-sm d-none">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">Generated Mini-Genes</h5>
+                            <a href="{% url 'tools:MiniGeneExtractor' %}?download=true" id="downloadBtn" class="btn btn-success">
+                                <i class="bi bi-download me-2"></i>Download Results (Excel)
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-striped">
+                                <thead id="resultsThead" class="table-light"></thead>
+                                <tbody id="resultsTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+                
+                <div id="placeholderCard" class="card">
+                    <div class="card-body text-center text-muted">
+                        <i class="bi bi-bar-chart-line fs-1"></i>
+                        <p class="mt-3">Your analysis results will appear here after submission.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .border-dashed {
+        border: 2px dashed #dee2e6;
+    }
+    .nav-pills .nav-link {
+        color: #495057;
+    }
+    .nav-pills .nav-link.active {
+        color: #fff;
+        background-color: #0d6efd;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+    .card-header {
+        padding: 0.75rem 1.25rem;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('miniGeneForm');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    const resultsCard = document.getElementById('resultsCard');
+    const errorAlert = document.getElementById('errorAlert');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resultsThead = document.getElementById('resultsThead');
+    const resultsTbody = document.getElementById('resultsTbody');
+    const placeholderCard = document.getElementById('placeholderCard');
+    const exampleLink = document.getElementById('example-link');
+
+    exampleLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        const exampleText = "ENST00000262960.9:c.1108C>G,ENSP00000262960.8:p.Pro370Ala";
+        document.getElementById('mutationText').value = exampleText;
+        // Switch to text input tab if not already active
+        const textInputTab = new bootstrap.Tab(document.getElementById('text-input-tab'));
+        textInputTab.show();
+    });
+
+    // Logic to switch between text and file input
+    const textInputTab = document.getElementById('text-input-tab');
+    const fileUploadTab = document.getElementById('file-upload-tab');
+    const hiddenInputTypeForText = document.querySelector('#text-input input[name="input_type"]');
+    const hiddenInputTypeForFile = document.querySelector('#file-upload input[name="input_type"]');
+    const mutationTextInput = document.getElementById('mutationText');
+    const mutationFileInput = document.getElementById('mutationFile');
+
+    textInputTab.addEventListener('click', function() {
+        hiddenInputTypeForText.disabled = false;
+        hiddenInputTypeForFile.disabled = true;
+        mutationFileInput.value = ''; // Clear file input
+    });
+
+    fileUploadTab.addEventListener('click', function() {
+        hiddenInputTypeForText.disabled = true;
+        hiddenInputTypeForFile.disabled = false;
+        mutationTextInput.value = ''; // Clear text input
+    });
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Reset UI
+        submitBtn.disabled = true;
+        spinner.classList.remove('d-none');
+        resultsCard.classList.add('d-none');
+        errorAlert.classList.add('d-none');
+        placeholderCard.classList.remove('d-none');
+
+        const formData = new FormData(form);
+        
+        // Determine active tab and set input_type correctly
+        const activeTab = document.querySelector('.nav-pills .nav-link.active').id;
+        if (activeTab === 'text-input-tab') {
+            formData.set('input_type', 'text');
+        } else {
+            formData.set('input_type', 'file');
+        }
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.message || 'Server error'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                const results = JSON.parse(data.results_json);
+                if (results.length > 0) {
+                    // Clear old data
+                    resultsThead.innerHTML = '';
+                    resultsTbody.innerHTML = '';
+
+                    // Create table header
+                    const headers = Object.keys(results[0]);
+                    const headerRow = document.createElement('tr');
+                    headers.forEach(header => {
+                        const th = document.createElement('th');
+                        th.textContent = header;
+                        headerRow.appendChild(th);
+                    });
+                    resultsThead.appendChild(headerRow);
+
+                    // Populate table data
+                    results.forEach(rowData => {
+                        const row = document.createElement('tr');
+                        headers.forEach(header => {
+                            const td = document.createElement('td');
+                            td.textContent = rowData[header];
+                            row.appendChild(td);
+                        });
+                        resultsTbody.appendChild(row);
+                    });
+
+                    resultsCard.classList.remove('d-none');
+                    placeholderCard.classList.add('d-none');
+                } else {
+                    errorAlert.textContent = 'Analysis complete, but no results were generated.';
+                    errorAlert.classList.remove('d-none');
+                }
+            } else {
+                errorAlert.textContent = 'Error: ' + data.message;
+                errorAlert.classList.remove('d-none');
+            }
+        })
+        .catch(error => {
+            errorAlert.textContent = 'An unknown error occurred: ' + error.message;
+            errorAlert.classList.remove('d-none');
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            spinner.classList.add('d-none');
+        });
+    });
+
+    downloadBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        // The download logic in the view now depends on the session, so we just need to make a GET request.
+        // The URL is now static in the template.
+        window.location.href = this.href;
+    });
+});
+</script>
+{% endblock %}

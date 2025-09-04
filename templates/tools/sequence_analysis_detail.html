@@ -1,229 +1,494 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block title %}Sequence Analysis Results{% endblock %}
+
 {% block extra_head %}
 <style>
-    /* 进度条照旧使用 Flex 布局 */
-    .progress {
-        overflow: hidden;        /* 不让 min-width 段溢出条容器 */
-        height: 1.25rem;         /* 稍微高一点，数字更清晰 */
-    }
-    
-    /* 通用：让数字在条中水平居中 */
-    .progress-bar {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: .75rem;       /* 数字不要太大，避免拥挤 */
-        line-height: 1.25rem;
-    }
-    
-    /* 关键：如果段太窄，给它最小宽度 */
-    .progress-bar.too-narrow {
-        min-width: 30px;         /* 你可以改成 24–40px 之间的任意值 */
-    }
+  /* Modern page font + spacing */
+  .sa-page { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  .card.shadow-sm { box-shadow: 0 .5rem 1rem rgba(0,0,0,.05)!important; }
+  .results-header { background: linear-gradient(90deg,#f8f9fa,#eef1f4); border: 1px solid #eaedf1; border-radius: .75rem; padding: 1rem 1.25rem; }
+  .toolbar { gap: .5rem; }
+  .toolbar .form-control { border-radius: .75rem; }
+  .toolbar .btn { border-radius: .65rem; }
+  .sticky-tools { position: sticky; top: 12px; z-index: 10; }
+
+  /* Progress bar: slightly taller and clearer numbers */
+  .results-progress.progress { overflow: hidden; height: 1.25rem; border-radius: 999px; }
+  .results-progress .progress-bar { display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: .75rem; line-height: 1.25rem; }
+  .results-progress .progress-bar.too-narrow { min-width: 30px; }
+
+  /* Legend badges */
+  .legend-badge { font-size: .75rem; border-radius: 999px; padding: .25rem .5rem; border: 1px solid #e5e7eb; background: #fff; }
+
+  /* Card accents by severity */
+  .severity-border-ok { border-left: 6px solid #198754; }
+  .severity-border-warn { border-left: 6px solid #ffc107; }
+  .severity-border-high { border-left: 6px solid #dc3545; }
+  .severity-pill { border-radius: 999px; padding: .15rem .5rem; font-weight: 600; font-size: .75rem; }
+  .severity-pill.ok { background: #e9f7ef; color: #198754; border: 1px solid #cdebd9; }
+  .severity-pill.warn { background: #fff8e1; color: #b08900; border: 1px solid #ffe08a; }
+  .severity-pill.high { background: #fde2e1; color: #c0362c; border: 1px solid #f6b5b2; }
+
+  /* Sequence block */
+  .sequence-block { background: #fbfbfc; border: 1px solid #eaedf1; border-radius: .5rem; padding: .75rem; position: relative; }
+  .sequence-text { font-family: 'Consolas', 'Lucida Console', monospace; font-size: .9rem; word-break: break-word; white-space: pre-wrap; margin: 0; }
+  .sequence-actions { position: absolute; top: .5rem; right: .5rem; display: flex; gap: .25rem; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+  .sequence-block:hover .sequence-actions, .sequence-actions:focus-within { opacity: 1; pointer-events: auto; }
+
+  /* Feature list items (clickable highlights) */
+  .feature-list { margin: 0; padding-left: 1rem; }
+  .feature-list li.sequence-highlighter { cursor: pointer; padding: .25rem .5rem; border-radius: .35rem; margin-bottom: .25rem; transition: background-color .15s ease; }
+  .feature-list li.sequence-highlighter:hover { background: #f5f7fa; }
+  .feature-list .bi { vertical-align: -2px; }
+
+  /* Minor utilities */
+  .muted-badge { background: #f1f3f5; color: #6c757d; border: 1px solid #e9ecef; }
+  .btn-icon { padding: .25rem .5rem; border-radius: .5rem; }
+  .btn-ghost { background: #fff; border: 1px solid #e9ecef; }
+  .btn-ghost.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+  /* Findings summary chips */
+  .finding-chip { border: 1px solid #edf0f3; background: #fff; border-radius: 999px; padding: .25rem .5rem; display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; }
+  /* More vivid severity pill */
+  .severity-pill { font-size: .85rem; letter-spacing: .2px; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+  .severity-pill.ok { background: linear-gradient(180deg,#e9f7ef,#dff7ea); }
+  .severity-pill.warn { background: linear-gradient(180deg,#fff5d6,#ffefbf); }
+  .severity-pill.high { background: linear-gradient(180deg,#ffe3e1,#ffd4d1); }
+
+  /* Category highlights */
+  .hl-long { background: #fde68a; color: #7c4d00; }
+  .hl-homo { background: #c8e6c9; color: #1b5e20; }
+  .hl-ws { background: #bbdefb; color: #0d47a1; }
+  .hl-highgc { background: #ffcdd2; color: #b71c1c; }
+  .hl-lowgc { background: #cfe9ff; color: #003c80; }
+  .hl-dint { background: #e1bee7; color: #4a148c; }
+  .hl-pal { background: #ffe0b2; color: #bf360c; }
+  .hl-inv { background: #ffecb3; color: #8d6e63; }
 </style>
-    
 {% endblock %}
 
 {% block content %}
-<div class="container mt-3">
-    <!-- 顶部信息 -->
-    <div class="row">
-        <div class="col-md-8">
-            <h2>Sequence Analysis Results</h2>
-            <p class="mb-0">
-                Total Genes: {{ gene_table|length }}
-                <i class="bi bi-question-circle-fill ms-1 text-muted"
-                   data-bs-toggle="tooltip"
-                   data-bs-placement="right"
-                   title="Total penalty score of each sequence is the sum of all feature-specific penalty scores. 
-                          Green: score = 0; Yellow: 0 < score ≤ 28; Red: score > 28.">
-                </i>
-              </p>
+<div class="container mt-4 sa-page">
+  <!-- Header + actions -->
+  <div class="results-header mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h4 class="mb-1"><i class="bi bi-activity me-2 text-primary"></i>Sequence Analysis Results</h4>
+        <div class="text-muted small">
+          Total Genes: {{ gene_table|length }}
+          <i class="bi bi-question-circle-fill ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="right" title="Total penalty = sum of feature-specific penalties. Green: 0; Yellow: 1–28; Red: >28."></i>
         </div>
-        <div class="col-md-4 text-end">
-            <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i> Download CSV</a>
-        </div>
-        <div class="col-12 mt-2">
-            <div class="progress">
-                {# 绿色段 #}
-                <div class="progress-bar bg-success position-relative
-                            {% if green_percentage < 3 %}too-narrow{% endif %}"
-                     role="progressbar"
-                     style="width: {{ green_percentage }}%"
-                     aria-valuenow="{{ green_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                    <span class="text-dark">{{ green_count }}</span>
-                </div>
-            
-                {# 黄色段 #}
-                <div class="progress-bar bg-warning position-relative
-                            {% if yellow_percentage < 3 %}too-narrow{% endif %}"
-                     role="progressbar"
-                     style="width: {{ yellow_percentage }}%"
-                     aria-valuenow="{{ yellow_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                    <span class="text-dark">{{ yellow_count }}</span>
-                </div>
-            
-                {# 红色段 #}
-                <div class="progress-bar bg-danger position-relative
-                            {% if red_percentage < 3 %}too-narrow{% endif %}"
-                     role="progressbar"
-                     style="width: {{ red_percentage }}%"
-                     aria-valuenow="{{ red_percentage }}" aria-valuemin="0" aria-valuemax="100">
-                    <span class="text-light">{{ red_count }}</span>
-                </div>
-            </div>
-        </div>
+      </div>
+      <div>
+        <a href="{% url 'tools:download_gene_table' %}" id="downloadButton" class="btn btn-primary"><i class="bi bi-download me-2"></i>Download CSV</a>
+      </div>
     </div>
-    <!-- Gene Table -->
-    <div class="row mt-3">
-        {% for g in gene_table %}
-        <div class="col-12 mb-2">
-            <!-- Gene Card -->
-            <div class="card">
-                <div class="card-header {% if g.total_penalty_score == 0 %}bg-success{% elif g.total_penalty_score <= 28 %}bg-warning{% elif g.total_penalty_score > 28 %}bg-danger{% endif %}">
-                    <div class="row">
-                        <div class="col-6 text-start">
-                            Gene ID: {{ g.gene_id }}
-                        </div>
-                        <div class="col-6 text-end" data-bs-toggle="tooltip" data-bs-placement="right" title="green: score is 0; yellow:0<score<28; red:score>28">
-                            Total Penalty Score: {{ g.total_penalty_score }}
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <p class="card-text" id="seq-{{ forloop.counter }}">{{ g.sequence }}</p>
-                    <!-- Accordion for details -->
-                    <div class="accordion" id="accordion{{ forloop.counter }}">
-                        <div class="accordion-item">
-                            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
-                                    Show More Details
-                                </button>
-                            </h2>
-                            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordion{{ forloop.counter }}">
-                                <div class="accordion-body">
-                                    <!-- Display other information as list -->
-                                    <ul>
-                                        {% if g.tandem_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.tandem_repeats_positions }}">
-                                            Check Tandem Repeats: {{ g.tandem_repeats }},score: {{ g.tandem_repeats_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if g.inverted_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.inverted_repeats_sequence }}">
-                                            Check Inverted Repeats: {{ g.inverted_repeats }}, score: {{ g.inverted_repeats_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if g.W12S12Motifs %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.W12S12Motifs }}">
-                                            Check W12S12 motif: {{ g.W12S12Motifs }}. score: {{ g.W12S12Motifs_penalty_score }}.
-                                        </li>
-                                        {% endif %}
-                                        {% if g.Homopolymers %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.Homopolymers }}">
-                                        Check Homopolymers: {{ g.Homopolymers }}, score: {{ g.Homopolymers_penalty_score }}</li>
-                                        {% endif %}
-                                        {% if g.LongRepeats %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.LongRepeats }}">
-                                        Check Long Repeats: {{ g.LongRepeats }}, score: {{ g.LongRepeats_penalty_score}}</li>
-                                        {% endif %}
-                                        
-                                        {% if g.palindromes %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.palindromes }}">
-                                        Check Palindromes: {{ g.Palindromes }}, score: {{g.Palindromes_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if g.LowGC %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.LowGC }}">
-                                        Check LowGC: {{ g.LowGC }}, score: {{ g.LowGC_penalty_score }}</li>
-                                        {% endif %}
-                                        {% if g.HighGC %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ g.HighGC }}">
-                                        Check HighGC: {{ g.HighGC }}, score: {{ g.HighGC_penalty_score }}</li>
-                                        {% endif %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="row align-items-center mt-3 g-2">
+      <div class="col-lg-7">
+        <div class="results-progress progress">
+          <div class="progress-bar bg-success {% if green_percentage < 3 %}too-narrow{% endif %}" style="width: {{ green_percentage }}%" aria-valuenow="{{ green_percentage }}" aria-valuemin="0" aria-valuemax="100">
+            <span class="text-dark">{{ green_count }}</span>
+          </div>
+          <div class="progress-bar bg-warning {% if yellow_percentage < 3 %}too-narrow{% endif %}" style="width: {{ yellow_percentage }}%" aria-valuenow="{{ yellow_percentage }}" aria-valuemin="0" aria-valuemax="100">
+            <span class="text-dark">{{ yellow_count }}</span>
+          </div>
+          <div class="progress-bar bg-danger {% if red_percentage < 3 %}too-narrow{% endif %}" style="width: {{ red_percentage }}%" aria-valuenow="{{ red_percentage }}" aria-valuemin="0" aria-valuemax="100">
+            <span class="text-light">{{ red_count }}</span>
+          </div>
         </div>
-        {% endfor %}
+      </div>
+      <div class="col-lg-5 d-flex gap-2 flex-wrap justify-content-lg-end">
+        <span class="legend-badge"><span class="badge bg-success me-1">OK</span>{{ green_count }} ({{ green_percentage }}%)</span>
+        <span class="legend-badge"><span class="badge bg-warning me-1">Warn</span>{{ yellow_count }} ({{ yellow_percentage }}%)</span>
+        <span class="legend-badge"><span class="badge bg-danger me-1">High</span>{{ red_count }} ({{ red_percentage }}%)</span>
+      </div>
     </div>
+  </div>
+
+  <!-- Sticky tools: search + filters + expand/collapse -->
+  <div class="sticky-tools mb-3">
+    <div class="d-flex flex-wrap align-items-center toolbar">
+      <div class="flex-grow-1">
+        <div class="input-group">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input id="searchInput" type="text" class="form-control" placeholder="Search Gene ID...">
+          <button id="clearSearch" class="btn btn-outline-secondary" type="button" title="Clear"><i class="bi bi-x"></i></button>
+        </div>
+      </div>
+      <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
+        <div class="input-group" style="width: 260px;">
+          <span class="input-group-text bg-white"><i class="bi bi-sort-alpha-down"></i></span>
+          <select id="sortSelect" class="form-select">
+            <option value="score_desc">Sort: Score ↓</option>
+            <option value="score_asc">Sort: Score ↑</option>
+            <option value="gene_asc">Sort: Gene ID A→Z</option>
+            <option value="gene_desc">Sort: Gene ID Z→A</option>
+          </select>
+        </div>
+        <div class="btn-group" role="group" aria-label="Severity filter">
+          <button class="btn btn-ghost active" data-severity-filter="all" type="button">All</button>
+          <button class="btn btn-ghost" data-severity-filter="ok" type="button">OK</button>
+          <button class="btn btn-ghost" data-severity-filter="warn" type="button">Warn</button>
+          <button class="btn btn-ghost" data-severity-filter="high" type="button">High</button>
+        </div>
+        <div class="vr"></div>
+        <button id="expandAll" class="btn btn-light" type="button"><i class="bi bi-arrows-expand me-1"></i>Expand All</button>
+        <button id="collapseAll" class="btn btn-light" type="button"><i class="bi bi-arrows-collapse me-1"></i>Collapse All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gene Cards -->
+  <div class="row gy-3" id="geneList">
+    {% for g in gene_table %}
+      <div class="col-12">
+        <div class="card shadow-sm {% if g.total_penalty_score == 0 %}severity-border-ok{% elif g.total_penalty_score <= 28 %}severity-border-warn{% else %}severity-border-high{% endif %}"
+             data-gene-id="{{ g.gene_id }}"
+             data-total-score="{{ g.total_penalty_score }}"
+             data-severity="{% if g.total_penalty_score == 0 %}ok{% elif g.total_penalty_score <= 28 %}warn{% else %}high{% endif %}">
+          <div class="card-header bg-white">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="fw-semibold">Gene ID: <span class="text-primary">{{ g.gene_id }}</span></div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge muted-badge">Length: {{ g.sequence|length }} bp</span>
+                <span class="severity-pill {% if g.total_penalty_score == 0 %}ok{% elif g.total_penalty_score <= 28 %}warn{% else %}high{% endif %}">
+                  {% if g.total_penalty_score == 0 %}
+                    <i class="bi bi-check-circle-fill me-1"></i>OK · Score {{ g.total_penalty_score }}
+                  {% elif g.total_penalty_score <= 28 %}
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>WARN · Score {{ g.total_penalty_score }}
+                  {% else %}
+                    <i class="bi bi-fire me-1"></i>HIGH · Score {{ g.total_penalty_score }}
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="sequence-block">
+              <div class="sequence-actions">
+                <button class="btn btn-sm btn-icon btn-outline-secondary copy-seq" type="button" data-target="#seq-{{ forloop.counter }}" title="Copy sequence"><i class="bi bi-clipboard"></i></button>
+              </div>
+              <pre class="sequence-text" id="seq-{{ forloop.counter }}">{{ g.sequence }}</pre>
+            </div>
+
+            <!-- Findings summary row: preview + toggle on the same line -->
+            {% if g.total_penalty_score > 0 or g.LongRepeats_total_length or g.Homopolymers_total_length or g.W12S12Motifs_total_length or g.HighGC_total_length or g.LowGC_total_length or g.DoubleNT_total_length %}
+            <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
+              {% if g.total_penalty_score > 0 %}
+              <span class="finding-chip preview-issues" data-target="#seq-{{ forloop.counter }}" data-scope="#features-{{ forloop.counter }}" title="Hover to highlight problematic segments">Show Problematic Features Only</span>
+              <button class="btn btn-light btn-sm toggle-findings" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                <i class="bi bi-list-check me-1"></i>Findings
+              </button>
+              {% endif %}
+              {% if g.LongRepeats_total_length %}
+                <span class="finding-chip"><i class="bi bi-infinity text-secondary"></i>Long Repeats <span class="badge bg-light text-secondary border">{{ g.LongRepeats_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.Homopolymers_total_length %}
+                <span class="finding-chip"><i class="bi bi-grip-horizontal text-secondary"></i>Homopolymers <span class="badge bg-light text-secondary border">{{ g.Homopolymers_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.W12S12Motifs_total_length %}
+                <span class="finding-chip"><i class="bi bi-crosshair text-secondary"></i>W12S12 Motifs <span class="badge bg-light text-secondary border">{{ g.W12S12Motifs_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.HighGC_total_length %}
+                <span class="finding-chip"><i class="bi bi-thermometer-high text-danger"></i>High GC <span class="badge bg-light text-secondary border">{{ g.HighGC_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.LowGC_total_length %}
+                <span class="finding-chip"><i class="bi bi-thermometer-low text-primary"></i>Low GC <span class="badge bg-light text-secondary border">{{ g.LowGC_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.DoubleNT_total_length %}
+                <span class="finding-chip"><i class="bi bi-shuffle text-secondary"></i>Dinucleotide Repeats <span class="badge bg-light text-secondary border">{{ g.DoubleNT_total_length }} bp</span></span>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if g.total_penalty_score > 0 %}
+            <div class="collapse mt-2" id="collapse{{ forloop.counter }}">
+              <div id="features-{{ forloop.counter }}">
+                <ul class="feature-list list-group list-group-flush">
+                      {% if g.tandem_repeats_sequence %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="tandem" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.tandem_repeats|escapejs }}">
+                          <div><i class="bi bi-record-circle text-warning me-1"></i>Tandem Repeats: {{ g.tandem_repeats }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.tandem_repeats_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.inverted_repeats_sequence %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="inv" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.inverted_repeats|escapejs }}">
+                          <div><i class="bi bi-arrow-left-right text-warning me-1"></i>Inverted Repeats: {{ g.inverted_repeats }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.inverted_repeats_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.W12S12Motifs %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="ws" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.W12S12Motifs|escapejs }}">
+                          <div><i class="bi bi-crosshair text-warning me-1"></i>W12S12 motif: {{ g.W12S12Motifs }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.W12S12Motifs_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.Homopolymers %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="homo" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.Homopolymers|escapejs }}">
+                          <div><i class="bi bi-grip-horizontal text-warning me-1"></i>Homopolymers: {{ g.Homopolymers }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.Homopolymers_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.LongRepeats %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="long" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.LongRepeats|escapejs }}">
+                          <div><i class="bi bi-infinity text-warning me-1"></i>Long Repeats: {{ g.LongRepeats }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.LongRepeats_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.palindromes %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="pal" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.Palindromes|escapejs }}">
+                          <div><i class="bi bi-arrow-repeat text-warning me-1"></i>Palindromes: {{ g.Palindromes }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.Palindromes_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.LowGC %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="lowgc" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.LowGC|escapejs }}">
+                          <div><i class="bi bi-thermometer-low text-primary me-1"></i>Low GC: {{ g.LowGC }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.LowGC_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {% if g.HighGC %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="highgc" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.HighGC|escapejs }}">
+                          <div><i class="bi bi-thermometer-high text-danger me-1"></i>High GC: {{ g.HighGC }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.HighGC_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                </ul>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}
 
 {% block javascript %}
 <script type="text/javascript">
-    let allowUnload = true;  // Flag to determine if the unload prompt should be shown
+  let allowUnload = true; // 控制是否在离开页面时提示
 
-    // 当文档加载完成后，添加事件监听器
-    window.addEventListener('DOMContentLoaded', function () {
-        // 下载按钮的点击事件监听器，用于取消卸载警告
-        const downloadButton = document.getElementById('downloadButton');
-        if (downloadButton) {
-            downloadButton.addEventListener('click', function (e) {
-                e.preventDefault();   // 阻止默认行为
-                allowUnload = false;  // 当按钮被点击时，设置标志为false
-                window.location.href = "/tools/download_gene_table/";  // 重定向到下载链接
-            });
-        }
+  // Helpers
+  function setActiveSeverity(button) {
+    document.querySelectorAll('[data-severity-filter]').forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+  }
 
-        document.querySelectorAll('.sequence-highlighter').forEach(function(item) {
-            item.addEventListener('mouseenter', function() {
-                // 1) Get the full text in this <li>
-                const fullText = this.textContent.trim();
-                // console.log('Full Text:', fullText);
- 
-                // 2) Extract substring(s) that appear after "sequence:" and before the next '|' character
-                //    This RegExp looks for "sequence:" followed by any non-'|' characters. 'g' for multiple matches.
-                const regex = /sequence:\s*([^|]+)/gi;
-                let match;
-                const extractedSeqs = [];
-                while ((match = regex.exec(fullText)) !== null) {
-                    const seq = match[1].trim();
-                    if (seq) extractedSeqs.push(seq);
-                }
-                // console.log('Extracted Sequences:', extractedSeqs);
- 
-                // 3) Get the target element, whose ID is in data-target
-                const targetId = this.getAttribute('data-target');
-                const targetElement = document.querySelector(targetId);
-                if (!targetElement) return;
- 
-                // 4) Highlight the extracted sequences inside the target element
-                let highlightedText = targetElement.textContent;
-                extractedSeqs.forEach(sequence => {
-                    // case-insensitive global matching
-                    const re = new RegExp(sequence, 'gi');
-                    highlightedText = highlightedText.replace(
-                        re,
-                        '<span class="bg-warning text-dark">$&</span>'
-                    );
-                });
-                targetElement.innerHTML = highlightedText;
-            });
- 
-            item.addEventListener('mouseleave', function() {
-                // restore original text
-                const targetId = this.getAttribute('data-target');
-                const targetElement = document.querySelector(targetId);
-                if (targetElement) {
-                    targetElement.innerHTML = targetElement.textContent;
-                }
-            });
+  function filterCards() {
+    const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+    const active = document.querySelector('[data-severity-filter].active');
+    const sev = active ? active.getAttribute('data-severity-filter') : 'all';
+    document.querySelectorAll('#geneList .card').forEach(card => {
+      const gid = (card.getAttribute('data-gene-id') || '').toLowerCase();
+      const s = card.getAttribute('data-severity');
+      const matchText = !q || gid.includes(q);
+      const matchSev = (sev === 'all') || (s === sev);
+      card.parentElement.style.display = (matchText && matchSev) ? '' : 'none';
+    });
+  }
+
+  function sortCards() {
+    const list = document.getElementById('geneList');
+    const sortVal = (document.getElementById('sortSelect') || {}).value || 'score_desc';
+    const items = Array.from(list.querySelectorAll(':scope > .col-12'));
+    const getCard = el => el.querySelector(':scope > .card');
+    items.sort((a, b) => {
+      const ca = getCard(a), cb = getCard(b);
+      const ga = (ca.getAttribute('data-gene-id') || '').toLowerCase();
+      const gb = (cb.getAttribute('data-gene-id') || '').toLowerCase();
+      const sa = parseFloat(ca.getAttribute('data-total-score') || '0') || 0;
+      const sb = parseFloat(cb.getAttribute('data-total-score') || '0') || 0;
+      switch (sortVal) {
+        case 'score_asc': return sa - sb;
+        case 'gene_asc': return ga.localeCompare(gb);
+        case 'gene_desc': return gb.localeCompare(ga);
+        case 'score_desc':
+        default: return sb - sa;
+      }
+    });
+    items.forEach(el => list.appendChild(el));
+  }
+
+  // 初始化行为
+  window.addEventListener('DOMContentLoaded', function () {
+    // 下载按钮：关闭离开提示
+    const downloadButton = document.getElementById('downloadButton');
+    if (downloadButton) {
+      downloadButton.addEventListener('click', function (e) {
+        e.preventDefault();
+        allowUnload = false;
+        window.location.href = "{% url 'tools:download_gene_table' %}";
+      });
+    }
+
+    // 搜索和清空
+    const searchInput = document.getElementById('searchInput');
+    const clearSearch = document.getElementById('clearSearch');
+    if (searchInput) searchInput.addEventListener('input', filterCards);
+    if (clearSearch) clearSearch.addEventListener('click', () => { searchInput.value = ''; filterCards(); });
+
+    // 严重程度过滤
+    document.querySelectorAll('[data-severity-filter]').forEach(btn => {
+      btn.addEventListener('click', () => { setActiveSeverity(btn); filterCards(); });
+    });
+
+    // 排序
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) sortSelect.addEventListener('change', sortCards);
+
+    // 展开/收起全部
+    const expandAllBtn = document.getElementById('expandAll');
+    const collapseAllBtn = document.getElementById('collapseAll');
+    if (expandAllBtn) expandAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('[id^="collapse"]').forEach(el => {
+        const c = new bootstrap.Collapse(el, { toggle: false });
+        c.show();
+      });
+    });
+    if (collapseAllBtn) collapseAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('[id^="collapse"]').forEach(el => {
+        const c = new bootstrap.Collapse(el, { toggle: false });
+        c.hide();
+      });
+    });
+
+    // 文本高亮：Hover 高亮 & 离开还原
+    function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function parseSequences(text) {
+      const regex = /sequence\s*:\s*([^|;]+)/gi; // 捕获到 | 或 ; 为止
+      let match; const arr = [];
+      while ((match = regex.exec(text)) !== null) { const seq = (match[1]||'').trim(); if (seq) arr.push(seq); }
+      return arr;
+    }
+    function featureClass(feature) {
+      switch ((feature||'').toLowerCase()) {
+        case 'long': return 'hl-long';
+        case 'homo': return 'hl-homo';
+        case 'ws': return 'hl-ws';
+        case 'highgc': return 'hl-highgc';
+        case 'lowgc': return 'hl-lowgc';
+        case 'dint': return 'hl-dint';
+        case 'pal': return 'hl-pal';
+        case 'tandem': return 'hl-long';
+        case 'inv': return 'hl-inv';
+        default: return 'bg-warning text-dark';
+      }
+    }
+    function highlightMany(targetElement, seqClassPairs) {
+      if (!targetElement) return;
+      const original = targetElement.textContent;
+      // 长度降序，避免短序列先替换造成嵌套冲突
+      const pairs = seqClassPairs.slice().sort((a,b) => (b.seq||'').length - (a.seq||'').length);
+      let marked = original;
+      pairs.forEach(({seq, cls}) => {
+        if (!seq) return;
+        const re = new RegExp(escapeRegExp(seq), 'gi');
+        marked = marked.replace(re, `<span class="${cls}">$&</span>`);
+      });
+      targetElement.innerHTML = marked;
+    }
+
+    document.querySelectorAll('.sequence-highlighter').forEach(function(item) {
+      item.addEventListener('mouseenter', function() {
+        const fullText = (this.getAttribute('data-raw') || this.textContent || '').trim();
+        const feature = this.getAttribute('data-feature') || '';
+        const cls = featureClass(feature);
+        const extractedSeqs = parseSequences(fullText);
+        const targetId = this.getAttribute('data-target');
+        const targetElement = document.querySelector(targetId);
+        if (!targetElement) return;
+        const pairs = extractedSeqs.map(seq => ({ seq, cls }));
+        highlightMany(targetElement, pairs);
+      });
+      item.addEventListener('click', function(e) {
+        // 点击也触发一次高亮，并在短时间后还原，便于触屏设备使用
+        const fullText = (this.getAttribute('data-raw') || this.textContent || '').trim();
+        const feature = this.getAttribute('data-feature') || '';
+        const cls = featureClass(feature);
+        const extractedSeqs = parseSequences(fullText);
+        const targetId = this.getAttribute('data-target');
+        const targetElement = document.querySelector(targetId);
+        if (!targetElement) return;
+        const pairs = extractedSeqs.map(seq => ({ seq, cls }));
+        highlightMany(targetElement, pairs);
+        setTimeout(() => { if (targetElement) targetElement.innerHTML = targetElement.textContent; }, 1600);
+      });
+      item.addEventListener('mouseleave', function() {
+        const targetId = this.getAttribute('data-target');
+        const targetElement = document.querySelector(targetId);
+        if (targetElement) targetElement.innerHTML = targetElement.textContent;
+      });
+    });
+
+    // 预览按钮：在未展开时也可高亮所有问题片段
+    document.querySelectorAll('.preview-issues').forEach(preview => {
+      const targetSel = preview.getAttribute('data-target');
+      const scopeSel = preview.getAttribute('data-scope');
+      const targetElement = document.querySelector(targetSel);
+      const scope = document.querySelector(scopeSel);
+      function collectPairs() {
+        if (!scope) return [];
+        const lis = Array.from(scope.querySelectorAll('.sequence-highlighter'));
+        const pairs = [];
+        lis.forEach(li => {
+          const raw = (li.getAttribute('data-raw') || li.textContent || '').trim();
+          const feature = li.getAttribute('data-feature') || '';
+          const cls = featureClass(feature);
+          const seqs = parseSequences(raw);
+          seqs.forEach(seq => pairs.push({ seq, cls }));
         });
+        return pairs;
+      }
+      preview.addEventListener('mouseenter', () => {
+        const pairs = collectPairs();
+        if (targetElement) highlightMany(targetElement, pairs);
+      });
+      preview.addEventListener('mouseleave', () => {
+        if (targetElement) targetElement.innerHTML = targetElement.textContent;
+      });
     });
 
-    // 注册 beforeunload 事件监听器
-    window.addEventListener('beforeunload', function (e) {
-        // console.log("allowUnload: ", allowUnload); // 打印当前的 allowUnload 值
-        if (!allowUnload) return;  // 如果标志为false，不显示警告
-        var confirmationMessage = 'Are you sure you want to leave this page?';
-        (e || window.event).returnValue = confirmationMessage; // Gecko and Trident
-        return confirmationMessage; // Gecko and WebKit
+    // 复制序列
+    document.querySelectorAll('.copy-seq').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = document.querySelector(btn.getAttribute('data-target'));
+        if (!target) return;
+        const text = target.textContent;
+        const fallbackCopy = () => {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.top = '-1000px';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => {
+            btn.innerHTML = '<i class="bi bi-clipboard-check"></i>';
+            setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1200);
+          }).catch(() => { fallbackCopy(); });
+        } else {
+          fallbackCopy();
+          btn.innerHTML = '<i class="bi bi-clipboard-check"></i>';
+          setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1200);
+        }
+      });
     });
+
+    // 初始过滤与排序
+    filterCards();
+    sortCards();
+  });
+
+  // 离开页面提示
+  window.addEventListener('beforeunload', function (e) {
+    if (!allowUnload) return;
+    const msg = 'Are you sure you want to leave this page?';
+    (e || window.event).returnValue = msg; return msg;
+  });
 </script>
-
 {% endblock %}

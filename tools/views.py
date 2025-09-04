@@ -3,6 +3,7 @@ import json
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import BadRequest
 from django.shortcuts import redirect, render
+from django.views import View
 from .models import Tool
 from django.contrib.auth.decorators import login_required
 from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
@@ -11,7 +12,352 @@ import pandas as pd
 from Bio import SeqIO
 import zipfile
 from io import BytesIO
-# from tools.scripts.penalty_score_predict import predict_new_data_from_df
+import requests
+from typing import Dict, List, Tuple, Optional
+import time
+
+# ==============================================================================
+# MiniGeneExtractor Logic - Adapted from extract_mini_genes.py
+# ==============================================================================
+
+class MiniGeneExtractorLogic:
+    def __init__(self, genome_version='hg38'):
+        if genome_version == 'hg19':
+            self.ensembl_server = "https://grch37.rest.ensembl.org"
+        else:
+            self.ensembl_server = "https://rest.ensembl.org"
+        self.session = requests.Session()
+        
+        self.aa_three_to_one = {
+            'Ala': 'A', 'Arg': 'R', 'Asn': 'N', 'Asp': 'D', 'Cys': 'C',
+            'Gln': 'Q', 'Glu': 'E', 'Gly': 'G', 'His': 'H', 'Ile': 'I',
+            'Leu': 'L', 'Lys': 'K', 'Met': 'M', 'Phe': 'F', 'Pro': 'P',
+            'Ser': 'S', 'Thr': 'T', 'Trp': 'W', 'Tyr': 'Y', 'Val': 'V',
+            'Ter': '*', 'Stop': '*'
+        }
+
+    def three_to_one_aa(self, three_letter: str) -> str:
+        if not three_letter:
+            return ''
+        return self.aa_three_to_one.get(three_letter, three_letter)
+
+    def parse_hgvs_protein(self, hgvs_p: str) -> Optional[Dict]:
+        if pd.isna(hgvs_p) or not hgvs_p:
+            return None
+        
+        try:
+            if ':' in hgvs_p:
+                protein_id, variant_part = hgvs_p.split(':', 1)
+            else:
+                protein_id, variant_part = None, hgvs_p
+                
+            if variant_part.startswith('p.'):
+                variant_part = variant_part[2:]
+            
+            patterns = {
+                'range_deletion': r'^([A-Za-z]{3})(\d+)_([A-Za-z]{3})(\d+)del$',
+                'single_deletion': r'^([A-Za-z]{3})(\d+)del$',
+                'frameshift': r'^([A-Za-z]{3})(\d+)([A-Za-z]{3})fs(?:Ter|\*)(\d+)$',
+                'insertion': r'^([A-Za-z]{3})(\d+)_([A-Za-z]{3})(\d+)ins([A-Za-z]+)$',
+                'substitution': r'^([A-Za-z]{3})(\d+)([A-Za-z]{3})$'
+            }
+
+            match = re.match(patterns['range_deletion'], variant_part)
+            if match:
+                start_aa, start_pos, end_aa, end_pos = match.groups()
+                return {'protein_id': protein_id, 'ref_aa': start_aa, 'position': int(start_pos), 'end_position': int(end_pos), 'end_aa': end_aa, 'alt_aa': '', 'type': 'deletion'}
+
+            match = re.match(patterns['single_deletion'], variant_part)
+            if match:
+                ref_aa, position = match.groups()
+                return {'protein_id': protein_id, 'ref_aa': ref_aa, 'position': int(position), 'alt_aa': '', 'type': 'deletion'}
+
+            match = re.match(patterns['frameshift'], variant_part)
+            if match:
+                ref_aa, position, alt_aa, ter_position = match.groups()
+                return {'protein_id': protein_id, 'ref_aa': ref_aa, 'position': int(position), 'alt_aa': alt_aa, 'ter_position': int(ter_position), 'type': 'frameshift'}
+
+            match = re.match(patterns['insertion'], variant_part)
+            if match:
+                left_aa, left_pos, right_aa, right_pos, inserted_three = match.groups()
+                return {'protein_id': protein_id, 'ref_aa': left_aa, 'position': int(left_pos), 'end_position': int(right_pos), 'end_aa': right_aa, 'alt_aa': inserted_three, 'type': 'insertion'}
+
+            match = re.match(patterns['substitution'], variant_part)
+            if match:
+                ref_aa, position, alt_aa = match.groups()
+                return {'protein_id': protein_id, 'ref_aa': ref_aa, 'position': int(position), 'alt_aa': alt_aa, 'type': 'substitution'}
+            
+            return None
+        except Exception:
+            return None
+
+    def parse_hgvs_coding(self, hgvs_c: str) -> Optional[Dict]:
+        if pd.isna(hgvs_c) or not hgvs_c:
+            return None
+        try:
+            transcript_id = None
+            c_part = hgvs_c
+            if ':' in hgvs_c:
+                tid, c_part = hgvs_c.split(':', 1)
+                if tid.startswith('ENST') or tid.startswith('NM_'):
+                    transcript_id = tid
+            if c_part.startswith('c.'):
+                c_part = c_part[2:]
+            
+            # Simplified patterns for view context
+            m = re.match(r'^(\d+)([ATCG])>([ATCG])$', c_part, flags=re.IGNORECASE)
+            if m:
+                pos, ref_nt, alt_nt = m.groups()
+                return {'type': 'substitution', 'position': int(pos), 'ref_nucleotide': ref_nt.upper(), 'alt_nucleotide': alt_nt.upper(), 'transcript_id': transcript_id}
+            
+            return {'transcript_id': transcript_id, 'raw': hgvs_c} # Return at least transcript_id
+        except Exception:
+            return None
+
+    def get_protein_sequence_from_ensembl(self, transcript_id: str) -> Optional[str]:
+        try:
+            url = f"{self.ensembl_server}/sequence/id/{transcript_id}?type=protein"
+            response = self.session.get(url, headers={"Content-Type": "application/json"}, timeout=10)
+            if response.status_code == 200:
+                return response.json().get('seq')
+            return None
+        except requests.RequestException:
+            return None
+
+    def extract_mini_gene_sequence(self, protein_seq: str, mutation_pos: int, ref_aa: str, alt_aa: str, mutation_type: str = 'substitution', window_size: int = 14) -> Dict:
+        pos_0based = mutation_pos - 1
+        
+        # WT sequence - 突变位置前后各延长window_size个氨基酸
+        start_pos_wt = max(0, pos_0based - window_size)
+        end_pos_wt = min(len(protein_seq), pos_0based + window_size + 1)
+        wt_seq = protein_seq[start_pos_wt:end_pos_wt]
+
+        # MT sequence
+        alt_aa_single = self.three_to_one_aa(alt_aa)
+        mut_seq_list = list(protein_seq)
+        
+        if mutation_type == 'substitution':
+            if 0 <= pos_0based < len(mut_seq_list):
+                mut_seq_list[pos_0based] = alt_aa_single
+            mutated_protein = "".join(mut_seq_list)
+            start_pos_mt = max(0, pos_0based - window_size)
+            end_pos_mt = min(len(mutated_protein), pos_0based + window_size + 1)
+            mt_seq = mutated_protein[start_pos_mt:end_pos_mt]
+
+        elif mutation_type == 'deletion':
+            # Simplified for now
+            mutated_protein = protein_seq[:pos_0based] + protein_seq[pos_0based + 1:]
+            start_pos_mt = max(0, pos_0based - window_size)
+            end_pos_mt = min(len(mutated_protein), pos_0based + window_size)
+            mt_seq = mutated_protein[start_pos_mt:end_pos_mt]
+        
+        elif mutation_type == 'insertion':
+            inserted_one_list = []
+            if alt_aa:
+                for i in range(0, len(alt_aa), 3):
+                    inserted_one_list.append(self.three_to_one_aa(alt_aa[i:i+3]))
+            inserted_one = ''.join(inserted_one_list)
+            mutated_protein = protein_seq[:pos_0based + 1] + inserted_one + protein_seq[pos_0based + 1:]
+            
+            # 插入后重新计算位置
+            start_pos_mt = max(0, pos_0based - window_size)
+            end_pos_mt = min(len(mutated_protein), pos_0based + len(inserted_one) + window_size + 1)
+            mt_seq = mutated_protein[start_pos_mt:end_pos_mt]
+
+        else: # frameshift or other complex types
+            # Fallback for complex types: show substitution at mutation point
+            if 0 <= pos_0based < len(mut_seq_list):
+                mut_seq_list[pos_0based] = alt_aa_single
+            mutated_protein = "".join(mut_seq_list)
+            start_pos_mt = max(0, pos_0based - window_size)
+            end_pos_mt = min(len(mutated_protein), pos_0based + window_size + 1)
+            mt_seq = mutated_protein[start_pos_mt:end_pos_mt]
+
+        return {
+            'WT_Minigene': wt_seq,
+            'MUT_Minigene': mt_seq,
+        }
+
+    def segment_sequence(self, sequence: str, window_size: int, pad_with_gs: bool) -> List[str]:
+        """
+        将序列切割为若干段：
+        - 每段长度为 (2*window_size + 1)
+        - 步长为 window_size（即两段之间重叠 window_size）
+        - 最后一段不足长度时：
+            - 如果 pad_with_gs 为 True，则在末尾用 'GS' 重复补齐至目标长度；
+            - 否则保持原样（不强制补齐）。
+        """
+        if window_size <= 0:
+            return [sequence] if sequence else []
+        target_len = 2 * window_size + 1
+        step = window_size
+        segments: List[str] = []
+        n = len(sequence)
+        if n == 0:
+            return []
+
+        i = 0
+        while i < n:
+            seg = sequence[i:i + target_len]
+            if len(seg) < target_len:
+                if pad_with_gs and len(seg) < target_len - 1:  # 如果只差1个位置，保持不补齐至28aa
+                    # 末尾用GS重复补齐，直到达到或超过目标长度
+                    while len(seg) + 2 <= target_len:
+                        seg += 'GS'
+                    # 如果现在正好差1个字符，仍然不补，因为只差1个位置的规则
+                # 不需要 else，保持原样
+            segments.append(seg)
+            if i + step >= n:
+                break
+            i += step
+        return segments
+
+    def process_single_mutation(self, hgvs_c: str, hgvs_p: str, options: dict) -> Dict:
+        protein_variant = self.parse_hgvs_protein(hgvs_p)
+        coding_variant = self.parse_hgvs_coding(hgvs_c)
+
+        if not protein_variant or not coding_variant:
+            return {"error": "Invalid HGVSc or HGVSp format."}
+
+        transcript_id = coding_variant.get('transcript_id')
+        if not transcript_id:
+            return {"error": "Could not extract Transcript ID from HGVSc."}
+
+        protein_seq = self.get_protein_sequence_from_ensembl(transcript_id)
+        if not protein_seq:
+            return {"error": f"Could not fetch protein sequence for {transcript_id}."}
+
+        result = self.extract_mini_gene_sequence(
+            protein_seq,
+            protein_variant['position'],
+            protein_variant['ref_aa'],
+            protein_variant['alt_aa'],
+            protein_variant['type'],
+            window_size=options.get('window_size', 14)
+        )
+        
+        mut_minigene = result['MUT_Minigene']
+
+        # 1) GS padding：按需求只在末尾补齐到 target_len
+        target_len = 2 * options.get('window_size', 14) + 1
+        if options.get('gs_padding'):
+            # 如果长度不足目标长度
+            if len(mut_minigene) < target_len:
+                # 如果只差1个位置，就不补，保持为 target_len-1
+                if len(mut_minigene) == target_len - 1:
+                    pass
+                else:
+                    # 在末尾用 'GS' 重复补齐到目标长度或尽可能接近且不超过
+                    while len(mut_minigene) + 2 <= target_len:
+                        mut_minigene += 'GS'
+                    # 如果现在刚好差1个字符，按规则不再补
+        
+        output = {
+            'HGVSc': hgvs_c,
+            'HGVSp': hgvs_p,
+            'Mutation_Type': protein_variant['type'],
+            'WT_Minigene': result['WT_Minigene'],
+            'MUT_Minigene': mut_minigene,
+        }
+
+        # 3) Segment mutated mini-gene：开启时，额外输出分段结果
+        if options.get('segment_minigene'):
+            segments = self.segment_sequence(mut_minigene, options.get('window_size', 14), options.get('gs_padding'))
+            output['MUT_Minigene_Segments'] = " | ".join(segments)
+        
+        return output
+
+# ==============================================================================
+# Django View
+# ==============================================================================
+
+class MiniGeneExtractorView(View):
+    def get(self, request, *args, **kwargs):
+        if 'download' in request.GET and 'results' in request.session:
+            results_json = request.session.get('results', '[]')
+            results_data = json.loads(results_json)
+            df = pd.DataFrame(results_data)
+
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='MiniGene_Results')
+            output.seek(0)
+
+            response = HttpResponse(
+                output,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="minigene_results.xlsx"'
+            
+            # Clean session
+            del request.session['results']
+            
+            return response
+            
+        return render(request, 'tools/tools_MiniGeneExtractor.html')
+
+    def post(self, request, *args, **kwargs):
+        form_data = request.POST
+        input_type = form_data.get('input_type')
+        genome_version = form_data.get('genomeVersion', 'hg38')
+        
+        # Get new options from form
+        options = {
+            'window_size': int(form_data.get('window_size', 14)),
+            'gs_padding': form_data.get('gs_padding') == 'on',
+            'segment_minigene': form_data.get('segment_minigene') == 'on',
+        }
+
+        extractor = MiniGeneExtractorLogic(genome_version=genome_version)
+        results = []
+        
+        try:
+            if input_type == 'text':
+                mutation_text = form_data.get('mutation_text', '')
+                lines = [line.strip() for line in mutation_text.splitlines() if line.strip()]
+                for line in lines:
+                    parts = [p.strip() for p in line.split(',') if p.strip()]
+                    if len(parts) == 2:
+                        hgvs_c, hgvs_p = parts[0], parts[1]
+                        result = extractor.process_single_mutation(hgvs_c, hgvs_p, options)
+                        results.append(result)
+                    else:
+                        results.append({"error": f"Invalid line format: {line}"})
+
+            elif input_type == 'file':
+                mutation_file = request.FILES.get('mutation_file')
+                if not mutation_file:
+                    return JsonResponse({'status': 'error', 'message': 'No file uploaded.'}, status=400)
+                
+                try:
+                    if mutation_file.name.endswith('.xlsx'):
+                        df = pd.read_excel(mutation_file)
+                    elif mutation_file.name.endswith('.csv'):
+                        df = pd.read_csv(mutation_file)
+                    else:
+                        return JsonResponse({'status': 'error', 'message': 'Unsupported file type.'}, status=400)
+
+                    # Expecting 'HGVSc' and 'HGVSp' columns
+                    if 'HGVSc' not in df.columns or 'HGVSp' not in df.columns:
+                         return JsonResponse({'status': 'error', 'message': "File must contain 'HGVSc' and 'HGVSp' columns."}, status=400)
+
+                    for _, row in df.iterrows():
+                        hgvs_c = row['HGVSc']
+                        hgvs_p = row['HGVSp']
+                        if pd.notna(hgvs_c) and pd.notna(hgvs_p):
+                            result = extractor.process_single_mutation(hgvs_c, hgvs_p, options)
+                            results.append(result)
+
+                except Exception as e:
+                    return JsonResponse({'status': 'error', 'message': f'Error processing file: {str(e)}'}, status=500)
+
+            # Store results in session for download
+            request.session['results'] = json.dumps(results)
+
+            return JsonResponse({'status': 'success', 'results_json': json.dumps(results)})
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 def tools_list(request):
@@ -49,7 +395,8 @@ def SequenceAnalyzer(request):
                 return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'})      
         else:
             return JsonResponse({'status': 'error', 'message': 'Invalid upload type or missing data'})
-
+        
+        # 从前端获取参数
         long_repeats_min_len = int(request.POST.get('longRepeatsMinLen', 16))
         homopolymers_min_len = int(request.POST.get('homopolymersMinLen', 7))
         min_w_length = int(request.POST.get('minWLength', 12))
@@ -647,6 +994,115 @@ def SplitEnzymeSite(request):
 
 def Seq2AA(request):
     return render(request, 'tools/tools_Seq2AA.html')
+
+
+def MiniGeneExtractor(request):
+    if request.method == 'GET':
+        if request.GET.get('download') == 'true':
+            results_data = request.session.get('mini_gene_results')
+            if not results_data:
+                return HttpResponse("No results to download.", status=404)
+
+            df = pd.DataFrame(results_data)
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='MiniGeneResults')
+            buffer.seek(0)
+
+            response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="mini_gene_results.xlsx"'
+            return response
+        return render(request, 'tools/tools_MiniGeneExtractor.html')
+
+    elif request.method == 'POST':
+        try:
+            genome_version = request.POST.get('genomeVersion', 'hg38')
+            input_type = request.POST.get('input_type')
+            mutations = []
+
+            if input_type == 'text':
+                mutation_text = request.POST.get('mutation_text', '')
+                mutations = [line.strip() for line in mutation_text.splitlines() if line.strip()]
+                if not mutations:
+                    return JsonResponse({'status': 'error', 'message': '文本输入框中没有提供突变信息。'}, status=400)
+
+            elif input_type == 'file':
+                mutation_file = request.FILES.get('mutation_file')
+                if not mutation_file:
+                    return JsonResponse({'status': 'error', 'message': '没有上传文件。'}, status=400)
+
+                try:
+                    if mutation_file.name.endswith('.csv'):
+                        df = pd.read_csv(mutation_file)
+                    elif mutation_file.name.endswith(('.xls', '.xlsx')):
+                        df = pd.read_excel(mutation_file)
+                    else:
+                        return JsonResponse({'status': 'error', 'message': '不支持的文件格式，请上传 CSV 或 Excel 文件。'}, status=400)
+
+                    if 'Mutation' not in df.columns:
+                        return JsonResponse({'status': 'error', 'message': "文件中缺少 'Mutation' 列。"}, status=400)
+                    
+                    mutations = df['Mutation'].dropna().astype(str).tolist()
+                except Exception as e:
+                    return JsonResponse({'status': 'error', 'message': f'处理文件时出错: {str(e)}'}, status=400)
+
+            else:
+                return JsonResponse({'status': 'error', 'message': '无效的输入类型。'}, status=400)
+
+            if not mutations:
+                return JsonResponse({'status': 'error', 'message': '未找到有效的突变信息进行分析。'}, status=400)
+
+            # =================================================================
+            # 在这里调用你的脚本
+            # 这是一个示例处理函数，你需要用你的实际脚本替换它
+            # 它接收突变列表和基因组版本，并返回一个字典列表
+            # =================================================================
+            results_df = process_mutations_for_minigene(mutations, genome_version)
+            # =================================================================
+
+            # 将结果存储在会话中以便下载
+            request.session['mini_gene_results'] = results_df.to_dict(orient='records')
+
+            return JsonResponse({
+                'status': 'success',
+                'results_json': results_df.to_json(orient='records')
+            })
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'发生意外错误: {str(e)}'}, status=500)
+
+
+def process_mutations_for_minigene(mutations, genome_version):
+    """
+    (占位符函数)
+    处理突变列表以生成 mini-gene 片段。
+    你需要用你自己的脚本逻辑替换这里的内容。
+
+    :param mutations: 突变信息的列表 (例如 ['NM_000546.6:c.818G>T', ...])
+    :param genome_version: 基因组版本 ('hg38' 或 'hg19')
+    :return: 一个包含结果的 pandas DataFrame
+    """
+    # 示例输出。你的脚本应该生成类似这样的数据结构。
+    # 这里的列名只是示例，你可以根据你的脚本输出进行修改。
+    results_data = []
+    for i, mutation in enumerate(mutations):
+        results_data.append({
+            'Input_Mutation': mutation,
+            'Genome_Version': genome_version,
+            'Gene_Symbol': f'GENE{i+1}',
+            'Status': 'Success',
+            'Mini_Gene_Sequence_29AA': f'SEQUENCE_{"A"*20}_{i}',
+            'Error_Message': ''
+        })
+
+    # 如果某个突变处理失败，你可以这样记录：
+    if len(mutations) > 1:
+        results_data[1]['Status'] = 'Failed'
+        results_data[1]['Mini_Gene_Sequence_29AA'] = ''
+        results_data[1]['Error_Message'] = 'Invalid mutation format'
+
+    return pd.DataFrame(results_data)
+
 
 def test(request):
     return render(request, 'tools/test.html')

@@ -1,140 +1,277 @@
 {% extends 'base.html' %}
 {% load static %}
 
-<!-- 引用tools的css文件 -->
+{% block title %}Sequence Analyzer{% endblock %}
+
 {% block extra_head %}
+<style>
+  .sa-page { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+  .hero-title {
+    letter-spacing: .3px;
+  }
+  .card.shadow-sm { box-shadow: 0 .5rem 1rem rgba(0,0,0,.05)!important; }
+  .border-dashed { border: 2px dashed #dee2e6; }
+  .nav-pills .nav-link { color: #495057; }
+  .nav-pills .nav-link.active { color: #fff; background-color: #0d6efd; }
+  .param-toggle-btn i { vertical-align: -2px; }
+  #excelTable { min-height: 120px; }
+  #addRowBtn { color: #0d6efd; border: 1px dashed #0d6efd33; }
+  #addRowBtn:hover { background: #0d6efd0d; }
+  .help-text { color: #6c757d; }
+  .header-accent { background: linear-gradient(90deg,#f8f9fa,#eef1f4); }
+  .feature-item { border: 1px solid #f1f3f5; border-radius: .75rem; padding: .75rem 1rem; background: #fff; }
+  .feature-item .bi { font-size: 1.1rem; }
+  .feature-badge { font-size: .7rem; }
+  .soon { opacity: .7; }
+  .upload-dropzone { cursor: pointer; }
+  .upload-dropzone.bg-light { transition: background-color .2s ease; }
+
+  /* Breadcrumb/back link */
+  .sa-breadcrumb a { color: #6c757d; text-decoration: none; }
+  .sa-breadcrumb a:hover { color: #0d6efd; }
+  .sa-breadcrumb .bi { vertical-align: -2px; }
+
+  /* Section block (modern, no heavy header) */
+  .sa-section { border: 1px solid #eaedf1; border-radius: .75rem; padding: 1.25rem; background: linear-gradient(180deg,#fff, #fbfbfc); }
+  .sa-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+  .sa-section-title { margin: 0; font-weight: 600; }
+  .sa-section-sub { margin: 0; color: #6c757d; font-size: .9rem; }
+
+  /* Feature chips */
+  .feature-chip { border: 1px solid #edf0f3; background: #fff; border-radius: 999px; padding: .5rem .75rem; display: flex; align-items: center; gap: .5rem; }
+  .feature-chip .bi { font-size: 1rem; }
+  .feature-chip .badge { font-size: .65rem; }
+  .feature-chip.supported { background: #f6fffa; border-color: #d1f5e1; }
+  .feature-chip.soon { background: #f8f9fa; color: #6c757d; border-color: #eceff3; }
+
+  /* Intro items */
+  .intro-item { border: 1px solid #eaedf1; background: #fff; border-radius: .75rem; }
+  .intro-item .bi { font-size: 1.25rem; }
+
+  /* Large, prominent tabs */
+  .sa-tabs-large .nav-link { 
+    padding: .75rem 1.25rem;
+    border-radius: .75rem;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0,0,0,.04);
+    background: #f4f7fb;
+    color: #495057;
+  }
+  .sa-tabs-large .nav-link .bi { vertical-align: -2px; }
+  .sa-tabs-large .nav-link.active {
+    background: #0d6efd;
+    color: #fff;
+  }
+
+  /* Tab-style (nav-tabs) */
+  .sa-tabs { border-bottom: 1px solid #dee2e6; }
+  .sa-tabs .nav-link { padding: .65rem 1rem; font-weight: 600; color: #495057; }
+  .sa-tabs .nav-link .bi { vertical-align: -2px; }
+  .sa-tabs .nav-link.active { color: #0d6efd; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <!-- Breadcrumb -->
-    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'tools:tools_list' %}" class="text-decoration-none">Tools List</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ tools_name }}</li>
-        </ol>
-    </nav>
-    <!-- Tools of {{ tools_name }} Usage -->
-    <div class="card mt-2">
-        <h4 class="card-header">Tools of {{ tools_name }} Usage</h4>
-        <div class="card-body">
-            <h5 class="card-title">Features:</h5>
-            <ul>
-                <li><del>Tandem Repeats</del></li>
-                <li>Long Repeats</li>
-                <li><del>Palindrome Repeats</del></li>
-                <li><del>Inverted Repeats</del></li>
-                <li>Homopolymers</li>
-                <li>Special Motifs (W12S12)</li>
-                <li>Local GC content per window</li>
-                <li>Dinucleotide Repeats</li>
-            </ul>
-            <h5 class="card-title">Some Notes:</h5>
-            <ul>
-                Detail information can be found <a class="text-decoration-none" href="https://t114xle63y.feishu.cn/wiki/Nl0SwJxbQiG1IkkYeSHcGSO6nVe" target="_blank">Here</a>.
-            </ul>
+<div class="container mt-4 sa-page">
+    <!-- Back link + Hero -->
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="sa-breadcrumb mb-2">
+            <a href="{% url 'tools:tools_list' %}"><i class="bi bi-arrow-left"></i> Back to Tools</a>
         </div>
     </div>
-    <!-- Sequence main checking function -->
-    <div class="card mt-3">
-        <h4 class="card-header">Submit Sequence</h4>
-        <div class="card-body">
-            <h5 class="card-title">Provide your gene names and DNA sequences in the table or upload a Fasta file. Then click 'Submit' for sequence evaluation.</h5>
-            
-            <button class="btn btn-primary mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#parameterSettings" aria-expanded="false" aria-controls="parameterSettings">
-                参数设置
-            </button>
+    <div class="text-center mb-4">
+        <h2 class="hero-title">Sequence Analyzer</h2>
+        <p class="lead text-muted">Evaluate DNA sequences for repeats, GC windows, and problematic motifs.</p>
+    </div>
 
-            <div class="collapse mb-3" id="parameterSettings">
-                <div class="card card-body">
+    <!-- Rich intro: what/inputs/outputs -->
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="intro-item h-100 d-flex p-3 gap-3 align-items-start shadow-sm">
+                <i class="bi bi-clipboard2-pulse text-primary"></i>
+                <div>
+                    <div class="fw-semibold">What it checks</div>
+                    <div class="text-muted small">Long repeats, homopolymers, W/S motifs, local GC window, and dinucleotide repeats with per-feature penalty scoring.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="intro-item h-100 d-flex p-3 gap-3 align-items-start shadow-sm">
+                <i class="bi bi-input-cursor-text text-primary"></i>
+                <div>
+                    <div class="fw-semibold">Inputs</div>
+                    <div class="text-muted small">Table: <code>GeneName</code>, <code>SeqNT</code>; or FASTA file (.fa/.fna/.fasta). Supported bases: A/C/G/T/N.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="intro-item h-100 d-flex p-3 gap-3 align-items-start shadow-sm">
+                <i class="bi bi-graph-up text-primary"></i>
+                <div>
+                    <div class="fw-semibold">Outputs</div>
+                    <div class="text-muted small">A detailed results page with total/feature penalties per gene, plus CSV download for downstream analysis.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Tools of {{ tools_name }} Usage -->
+    <div class="sa-section mt-2">
+        <div class="sa-section-header">
+            <div>
+                <h5 class="sa-section-title">What this tool checks</h5>
+                <p class="sa-section-sub">Key analyses supported. Items marked “Soon” are planned.</p>
+            </div>
+            <a class="small text-decoration-none" href="https://t114xle63y.feishu.cn/wiki/Nl0SwJxbQiG1IkkYeSHcGSO6nVe" target="_blank">
+                <i class="bi bi-journal-text me-1"></i>Documentation
+            </a>
+        </div>
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+            <div class="col">
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Long Repeats</span><span class="badge bg-success-subtle text-success">Supported</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Homopolymers</span><span class="badge bg-success-subtle text-success">Supported</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Special Motifs (W12S12)</span><span class="badge bg-success-subtle text-success">Supported</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Local GC content (window)</span><span class="badge bg-success-subtle text-success">Supported</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Dinucleotide Repeats</span><span class="badge bg-success-subtle text-success">Supported</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip soon"><i class="bi bi-dash-circle"></i><span>Tandem Repeats</span><span class="badge bg-secondary-subtle text-secondary">Soon</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip soon"><i class="bi bi-dash-circle"></i><span>Palindrome Repeats</span><span class="badge bg-secondary-subtle text-secondary">Soon</span></div>
+            </div>
+            <div class="col">
+                <div class="feature-chip soon"><i class="bi bi-dash-circle"></i><span>Inverted Repeats</span><span class="badge bg-secondary-subtle text-secondary">Soon</span></div>
+            </div>
+        </div>
+    </div>
+    <!-- Submit Sequence (modern, parameters collapsed by default) -->
+    <div class="sa-section mt-4">
+        <div class="sa-section-header">
+            <div>
+                <h5 class="sa-section-title">Submit Sequence</h5>
+                <p class="sa-section-sub">Enter in table or upload FASTA. Paste from Excel is supported. Empty rows will be ignored.</p>
+            </div>
+            <div>
+                <button class="btn btn-light btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#parameterSettings" aria-expanded="false" aria-controls="parameterSettings">
+                    <i class="bi bi-sliders me-1"></i> Advanced Parameters (Optional)
+                </button>
+            </div>
+        </div>
+
+        <!-- Parameters (optional) placed above the inputs when expanded) -->
+        <div id="parameterSettings" class="collapse mt-2">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light"><i class="bi bi-sliders me-2"></i>Parameters</div>
+                <div class="card-body">
                     <form id="parameterForm">
-                        <!-- Long Repeats -->
-                        <div class="row mb-3">
+                        <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="longRepeatsMinLen" class="form-label">Long Repeats Minimum Length</label>
                                 <input type="number" class="form-control" id="longRepeatsMinLen" value="16">
+                                <div class="form-text">Default 16. Increase to be more conservative.</div>
                             </div>
-                        </div>
-
-                        <!-- Homopolymers -->
-                        <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="homopolymersMinLen" class="form-label">Homopolymers Minimum Length</label>
                                 <input type="number" class="form-control" id="homopolymersMinLen" value="7">
+                                <div class="form-text">Default 7.</div>
                             </div>
-                        </div>
-
-                        <!-- W8S8 Motifs -->
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="minWLength" class="form-label">Minimum W Length (A or T)</label>
+                            <div class="col-md-3">
+                                <label for="minWLength" class="form-label">Min W (A/T)</label>
                                 <input type="number" class="form-control" id="minWLength" value="12">
                             </div>
-                            <div class="col-md-6">
-                                <label for="minSLength" class="form-label">Minimum S Length (G or C)</label>
+                            <div class="col-md-3">
+                                <label for="minSLength" class="form-label">Min S (G/C)</label>
                                 <input type="number" class="form-control" id="minSLength" value="12">
                             </div>
-                        </div>
-
-                        <!-- Local GC Content by Window -->
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label for="windowSize" class="form-label">Local GC Window Size</label>
+                            <div class="col-md-2">
+                                <label for="windowSize" class="form-label">GC Window</label>
                                 <input type="number" class="form-control" id="windowSize" value="30">
                             </div>
-                            <div class="col-md-4">
-                                <label for="minGCContent" class="form-label">Minimum GC Content (%)</label>
+                            <div class="col-md-2">
+                                <label for="minGCContent" class="form-label">Min GC %</label>
                                 <input type="number" class="form-control" id="minGCContent" value="20">
                             </div>
-                            <div class="col-md-4">
-                                <label for="maxGCContent" class="form-label">Maximum GC Content (%)</label>
+                            <div class="col-md-2">
+                                <label for="maxGCContent" class="form-label">Max GC %</label>
                                 <input type="number" class="form-control" id="maxGCContent" value="80">
                             </div>
                         </div>
                     </form>
                 </div>
             </div>
+        </div>
 
-            <!-- Tabs for Table and File Upload -->
-            <ul class="nav nav-tabs" id="inputMethodTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link active" id="table-tab" data-bs-toggle="tab" href="#table" role="tab" aria-controls="table" aria-selected="true">Input Table</a>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link" id="file-tab" data-bs-toggle="tab" href="#file" role="tab" aria-controls="file" aria-selected="false">Upload Fasta File</a>
-                </li>
-            </ul>
-            <div class="tab-content" id="inputMethodTabsContent">
-                <div class="tab-pane fade show active" id="table" role="tabpanel" aria-labelledby="table-tab">
-                    <div id="excelTable" class="mt-3">
-                        <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
-                    </div>
-                </div>
-                <div class="tab-pane fade" id="file" role="tabpanel" aria-labelledby="file-tab">
-                    <div class="mt-3">
-                        <label for="fastaFile" class="form-label">Upload Fasta File</label>
-                        <input class="form-control" type="file" id="fastaFile">
+        <!-- Tab-style selector (clear tabs) -->
+        <ul class="nav nav-tabs sa-tabs" id="inputMethodTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" id="table-tab" data-bs-toggle="tab" href="#table" role="tab" aria-controls="table" aria-selected="true">
+                    <i class="bi bi-table me-2"></i>Input Table
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="file-tab" data-bs-toggle="tab" href="#file" role="tab" aria-controls="file" aria-selected="false">
+                    <i class="bi bi-cloud-upload me-2"></i>Upload Fasta File
+                </a>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="inputMethodTabsContent">
+            <div class="tab-pane fade show active" id="table" role="tabpanel" aria-labelledby="table-tab">
+                <div class="mt-3">
+                    <p class="help-text small mb-2">Columns: <strong>GeneName</strong> and <strong>SeqNT</strong> (A/C/G/T/N). You can paste rows from Excel directly.</p>
+                    <div id="excelTable" class="mt-2"></div>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <button id="addRowBtn" class="btn btn-sm" type="button"><i class="bi bi-plus-circle-dotted me-1"></i>Add row</button>
+                        <button id="fillExample" type="button" class="btn btn-link btn-sm p-0 align-baseline"><i class="bi bi-lightning-charge me-1"></i>Use example</button>
                     </div>
                 </div>
             </div>
-
-            <!-- Loading modal -->
-            <div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="loadingModalLabel">Processing</h5>
+            <div class="tab-pane fade" id="file" role="tabpanel" aria-labelledby="file-tab">
+                <div class="mt-3">
+                    <label for="fastaFile" class="form-label">Upload Fasta File</label>
+                    <div class="card border-dashed text-center upload-dropzone p-4">
+                        <div class="card-body">
+                            <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
+                            <p class="text-muted mt-2 mb-3">Drop a FASTA file here or click to choose</p>
+                            <input class="form-control" type="file" id="fastaFile" accept=".fa,.fna,.fasta,.txt">
                         </div>
-                        <div class="modal-body text-center">
-                            <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Your sequence is being analyzed. Please wait...</p>
-                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <button id="downloadExampleFasta" type="button" class="btn btn-link btn-sm p-0 align-baseline"><i class="bi bi-download me-1"></i>Download example FASTA</button>
                     </div>
                 </div>
             </div>
-            <button onclick="postData()" class="btn btn-primary mt-3"><i class="bi bi-clipboard-pulse"></i> Submit & Analyze Sequences</button>
+        </div>
+
+        
+
+        <div id="errorAlert" class="alert alert-danger d-none mt-3" role="alert"></div>
+        <div class="d-flex justify-content-start mt-2">
+            <button onclick="postData()" class="btn btn-primary btn-lg"><i class="bi bi-clipboard-pulse me-1"></i>Submit & Analyze Sequences</button>
+        </div>
+        <!-- Loading modal -->
+        <div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="loadingModalLabel">Processing</h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Your sequence is being analyzed. Please wait...</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -142,44 +279,147 @@
 
 {% block javascript %}
 <script>
-    const container = document.querySelector('#excelTable');
-    const hot = new Handsontable(container, {
+    document.addEventListener('DOMContentLoaded', function() {
+      const container = document.querySelector('#excelTable');
+      // Simple validators (UI-only)
+      function createGeneNameValidator() {
+        let lastError = '';
+        return function(value, callback) {
+          const v = (value || '').toString().trim();
+          const ok = /^[a-zA-Z0-9_-]{1,60}$/.test(v);
+          lastError = ok ? '' : 'GeneName must be 1-60 chars (A-Z, 0-9, _ or -).';
+          callback(ok);
+          return lastError;
+        };
+      }
+      function createSeqNTValidator() {
+        let lastError = '';
+        return function(value, callback) {
+          const v = (value || '').toString().trim().toUpperCase();
+          const ok = v === '' || /^[ACGTN\s]+$/.test(v);
+          lastError = ok ? '' : 'SeqNT should contain only A/C/G/T/N.';
+          callback(ok);
+          return lastError;
+        };
+      }
+
+      const geneNameValidator = createGeneNameValidator();
+      const seqNTValidator = createSeqNTValidator();
+
+      const hot = new Handsontable(container, {
         colHeaders: ['GeneName', 'SeqNT'],
         rowHeaders: true,
         colWidths: [200, 800],
         columns: [
-            { data: 'GeneName' },
-            { data: 'SeqNT' },
+          { data: 'GeneName', validator: geneNameValidator },
+          { data: 'SeqNT', validator: seqNTValidator },
         ],
-
         height: 'auto',
         width: 'auto',
         licenseKey: 'non-commercial-and-evaluation',
-    });
-    hot.addHook('afterValidate', function (isValid, value, row, prop, source) {
-        if (!isValid) {
-            validationFailed = true;
-            let errorMessage = '';
-            if (prop === 'GeneName') {
-                errorMessage = geneNameValidator(value, () => {});
-            } else if (prop === 'Sequence') {
-                errorMessage = sequenceValidator(value, () => {});
-            }
-            alert('Validation error at row ' + (row + 1) + ': ' + errorMessage);
-        }
-    });
+      });
 
-    document.getElementById('addRowBtn').addEventListener('click', function () {
+      let validationFailed = false;
+      hot.addHook('afterValidate', function (isValid, value, row, prop) {
+        if (!isValid) {
+          validationFailed = true;
+          let errorMessage = '';
+          if (prop === 'GeneName') errorMessage = geneNameValidator(value, () => {});
+          else if (prop === 'SeqNT') errorMessage = seqNTValidator(value, () => {});
+          alert('Validation error at row ' + (row + 1) + ': ' + errorMessage);
+        }
+      });
+
+      document.getElementById('addRowBtn').addEventListener('click', function () {
         hot.alter('insert_row_below');
-    });
-    
-    function postData() {
+      });
+
+      document.getElementById('fillExample').addEventListener('click', function() {
+        const exampleObjects = [
+          { GeneName: 'GeneA', SeqNT: 'ATGCGTACTGACTGACGTTAGCTA' },
+          { GeneName: 'GeneB', SeqNT: 'TTGACCGGTTAACTGACGATCGTAACG' },
+          { GeneName: 'GeneC', SeqNT: 'GGGAAATTTCCCGGGAAATTTCCCGGGA' },
+        ];
+        hot.loadData(exampleObjects);
+      });
+
+      // File upload helpers (click and drag-drop)
+      let droppedFile = null;
+      const dropzone = document.querySelector('.upload-dropzone');
+      const fileInput = document.getElementById('fastaFile');
+      if (dropzone) {
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('bg-light'); });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('bg-light'));
+        dropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('bg-light');
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            droppedFile = e.dataTransfer.files[0];
+            dropzone.querySelector('p').textContent = 'Selected: ' + droppedFile.name;
+          }
+        });
+      }
+
+      // Download example FASTA
+      const dlBtn = document.getElementById('downloadExampleFasta');
+      if (dlBtn) {
+        dlBtn.addEventListener('click', function() {
+          const fasta = [
+            '>GeneA',
+            'ATGCGTACTGACTGACGTTAGCTA',
+            '>GeneB',
+            'TTGACCGGTTAACTGACGATCGTAACG',
+            '>GeneC',
+            'GGGAAATTTCCCGGGAAATTTCCCGGGA'
+          ].join('\n');
+          const blob = new Blob([fasta], {type: 'text/plain'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'example.fasta';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      }
+
+      // Ensure loading modal does not persist after browser back/forward
+      function forceHideLoadingModal() {
+        const modalEl = document.getElementById('loadingModal');
+        if (!modalEl) return;
+        try {
+          const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+          inst.hide();
+        } catch (e) {}
+        modalEl.classList.remove('show');
+        modalEl.style.display = 'none';
+        document.body.classList.remove('modal-open');
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        const err = document.getElementById('errorAlert');
+        if (err) err.classList.add('d-none');
+      }
+      window.addEventListener('pageshow', forceHideLoadingModal);
+      window.addEventListener('popstate', forceHideLoadingModal);
+      if (document.visibilityState === 'visible') {
+        // On first load
+        forceHideLoadingModal();
+      }
+
+      // Expose postData with closure variables
+      window.postData = function postData() {
         // Show loading modal
         var loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
         loadingModal.show();
 
-        const hotData = hot.getData();
-        const fastaFile = document.getElementById('fastaFile').files[0];
+        const rawData = hot.getData();
+        const hotData = (rawData || []).filter(r => {
+          const a = (r[0] ?? '').toString().trim();
+          const b = (r[1] ?? '').toString().trim();
+          return a !== '' || b !== '';
+        });
+        const fastaFile = droppedFile || document.getElementById('fastaFile').files[0];
         const formData = new FormData();
         const uploadType = fastaFile ? 'file' : 'table';
 
@@ -187,6 +427,13 @@
         if (fastaFile) {
             formData.append('fastaFile', fastaFile);
         } else {
+            if (hotData.length === 0) {
+                loadingModal.hide();
+                const err = document.getElementById('errorAlert');
+                err.textContent = 'Please add at least one row or upload a FASTA file.';
+                err.classList.remove('d-none');
+                return;
+            }
             formData.append('genetable', JSON.stringify(hotData));
         }
 
@@ -211,14 +458,19 @@
             if (data.status === 'success') {
                 window.location.href = data.redirect_url;
             } else {
-                alert('Data submission failed');
+                const err = document.getElementById('errorAlert');
+                err.textContent = data.message || 'Data submission failed';
+                err.classList.remove('d-none');
             }
         })
         .catch((error) => {
             loadingModal.hide();
             console.error('Error:', error);
-            alert('An error occurred while submitting the data');
+            const err = document.getElementById('errorAlert');
+            err.textContent = 'An error occurred while submitting the data';
+            err.classList.remove('d-none');
         });
-    }
+      }
+    });
 </script>
 {% endblock %}

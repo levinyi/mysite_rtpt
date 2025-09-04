@@ -7,4 +7,4 @@ class Tool(models.Model):
     tool_name = models.CharField(verbose_name="tool name", max_length=64)
     tool_desc = models.TextField(verbose_name="description")
     tool_freq = models.SmallIntegerField(verbose_name="Use frequency",)
-    tool_icon = models.ImageField(upload_to="static/img/tools_icon", blank=True)
+    icon = models.ImageField(upload_to="tools_icon/", blank=True, null=True, verbose_name="Tool Icon")
