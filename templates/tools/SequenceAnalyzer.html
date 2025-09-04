@@ -286,8 +286,9 @@
         let lastError = '';
         return function(value, callback) {
           const v = (value || '').toString().trim();
-          const ok = /^[a-zA-Z0-9_-]{1,60}$/.test(v);
-          lastError = ok ? '' : 'GeneName must be 1-60 chars (A-Z, 0-9, _ or -).';
+          // Allow letters, digits, underscore, hyphen, and square brackets
+          const ok = /^[a-zA-Z0-9_\-\[\]]{1,60}$/.test(v);
+          lastError = ok ? '' : 'GeneName must be 1-60 chars (A-Z, 0-9, _, -, [, ]).';
           callback(ok);
           return lastError;
         };
@@ -311,7 +312,7 @@
         rowHeaders: true,
         colWidths: [200, 800],
         columns: [
-          { data: 'GeneName', validator: geneNameValidator },
+          { data: 'GeneName' },
           { data: 'SeqNT', validator: seqNTValidator },
         ],
         height: 'auto',

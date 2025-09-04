@@ -16,10 +16,6 @@ import requests
 from typing import Dict, List, Tuple, Optional
 import time
 
-# ==============================================================================
-# MiniGeneExtractor Logic - Adapted from extract_mini_genes.py
-# ==============================================================================
-
 class MiniGeneExtractorLogic:
     def __init__(self, genome_version='hg38'):
         if genome_version == 'hg19':
@@ -1103,21 +1099,3 @@ def process_mutations_for_minigene(mutations, genome_version):
 
     return pd.DataFrame(results_data)
 
-
-def test(request):
-    return render(request, 'tools/test.html')
-
-def test_analyze_sequence(request):
-    from tools.scripts.AnalysisSequence import DNARepeatsFinder
-    if request.method == 'POST':
-        sequence = request.POST.get('sequence')
-        print("sequence: ", sequence)
-        
-        if sequence:
-            repeats_finder = DNARepeatsFinder(sequence=sequence)
-            results = repeats_finder.find_high_gc_content(window_size=30, max_GC_content=80)
-            print("results: ", results)
-            return JsonResponse({'status': 'success', 'message': 'Sequence analyzed successfully', 'penalty_score': results})
-        else:
-            return JsonResponse({'status': 'error', 'message': 'No sequence provided'})
-    return render(request, 'tools/test.html')

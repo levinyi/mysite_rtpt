@@ -20,7 +20,4 @@ urlpatterns = [
 
     # 5 mini gene
     path('MiniGeneExtractor/', views.MiniGeneExtractorView.as_view(), name='MiniGeneExtractor'),
-    # test
-    path('test/', views.test, name='test'),
-    path('test_analyze_sequence/', views.test_analyze_sequence, name='test_analyze_sequence'),
 ]

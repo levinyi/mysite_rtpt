@@ -65,8 +65,14 @@ class DNARepeatsFinder:
         '''Check if a given DNA sequence is a homopolymer (consisting of only one type of base).'''
         return len(set(unit)) == 1
 
+    @staticmethod
+    def gc_percent(seq):
+        """Return GC percentage with two decimal places."""
+        return round(GC(seq) * 100, 2)
+
     def calculate_homopolymer_penalty_score(self, length):
-        return length *10 if length > 10 else length
+        # 保留 1 位小数
+        return round((length * 10) if length > 10 else float(length), 1)
     
     def calculate_tandem_repeats_penalty_score(self, length):
         return round((length - 15) / 2 if length > 15 else 0, 1)
@@ -134,7 +140,7 @@ class DNARepeatsFinder:
 
         for repeat in repeats:
             repeat['length'] = len(repeat['sequence'])
-            repeat['gc_content'] = GC(repeat['sequence'])*100
+            repeat['gc_content'] = self.gc_percent(repeat['sequence'])
             repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
 
         return repeats
@@ -196,7 +202,7 @@ class DNARepeatsFinder:
                         'sequence': seq,
                         'start': matches,
                         'end': [match + len(seq) - 1 for match in matches],
-                        'gc_content': GC(seq)*100,
+                        'gc_content': self.gc_percent(seq),
                         'length': len(seq),
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
@@ -256,7 +262,7 @@ class DNARepeatsFinder:
                 merged_palindromes[-1]['end'] = new_end
                 merged_palindromes[-1]['sequence'] = s[merged_palindromes[-1]['start']:new_end + 1]
                 merged_palindromes[-1]['length'] = new_end - merged_palindromes[-1]['start'] + 1
-                merged_palindromes[-1]['gc_content'] = GC(merged_palindromes[-1]['sequence'])*100
+                merged_palindromes[-1]['gc_content'] = self.gc_percent(merged_palindromes[-1]['sequence'])
                 merged_palindromes[-1]['penalty_score'] = self.calculate_palindrome_repeats_penalty_score(merged_palindromes[-1]['length'])
             else:
                 merged_palindromes.append(palindrome)
@@ -364,10 +370,11 @@ class DNARepeatsFinder:
 
         n = len(s)
         if n < window_size:
-            gc_content = GC(s) * 100
+            gc_raw = GC(s) * 100
+            gc_content = round(gc_raw, 2)
             # print(f"GC Content for entire sequence: {gc_content}")  # 输出整个序列的GC含量
-            if gc_content >= max_GC_content:
-                penalty_score = self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content)
+            if gc_raw >= max_GC_content:
+                penalty_score = self.calculate_local_gc_penalty_score(float(gc_raw), max_GC_content, max_GC_content)
                 # print(f"Penalty Score for entire sequence: {penalty_score}")  # 输出惩罚分数
                 return [{
                     'length': n,
@@ -383,9 +390,10 @@ class DNARepeatsFinder:
 
         for i in range(n - window_size + 1):
             window = s[i:i + window_size]
-            gc_content = GC(window) * 100
-            if gc_content >= max_GC_content:
-                penalty_score = self.calculate_local_gc_penalty_score(float(gc_content), max_GC_content, max_GC_content)
+            gc_raw = GC(window) * 100
+            gc_content = round(gc_raw, 2)
+            if gc_raw >= max_GC_content:
+                penalty_score = self.calculate_local_gc_penalty_score(float(gc_raw), max_GC_content, max_GC_content)
                 # print(f"Window {i}-{i + window_size - 1}: {window}, GC Content: {gc_content} Penalty Score for window {i}-{i + window_size - 1}: {penalty_score}")
                 high_gc_contents_temp.append({
                     'sequence': window,
@@ -406,15 +414,16 @@ class DNARepeatsFinder:
         n = len(s)
         if n < window_size:
             # 将整个序列作为一个窗口
-            gc_content = GC(s)*100
-            if gc_content <= min_GC_content:
+            gc_raw = GC(s)*100
+            gc_content = round(gc_raw, 2)
+            if gc_raw <= min_GC_content:
                 return [{
                     'length': n,
                     'sequence': s,
                     'start': 0,
                     'end': n - 1,
                     'gc_content': gc_content,
-                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), min_GC_content, min_GC_content),
+                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_raw), min_GC_content, min_GC_content),
                 }]
             return []
 
@@ -422,14 +431,15 @@ class DNARepeatsFinder:
 
         for i in range(n - window_size + 1):
             window = s[i:i + window_size]
-            gc_content = GC(window)*100
-            if gc_content < min_GC_content:
+            gc_raw = GC(window)*100
+            gc_content = round(gc_raw, 2)
+            if gc_raw < min_GC_content:
                 low_gc_contents_temp.append({
                     'sequence': window,
                     'start': i,
                     'end': i + window_size - 1,
                     'gc_content': gc_content,
-                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_content), min_GC_content, min_GC_content),
+                    'penalty_score': self.calculate_local_gc_penalty_score(float(gc_raw), min_GC_content, min_GC_content),
                 })
 
         low_gc_contents = self.merge_gc_windows(low_gc_contents_temp, s, 'lowGC', min_GC_content=min_GC_content, max_GC_content=None)
@@ -437,9 +447,10 @@ class DNARepeatsFinder:
         return low_gc_contents
 
     def merge_gc_windows(self, gc_contents_temp, sequence, gc_type, min_GC_content=None, max_GC_content=None):
+        """原始合并逻辑：只要区间重叠或相邻就合并。"""
         gc_contents = []
         for gc_content in gc_contents_temp:
-            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠
+            if gc_contents and gc_contents[-1]['end'] >= gc_content['start'] - 1:  # 表示有重叠或相邻
                 old_end = gc_contents[-1]['end']
                 new_end = max(old_end, gc_content['end'])
                 gc_contents[-1]['end'] = new_end
@@ -451,8 +462,9 @@ class DNARepeatsFinder:
         for gc_content in gc_contents:
             gc_content['seqType'] = gc_type
             gc_content['length'] = len(gc_content['sequence'])
-            gc_content['gc_content'] = GC(gc_content['sequence'])*100
-            # 不再重新计算 penalty_score
+            gc_content['gc_content'] = self.gc_percent(gc_content['sequence'])
+            # 保留 1 位小数的显示效果
+            gc_content['penalty_score'] = round(float(gc_content.get('penalty_score', 0)), 1)
         return gc_contents
 
     # 8) Dinucleotide Repeats
@@ -483,8 +495,8 @@ class DNARepeatsFinder:
                         'start': i,
                         'end': i + repeat_length - 1,
                         'length': repeat_length,
-                        'gc_content': GC(sequence)*100,
-                        'penalty_score': repeat_length // 2
+                        'gc_content': self.gc_percent(sequence),
+                        'penalty_score': round(repeat_length / 2, 1)
                     })
             
             i += repeat_length  # 跳过已检测到的重复序列
@@ -546,7 +558,8 @@ def format_feature_data(feature_data, keys):
 
 def calculate_total_penalty_score(feature_list):
     # 定义函数来计算每个特征的总 penalty score
-    return sum(item.get('penalty_score', 0) for item in feature_list)
+    total = sum(float(item.get('penalty_score', 0)) for item in feature_list)
+    return round(total, 1)
 
 # --- 新增：统计各特征总长度 ---
 def calculate_total_feature_length(feature_list):

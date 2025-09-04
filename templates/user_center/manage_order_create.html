@@ -7,9 +7,11 @@
 <style>
     .custom-workflow-container {
         display: flex;
+        gap: 1rem;
         justify-content: space-between;
         align-items: center;
         position: relative;
+        padding: 1rem 1.25rem;
     }
 
     .custom-workflow-step {
@@ -20,118 +22,147 @@
     }
 
     .custom-workflow-icon {
-        font-size: 2rem;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
         color: #0d6efd;
+        background: linear-gradient(145deg, #eff6ff, #f7fbff);
+        border: 1px solid rgba(13,110,253,.12);
     }
 
     .custom-step-label {
         font-weight: bold;
         color: #495057;
+        margin-top: .5rem;
     }
+
+    /* connectors between steps */
+    .custom-workflow-step:before {
+        content: '';
+        position: absolute;
+        top: 22px;
+        left: -50%;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(13,110,253,.12), rgba(13,110,253,.12));
+        z-index: 0;
+    }
+    .custom-workflow-step:first-child:before { display: none; }
+
+    .hero-card { background: linear-gradient(135deg, #f8fbff 0%, #f4f9ff 60%, #f8fff9 100%); }
+    .section-hint { color: #6c757d; font-size: .9rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mt-2">
-        <ol class="breadcrumb">
+    <nav class="mt-2" aria-label="breadcrumb">
+        <ol class="breadcrumb small">
             <li class="breadcrumb-item"><a href="{% url 'user_center:dashboard' %}" class="text-decoration-none">User Center</a></li>
             <li class="breadcrumb-item active" aria-current="page">Create Order</li>
         </ol>
     </nav>
     <!-- section title -->
-    <div class="card mt-4">
-        <div class="card-header text-center">
-            <h2>Order Creation Process</h2>
-        </div>
-        <div class="custom-workflow-container mb-4 mt-4">
-            <div class="custom-workflow-step">
-                <div class="custom-workflow-icon mb-3">
-                    <i class="bi bi-journal-text"></i>
+    <div class="card mt-3 border-0 hero-card">
+        <div class="card-body p-4 p-md-5">
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+                <div>
+                    <h4 class="mb-1">Start Ordering</h4>
+                    <div class="section-hint">Choose a vector, paste sequences, then submit for validation.</div>
                 </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'user_center:manage_vector' %}" class="btn btn-outline-secondary"><i class="bi bi-diagram-3 me-1"></i>Manage Vectors</a>
+                    <a href="{% url 'user_center:view_cart' %}" class="btn btn-primary"><i class="bi bi-cart3 me-1"></i>View Cart</a>
+                </div>
+            </div>
+        </div>
+        <div class="custom-workflow-container mb-3">
+            <div class="custom-workflow-step">
+                <div class="custom-workflow-icon"><i class="bi bi-journal-text"></i></div>
                 <div class="custom-step-label">Choose Vector</div>
             </div>
             <div class="custom-workflow-step">
-                <div class="custom-workflow-icon mb-3">
-                    <i class="bi bi-folder-check"></i>
-                </div>
+                <div class="custom-workflow-icon"><i class="bi bi-folder-check"></i></div>
                 <div class="custom-step-label">Submit Sequence</div>
             </div>
             <div class="custom-workflow-step">
-                <div class="custom-workflow-icon mb-3">
-                    <i class="bi bi-person-check"></i>
-                </div>
+                <div class="custom-workflow-icon"><i class="bi bi-person-check"></i></div>
                 <div class="custom-step-label">Sequence Validation</div>
             </div>
             <div class="custom-workflow-step">
-                <div class="custom-workflow-icon mb-3">
-                    <i class="bi bi-check-lg"></i>
-                </div>
+                <div class="custom-workflow-icon"><i class="bi bi-check-lg"></i></div>
                 <div class="custom-step-label">Order Complete</div>
             </div>
         </div>
     </div>
 
     <!-- Order Creation Form -->
-    <div class="card mt-3 mb-5">
-        <div class="card-header text-center">
-            <h2>Start Ordering</h2>
-        </div>
-        <div class="card-body">
+    <div class="card mt-3 mb-5 shadow-sm">
+        <div class="card-body p-4">
             <!-- Choose Vector -->
-            <div class="card-title mb-3 mt-2">
-                <h3><i class="bi bi-1-circle"></i> Choose Vector</h3>
-                <p>If you want to use your own vector, you must first create it <a class="text-decoration-none" href="{% url 'user_center:manage_vector' %}">here</a> and have it verified by us before it can be displayed on this site.</p>
+            <div class="mb-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h5 class="mb-1"><i class="bi bi-1-circle me-2"></i>Choose Vector</h5>
+                </div>
+                <div class="section-hint mb-2">RootPath common vectors and your verified vectors are listed. Create your own vector in <a class="text-decoration-none" href="{% url 'user_center:manage_vector' %}">Manage Vectors</a>.</div>
+                <div class="input-group input-group-sm mb-2" style="max-width: 420px;">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="vectorSearch" placeholder="Search vectors by name">
+                </div>
+                <select class="form-select mt-2" size="10" id="vector_id">
+                    <option value="" selected>Choose a vector</option>
+                    <optgroup label="RootPath Vectors">
+                        {% for vector in company_vectors %}
+                            <option value="{{ vector.id }}">{{ vector.vector_name }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Your Vectors">
+                        {% for vector in customer_vectors %}
+                            <option value="{{ vector.id }}">{{ vector.vector_name }} (user)</option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
             </div>
-            <span class="text-success">Commonly used vectors at RootPath </span> and <span class="text-info">your own vectors</span> are listed below.
-            <select class="form-select mt-2" size="10" aria-label="Multiple select example" id="vector_id" data-live-search="true">
-                <option value="" selected >Choose a vector</option>
-                {% for vector in company_vectors %}
-                    <option value="{{ vector.id }}" class="text-success">{{ forloop.counter }}. {{ vector.vector_name }}</option>
-                {% endfor %}
-
-                {% for vector in customer_vectors %}
-                    <option value="{{ vector.id }}" class="text-info">{{ forloop.counter }}. {{ vector.vector_name }} (user)</option>
-                {% endfor %}
-            </select>
             <!-- Submit Sequence -->
-            <div class="card-title mb-3 mt-5">
-                <h3><i class="bi bi-2-circle"></i> Submit Sequence</h3> 
-                <div class="card-body">
+            <div class="mt-4">
+                <h5 class="mb-2"><i class="bi bi-2-circle me-2"></i>Submit Sequence</h5>
+                <div class="card-body p-0">
                     <!-- Tab navigation -->
                     <ul class="nav nav-tabs" id="myTab" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="aa_sequence_tab" data-bs-toggle="tab" data-bs-target="#aa_sequence" type="button" role="tab" aria-controls="aa_sequence" aria-selected="true">
-                            For Protein Sequence</button>
+                            <i class="bi bi-activity me-1"></i>For Protein Sequence</button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="nt_sequence_tab" data-bs-toggle="tab" data-bs-target="#nt_sequence" type="button" role="tab" aria-controls="nt_sequence" aria-selected="false">
-                            For DNA Sequence</button>
+                            <i class="bi bi-code-slash me-1"></i>For DNA Sequence</button>
                         </li>
                     </ul>
                     <!-- Tab content -->
                     <div class="tab-content" id="myTabContent">
                         <!-- For AA Sequence Tab Pane -->
                         <div class="tab-pane fade show active" id="aa_sequence" role="tabpanel" aria-labelledby="aa_sequence_tab">
-                            <p class="mt-3">Provide your gene names, amino acid (AA) sequences, host species for codon optimization,  and forbidden sequences in the table. 
-                            <br>Then click 'Submit' for sequence evaluation. Otherwise, you can download our template <a href="{% static 'files/RootPath_Submit_Sequence_Template.xlsx' %}" class="text-decoration-none">here.</a></p>
-                            <div id="excelTable2" class="mt-3">
+                            <div id="excelTable2" class="mt-3"></div>
+                            <div class="mt-3">
                                 <button id="addRowBtn2" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
-                            
-                                <i class="bi bi-asterisk"></i> Fields marked with an asterisk (*) are mandatory. <br>
-                                <i class="bi bi-question-circle"></i> Entries in the 'Forbidden Sequence' column must follow the specified format. 1) Separate multiple forbidden sequences using ';' and 2) please do <strong>NOT</strong> leave space. For example: AAATTT;GGGCCC;AAAAAA. 3) The sequence exceeding 10,000 base pairs is not analyzed.
+                                <p class="mt-3 section-hint mb-1">Fill gene name, AA sequence, host species for codon optimization, and forbidden sequences. You may also download the template <a href="{% static 'files/RootPath_Submit_Sequence_Template.xlsx' %}" class="text-decoration-none">here</a>.</p>
+                                <div class="small text-muted">
+                                    <i class="bi bi-asterisk"></i> Fields with * are mandatory. <br>
+                                    <i class="bi bi-question-circle"></i> Forbidden Sequence format: separate by ';' without spaces. Example: AAATTT;GGGCCC;AAAAAA. Sequences longer than 10,000 bp are not analyzed.
+                                </div>
                             </div>
                             <button onclick="postDataFromAaSequence()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit</button>
                         </div>
                         <!-- For NT Sequence Tab Pane -->
                         <div class="tab-pane fade" id="nt_sequence" role="tabpanel" aria-labelledby="nt_sequence_tab">   
-                            <p class="mt-3">
-                                Provide your gene names and DNA sequences in the table. Then click 'Submit' for sequence evaluation. 
-                                Otherwise, you can download our template 
-                                <a href="{% static 'files/RootPath_Submit_Sequence_Template.xlsx' %}" class="text-decoration-none">here</a>.
-                            </p>
-                            <div id="excelTable" class="mt-3">
+                            <div id="excelTable" class="mt-3"></div>
+                            <div class="mt-3">
                                 <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
+                                <p class="mt-3 section-hint mb-0">Provide gene names and DNA sequences, then click Submit for evaluation. Template is available <a href="{% static 'files/RootPath_Submit_Sequence_Template.xlsx' %}" class="text-decoration-none">here</a>.</p>
                             </div>
                             <button onclick="postDataFromNtSequence()" class="btn btn-primary mt-3"><i class="bi bi-clipboard-pulse"></i> Submit</button>
                         </div>
@@ -281,6 +312,21 @@
     // 页面加载时初始化第一个Tab的Handsontable
     initHot2();
     hot2Initialized = true;
+
+    // 简易向量搜索过滤
+    const vectorSearch = document.getElementById('vectorSearch');
+    const vectorSelect = document.getElementById('vector_id');
+    if (vectorSearch && vectorSelect) {
+        vectorSearch.addEventListener('input', () => {
+            const q = vectorSearch.value.toLowerCase().trim();
+            // 遍历所有 option（包含 optgroup 内）
+            Array.from(vectorSelect.querySelectorAll('option')).forEach(opt => {
+                if (!opt.value) return; // 跳过 placeholder
+                const match = opt.textContent.toLowerCase().includes(q);
+                opt.hidden = !match;
+            });
+        });
+    }
 
     function postDataFromNtSequence() {
         // 获取当前活动Tab的Handsontable数据
