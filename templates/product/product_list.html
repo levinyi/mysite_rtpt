@@ -1,12 +1,35 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Product list{% endblock %}
+{% block extra_head %}
+<style>
+    /* Keep table within card and gracefully truncate content */
+    #product_table { table-layout: fixed; width: 100%; }
+    #product_table th, #product_table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Optional: tweak column widths for better balance */
+    /* index: 1:#, 2:GeneName, 3:CCDS, 4:GeneID, 5:ProteinID, 6:TranscriptID, 7:NTSeq, 8:AASeq */
+    #product_table th:nth-child(1), #product_table td:nth-child(1) { width: 36px; }
+    #product_table th:nth-child(2), #product_table td:nth-child(2) { width: 60px; }
+    #product_table th:nth-child(3), #product_table td:nth-child(3) { width: 140px; }
+    #product_table th:nth-child(4), #product_table td:nth-child(4) { width: 160px; }
+    #product_table th:nth-child(5), #product_table td:nth-child(5) { width: 140px; }
+    #product_table th:nth-child(6), #product_table td:nth-child(6) { width: 180px; }
+    #product_table th:nth-child(7), #product_table td:nth-child(7) { width: 180px; }
+    #product_table th:nth-child(8), #product_table td:nth-child(8) { width: 220px; }
+    #product_table th:nth-child(9), #product_table td:nth-child(9) { width: 220px; }
+    /* Ensure any horizontal overflow scrolls inside the card */
+    .rp-table-responsive { overflow-x: auto; }
+    /* Make truncate utility effective on inner blocks */
+    .truncate-block { display: inline-block; vertical-align: top; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container">
     <div class="card mt-3">
         <div class="card-body">
             <h5 class="card-title">Product List</h5>
-            <table id="product_table" class="display" style="width:100%; display:none">
+            <div class="rp-table-responsive">
+            <table id="product_table" class="display table table-striped table-hover" style="width:100%; display:none">
                 <thead>
                     <tr>
                         <th></th> <!-- For Select Checkboxes -->
@@ -28,14 +51,23 @@
                         <td>{{ gene.GeneName }}</td>
                         <td>{{ gene.CCDS }}</td>
                         <td>{{ gene.GeneID_NCBI }}</td>
-                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate" style="display: block">{{ gene.ProteinID_NP }}</td>
-                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate">{{ gene.TranscriptID }}</td>
-                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate">{{ gene.Gene_seq }}</td>
-                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="text-truncate">{{ gene.AASeq }}</td>
+                        <td title="{{ gene.ProteinID_NP|stringformat:'s' }}">
+                            <div class="text-truncate truncate-block" style="max-width: 180px;">{{ gene.ProteinID_NP|stringformat:'s'|slice:":30" }}</div>
+                        </td>
+                        <td title="{{ gene.TranscriptID|stringformat:'s' }}">
+                            <div class="text-truncate truncate-block" style="max-width: 180px;">{{ gene.TranscriptID|stringformat:'s'|slice:":30" }}</div>
+                        </td>
+                        <td title="Sequence preview only">
+                            <div class="text-truncate truncate-block" style="max-width: 220px;">{{ gene.Gene_seq|stringformat:'s'|slice:":60" }}</div>
+                        </td>
+                        <td title="Sequence preview only">
+                            <div class="text-truncate truncate-block" style="max-width: 220px;">{{ gene.AASeq|stringformat:'s'|slice:":60" }}</div>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 </div>
@@ -74,11 +106,18 @@
             select: {
                 style: 'multi+shift'
             },
-            columnDefs: [{
-                orderable: false,
-                className: 'select-checkbox',
-                targets: 0
-            }],
+            deferRender: true,
+            processing: true,
+            pageLength: 25,
+            lengthMenu: [[25, 50, 100, -1], [25, 50, 100, 'All']],
+            columnDefs: [
+                {
+                    orderable: false,
+                    className: 'select-checkbox',
+                    targets: 0
+                },
+                { targets: [5,6,7,8], searchable: false, orderable: false }
+            ],
             order: [[ 1, 'asc' ]],
             initComplete: function () {
                 hideLoading();

@@ -45,7 +45,14 @@
                     <a href="/tools/{{ tool.tool_name }}/" class="text-decoration-none text-dark stretched-link">
                         <div class="row g-0">
                             <div class="col-md-4">
-                                <img src="{{ tool.icon.url }}" class="img-fluid rounded-start" alt="{{ tool.tools_name }}">
+                                {% if tool.icon %}
+                                <img src="{{ tool.icon.url }}"
+                                     class="img-fluid rounded-start"
+                                     alt="{{ tool.tool_name }}"
+                                     onerror="this.onerror=null;this.src='{% static 'images/favicon.png' %}';">
+                                {% else %}
+                                <img src="{% static 'images/favicon.png' %}" class="img-fluid rounded-start" alt="{{ tool.tool_name }}">
+                                {% endif %}
                             </div>
                             <div class="col-md-8">
                                 <div class="card-body">
