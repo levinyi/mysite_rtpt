@@ -1,0 +1,71 @@
+{
+    email dushiyi@rootpath.com.cn
+}
+
+# HTTP fallback for all hosts (including IP)
+:80 {
+    encode gzip zstd
+
+    handle_path /static/* {
+        root * /app/staticfiles
+        file_server
+    }
+
+    handle_path /media/* {
+        root * /app/media
+        file_server
+    }
+
+    reverse_proxy web:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+
+    log {
+        output file /data/access.log
+        format json
+    }
+}
+
+# HTTPS with auto-HTTPS for primary domains
+rootpath.com.cn, www.rootpath.com.cn {
+    encode gzip zstd
+
+    handle_path /static/* {
+        root * /app/staticfiles
+        file_server
+    }
+
+    handle_path /media/* {
+        root * /app/media
+        file_server
+    }
+
+    reverse_proxy web:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Only set HSTS on HTTPS sites
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+
+    log {
+        output file /data/access.log
+        format json
+    }
+}
