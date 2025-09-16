@@ -9,7 +9,7 @@ from Bio import SeqIO
 from io import BytesIO, StringIO
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Q, Count
+from django.db.models import Q, Count, F
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 # from account.models import UserProfile
 from product.models import Species, Vector
+from user_account.models import UserProfile
 from user_center.models import OrderInfo
 from user_center.views import \
     vector_download as uc_vector_download, \
@@ -690,15 +691,42 @@ def user_manage(request):
 @login_required
 # @is_secondary_admin_required
 def user_data_api(request):
-    user_list = UserProfile.objects.select_related('user').values(
-        'user__id', 'user__username', 'email', 'first_name', 'last_name', 'department', 'phone', 'company', 'shipping_address', 'photo', 'register_time', 'is_verify')
-    return JsonResponse({'data': list(user_list)})
+    """返回所有用户（包括尚未创建UserProfile的）
+    使用User为主表，左连接UserProfile。
+    """
+    qs = (
+        User.objects
+        .select_related('userprofile')
+        .values(
+            'id', 'username', 'email',
+            'userprofile__first_name', 'userprofile__last_name', 'userprofile__department',
+            'userprofile__phone', 'userprofile__company', 'userprofile__shipping_address',
+            'userprofile__photo', 'userprofile__register_time', 'userprofile__is_verify'
+        )
+    )
+    data = []
+    for u in qs:
+        data.append({
+            'user__id': u['id'],
+            'user__username': u['username'],
+            'email': u['email'],
+            'first_name': u['userprofile__first_name'],
+            'last_name': u['userprofile__last_name'],
+            'department': u['userprofile__department'],
+            'phone': u['userprofile__phone'],
+            'company': u['userprofile__company'],
+            'shipping_address': u['userprofile__shipping_address'],
+            'photo': u['userprofile__photo'],
+            'register_time': u['userprofile__register_time'],
+            'is_verify': u['userprofile__is_verify'],
+        })
+    return JsonResponse({'data': data})
 
 @login_required
 # @is_secondary_admin_required
 def view_user_profile(request, user_id):
     user = User.objects.get(id=user_id)
-    userprofile = UserProfile.objects.get(user=user_id)
+    userprofile, _ = UserProfile.objects.get_or_create(user=user)
     return render(request, 'super_manage/user_profile.html', {"user": user, "userprofile": userprofile})
 
 @login_required
@@ -706,21 +734,24 @@ def view_user_profile(request, user_id):
 def save_user_profile(request, user_id):
     if request.method == 'POST':
         user = User.objects.get(id=user_id)
-        userprofile = UserProfile.objects.get(user=user.id)
+        userprofile, _ = UserProfile.objects.get_or_create(user=user)
         userprofile.first_name = request.POST.get('first_name')
         userprofile.last_name = request.POST.get('last_name')
-        userprofile.email = request.POST.get('email')
+        # 邮箱属于User模型
+        user.email = request.POST.get('email')
         userprofile.department = request.POST.get('department')
         userprofile.phone = request.POST.get('phone')
         userprofile.company = request.POST.get('company')
         userprofile.shipping_address = request.POST.get('shipping_address')
+        user.save()
         userprofile.save()
         return render(request, 'super_manage/user_profile.html', {"user": user, "userprofile": userprofile})
     return JsonResponse({'status': 'error', 'message': 'Invalid request'})
 
 def save_user_avatar(request):
     if request.method == 'POST':
-        user_id = request.POST.get('user_id')
+        # 前端传参名为 'userid'
+        user_id = request.POST.get('user_id') or request.POST.get('userid')
         imagePath = request.POST.get('imagePath')
         UserProfile.objects.filter(user_id=user_id).update(photo=imagePath)
         return redirect('super_manage:view_user_profile', user_id=user_id)
