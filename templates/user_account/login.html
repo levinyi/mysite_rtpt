@@ -50,8 +50,9 @@
                     <p class="mb-0">{% trans "Or sign in with" %}</p>
                     <a href="{% url 'account_login' %}?process=login&next=/accounts/feishu/login/callback/" class="btn btn-outline-secondary mt-2">
                         <img src="{% static 'images/feishu-logo.png' %}" alt="Feishu" style="width: 20px; height: 20px; margin-right: 5px;">
-                        {% trans "Feishu" %}
+                        Sign in with Feishu
                     </a>
+                    <p class="text-muted small mt-2 mb-0">Note: Feishu sign-in is currently limited to RootPath internal employees only. External Feishu accounts are not supported yet.</p>
                 </div>
             </div>
         </div>

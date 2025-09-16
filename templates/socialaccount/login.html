@@ -6,37 +6,40 @@
     {% trans "Sign In" %}
 {% endblock title %}
 {% block content %}
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card shadow-sm mt-5">
-                    <div class="card-body">
-                        {% if process == "connect" %}
-                            {% element h1 %}
-                                {% blocktrans with provider.name as provider %}Connect {{ provider }}{% endblocktrans %}
-                            {% endelement %}
-                            <p>
-                                {% blocktrans with provider.name as provider %}You are about to connect a new third-party account from {{ provider }}.{% endblocktrans %}
-                            </p>
-                        {% else %}
-                            {% element h1 %}
-                                {% blocktrans with provider.name as provider %}Sign In Via {{ provider }}{% endblocktrans %}
-                            {% endelement %}
-                            <p>
-                                {% blocktrans with provider.name as provider %}You are about to sign in using a third-party account from {{ provider }}.{% endblocktrans %}
-                            </p>
-                        {% endif %}
-                        <div class="d-flex justify-content-center">
-                            <form method="post" no_visible_fields=True>
-                                {% csrf_token %}
-                                    <button type="submit" class="btn btn-primary">
-                                        {% trans "Continue" %}
-                                    </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<section class="py-5 bg-light">
+  <div class="container py-4">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-8 col-lg-5">
+        <div class="text-center mb-3">
+          <img src="{% static 'images/feishu-logo.png' %}" alt="Feishu" style="width:40px;height:40px;">
         </div>
+
+        {% if process == "connect" %}
+          <h2 class="h4 text-center mb-2">{% blocktrans with provider.name as provider %}Connect {{ provider }}{% endblocktrans %}</h2>
+          <p class="text-muted text-center mb-3">
+            {% blocktrans with provider.name as provider %}You are about to connect a new third-party account from {{ provider }}.{% endblocktrans %}
+          </p>
+        {% else %}
+          <h2 class="h4 text-center mb-2">{% blocktrans with provider.name as provider %}Sign In Via {{ provider }}{% endblocktrans %}</h2>
+          <p class="text-muted text-center mb-3">
+            {% blocktrans with provider.name as provider %}You are about to sign in using a third-party account from {{ provider }}.{% endblocktrans %}
+          </p>
+        {% endif %}
+
+        <div class="alert alert-warning small text-center" role="alert">
+          Note: Feishu sign-in is currently limited to RootPath internal employees only. External Feishu accounts are not supported yet.
+        </div>
+
+        <form method="post" class="mt-3">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary w-100">{% trans "Continue" %}</button>
+        </form>
+
+        <div class="text-center mt-3">
+          <a href="{% url 'account_login' %}" class="text-decoration-none">{% trans "Back to Sign In" %}</a>
+        </div>
+      </div>
     </div>
+  </div>
+</section>
 {% endblock content %}

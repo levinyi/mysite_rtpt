@@ -2,24 +2,21 @@
 {% load static %}
 {% get_providers as socialaccount_providers %}
 {% if socialaccount_providers %}
-    {% element provider_list %}
-        {% for provider in socialaccount_providers %}
-            {% if provider.id == "openid" %}
-                {% for brand in provider.get_brands %}
-                    {% provider_login_url provider openid=brand.openid_url process=process as href %}
-                    <a href="{{ href }}" class="btn btn-outline-primary d-flex align-items-center mb-3">
-                        <img src="{% static 'images/'|add:brand.name|add:'-logo.png' %}" alt="{{ brand.name }}" class="me-2" style="width: 20px; height: 20px;">
-                        <span>{{ brand.name }}</span>
-                    </a>
-                {% endfor %}
-            {% else %}
-                <div class="d-flex align-items-center">
-                    <a href="{% provider_login_url provider process=process scope=scope auth_params=auth_params %}" class="btn btn-outline-primary d-flex align-items-center mb-3">
-                        <img src="{% static 'images/'|add:provider.name|add:'-logo.png' %}" alt="{{ provider.name }}" class="me-2" style="width: 20px; height: 20px;">
-                        <span>{{ provider.name }}</span>
-                    </a>
-                </div>
-            {% endif %}
-        {% endfor %}
-    {% endelement %}
+  {# Render without allauth's default <ul> wrapper to avoid extra padding #}
+  <div class="w-100">
+    {% for provider in socialaccount_providers %}
+      {% if provider.id == 'feishu' %}
+        <style>
+          .btn-feishu {background:#fff;border:1px solid #3370FF;color:#3370FF;border-radius:8px;width:100%;display:flex;align-items:center;justify-content:center;gap:.5rem;padding:.6rem .9rem;transition:all .2s ease}
+          .btn-feishu:hover {background:#eef3ff;color:#1f4fd6;border-color:#1f4fd6;box-shadow:0 6px 16px rgba(51,112,255,.15),0 2px 4px rgba(0,0,0,.06);transform:translateY(-1px)}
+          .btn-feishu:active {transform:translateY(0);box-shadow:0 2px 6px rgba(51,112,255,.2)}
+        </style>
+        <a href="{% provider_login_url provider process=process scope=scope auth_params=auth_params %}"
+           class="btn btn-feishu mb-3">
+          <img src="{% static 'images/feishu-logo.png' %}" alt="Feishu" style="width:20px;height:20px;"/>
+          <span>Sign in with Feishu</span>
+        </a>
+      {% endif %}
+    {% endfor %}
+  </div>
 {% endif %}

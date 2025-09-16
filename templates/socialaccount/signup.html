@@ -1,29 +1,44 @@
 {% extends "socialaccount/base_entrance.html" %}
 {% load i18n %}
+{% load static %}
 {% load allauth %}
 {% block head_title %}
     {% trans "Signup" %}
 {% endblock head_title %}
 {% block content %}
-    {% element h1 %}
-        {% trans "Sign Up" %}
-    {% endelement %}
-    <p>
-        {% blocktrans with provider_name=account.get_provider.name site_name=site.name %}You are about to use your {{provider_name}} account to login to
-{{site_name}}. As a final step, please complete the following form:{% endblocktrans %}
-    </p>
-    {% url 'socialaccount_signup' as action_url %}
-    {% element form form=form method="post" action=action_url %}
-        {% slot body %}
-            {% csrf_token %}
-            {% element fields form=form unlabeled=True %}
-            {% endelement %}
-            {{ redirect_field }}
-        {% endslot %}
-        {% slot actions %}
-            {% element button type="submit" %}
-                {% trans "Sign Up" %}
-            {% endelement %}
-        {% endslot %}
-    {% endelement %}
+{% language 'en' %}
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <img src="{% static 'images/feishu-logo.png' %}" alt="Feishu" style="width:24px;height:24px;" class="me-2"/>
+            <h5 class="mb-0">{% trans "Sign Up" %}</h5>
+          </div>
+          <p class="text-muted small">
+            {% blocktrans with provider_name=account.get_provider.name site_name=site.name %}
+            You are about to use your {{provider_name}} account to login to {{site_name}}. As a final step, please complete the following form:
+            {% endblocktrans %}
+          </p>
+          <div class="alert alert-warning small" role="alert">
+            Note: Feishu sign-in is currently limited to RootPath internal employees only. External Feishu accounts are not supported yet.
+          </div>
+          {% url 'socialaccount_signup' as action_url %}
+          {% element form form=form method="post" action=action_url %}
+            {% slot body %}
+              {% csrf_token %}
+              {% element fields form=form unlabeled=True %}{% endelement %}
+              {{ redirect_field }}
+            {% endslot %}
+            {% slot actions %}
+              {% element button type="submit" %}{% trans "Sign Up" %}{% endelement %}
+            {% endslot %}
+          {% endelement %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endlanguage %}
 {% endblock content %}
