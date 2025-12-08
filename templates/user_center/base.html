@@ -8,17 +8,73 @@
     <style>
         .leftslider {
             width: 250px; /* 默认宽度 */
-            transition: width 0.3s;
+            transition: width 0.3s ease, padding 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
         .leftslider .link-text {
             display: inline; /* default value */
+            opacity: 1;
+            transition: opacity 0.3s ease;
+            white-space: nowrap;
+        }
+        .leftslider.collapsed {
+            width: 60px;
+            padding: 0.75rem 0.5rem !important;
+        }
+        .leftslider.collapsed .link-text {
+            opacity: 0;
+            display: none;
+        }
+        .leftslider.collapsed hr {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .sidebar-col {
+            transition: all 0.3s ease;
+            flex: 0 0 auto;
+            width: 16.66666667%; /* col-2 */
+        }
+        .sidebar-col.collapsed {
+            width: 4%; /* 更窄的宽度 */
+        }
+        .content-col {
+            transition: all 0.3s ease;
+            flex: 0 0 auto;
+            width: 75%; /* col-9 */
+        }
+        .content-col.expanded {
+            width: 91%; /* 当侧边栏收起时扩展 */
+        }
+        .toggle-sidebar-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            transition: all 0.3s ease;
+        }
+        .leftslider.collapsed .toggle-sidebar-btn {
+            right: 50%;
+            transform: translateX(50%);
         }
         @media (max-width: 768px) {
             .leftslider {
-                width: 50px;
+                width: 60px;
+                padding: 0.75rem 0.5rem !important;
             }
             .leftslider .link-text {
                 display: none;
+            }
+            .sidebar-col {
+                width: 8%;
+            }
+            .content-col {
+                width: 92%;
             }
         }
         /* 可选：悬浮状态下的样式变化 */
@@ -58,14 +114,14 @@
     {% endblock %}
 </head> 
 <body class="d-flex flex-column min-vh-100"> 
-    {% include 'header.html' %} 
-    <div class="container-fluid"> 
+    {% include 'header.html' %}
+    <div class="container-fluid">
         <div class="row">
-            <div class="col-2 col-sm-2 col-md-2 col-lg-2 col-xl-2 col-xxl-2"> {% include 'user_center/leftslider.html' %}</div> 
-            <div class="col-9 col-sm-9 col-md-9 col-lg-9 col-xl-9 col-xxl-9"> 
-                {% block content %} 
-                {% endblock %} 
-            </div> 
+            <div class="sidebar-col"> {% include 'user_center/leftslider.html' %}</div>
+            <div class="content-col">
+                {% block content %}
+                {% endblock %}
+            </div>
         </div>
     </div>
     <!-- Global Loading Indicator -->
@@ -104,6 +160,42 @@
         $(function () {
             $('[data-bs-toggle="tooltip"]').tooltip()
         })
+    </script>
+    <script>
+        // Toggle sidebar functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('toggleSidebarBtn');
+            const sidebar = document.querySelector('.leftslider');
+            const sidebarCol = document.querySelector('.sidebar-col');
+            const contentCol = document.querySelector('.content-col');
+
+            // Check localStorage for saved state
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                sidebarCol.classList.add('collapsed');
+                contentCol.classList.add('expanded');
+                toggleBtn.innerHTML = '<i class="bi bi-chevron-right"></i>';
+            }
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    sidebar.classList.toggle('collapsed');
+                    sidebarCol.classList.toggle('collapsed');
+                    contentCol.classList.toggle('expanded');
+
+                    // Toggle icon
+                    if (sidebar.classList.contains('collapsed')) {
+                        this.innerHTML = '<i class="bi bi-chevron-right"></i>';
+                        localStorage.setItem('sidebarCollapsed', 'true');
+                    } else {
+                        this.innerHTML = '<i class="bi bi-chevron-left"></i>';
+                        localStorage.setItem('sidebarCollapsed', 'false');
+                    }
+                });
+            }
+        });
     </script>
     {% block javascript %}{% endblock %}
     {% include 'footer.html' %} 
