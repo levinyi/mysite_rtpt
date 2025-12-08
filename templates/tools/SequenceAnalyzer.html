@@ -90,7 +90,7 @@
                 <i class="bi bi-clipboard2-pulse text-primary"></i>
                 <div>
                     <div class="fw-semibold">What it checks</div>
-                    <div class="text-muted small">Long repeats, homopolymers, W/S motifs, local GC window, and dinucleotide repeats with per-feature penalty scoring.</div>
+                    <div class="text-muted small">Long repeats, homopolymers, W/S motifs, local GC window, dinucleotide repeats, tandem repeats, palindrome repeats, and inverted repeats with per-feature penalty scoring.</div>
                 </div>
             </div>
         </div>
@@ -141,13 +141,13 @@
                 <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Dinucleotide Repeats</span><span class="badge bg-success-subtle text-success">Supported</span></div>
             </div>
             <div class="col">
-                <div class="feature-chip soon"><i class="bi bi-dash-circle"></i><span>Tandem Repeats</span><span class="badge bg-secondary-subtle text-secondary">Soon</span></div>
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Tandem Repeats</span><span class="badge bg-success-subtle text-success">Supported</span></div>
             </div>
             <div class="col">
-                <div class="feature-chip soon"><i class="bi bi-dash-circle"></i><span>Palindrome Repeats</span><span class="badge bg-secondary-subtle text-secondary">Soon</span></div>
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Palindrome Repeats</span><span class="badge bg-success-subtle text-success">Supported</span></div>
             </div>
             <div class="col">
-                <div class="feature-chip soon"><i class="bi bi-dash-circle"></i><span>Inverted Repeats</span><span class="badge bg-secondary-subtle text-secondary">Soon</span></div>
+                <div class="feature-chip supported"><i class="bi bi-check2-circle text-success"></i><span>Inverted Repeats</span><span class="badge bg-success-subtle text-success">Supported</span></div>
             </div>
         </div>
     </div>
@@ -201,6 +201,57 @@
                             <div class="col-md-2">
                                 <label for="maxGCContent" class="form-label">Max GC %</label>
                                 <input type="number" class="form-control" id="maxGCContent" value="80">
+                            </div>
+                        </div>
+                        <!-- New parameters for Tandem, Palindrome, and Inverted Repeats -->
+                        <hr class="my-3">
+                        <h6 class="text-muted mb-3"><i class="bi bi-stars me-2"></i>New Feature Parameters</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="tandemMinUnit" class="form-label">Tandem: Min Unit Length</label>
+                                <input type="number" class="form-control" id="tandemMinUnit" value="3">
+                                <div class="form-text">Minimum repeat unit length. Default 3.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="tandemMinCopies" class="form-label">Tandem: Min Copies</label>
+                                <input type="number" class="form-control" id="tandemMinCopies" value="4">
+                                <div class="form-text">Minimum number of repeats. Default 4.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tandem: Max Mismatch</label>
+                                <div class="btn-group w-100" role="group" aria-label="Tandem Max Mismatch">
+                                    <input type="radio" class="btn-check" name="tandemMaxMismatch" id="mismatch0" value="0">
+                                    <label class="btn btn-outline-primary" for="mismatch0">
+                                        <i class="bi bi-shield-check"></i> 0 - Strict
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="tandemMaxMismatch" id="mismatch1" value="1" checked>
+                                    <label class="btn btn-outline-primary" for="mismatch1">
+                                        <i class="bi bi-star-fill"></i> 1 - Standard
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="tandemMaxMismatch" id="mismatch2" value="2">
+                                    <label class="btn btn-outline-primary" for="mismatch2">
+                                        <i class="bi bi-filter"></i> 2 - Relaxed
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    <strong>Standard (1)</strong> recommended for gene synthesis.
+                                    <a href="#" data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="0=Perfect repeats only; 1=Allow 1 mismatch (recommended); 2=Allow 2 mismatches">
+                                        <i class="bi bi-info-circle"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="palindromeMinLen" class="form-label">Palindrome: Min Length</label>
+                                <input type="number" class="form-control" id="palindromeMinLen" value="15">
+                                <div class="form-text">Minimum palindrome length. Default 15.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="invertedMinStemLen" class="form-label">Inverted: Min Stem Length</label>
+                                <input type="number" class="form-control" id="invertedMinStemLen" value="10">
+                                <div class="form-text">Minimum stem length for hairpin/inverted. Default 10.</div>
                             </div>
                         </div>
                     </form>
@@ -283,6 +334,12 @@
       setTimeout(function() {
         initializeHandsontable();
       }, 100);
+
+      // Initialize Bootstrap tooltips for info icons
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
     });
 
     function initializeHandsontable() {
@@ -451,6 +508,14 @@
         formData.append('windowSize', document.getElementById('windowSize').value);
         formData.append('minGCContent', document.getElementById('minGCContent').value);
         formData.append('maxGCContent', document.getElementById('maxGCContent').value);
+        // New feature parameters
+        formData.append('tandemMinUnit', document.getElementById('tandemMinUnit').value);
+        formData.append('tandemMinCopies', document.getElementById('tandemMinCopies').value);
+        // Get selected radio button value for tandemMaxMismatch
+        const selectedMismatch = document.querySelector('input[name="tandemMaxMismatch"]:checked');
+        formData.append('tandemMaxMismatch', selectedMismatch ? selectedMismatch.value : '1');
+        formData.append('palindromeMinLen', document.getElementById('palindromeMinLen').value);
+        formData.append('invertedMinStemLen', document.getElementById('invertedMinStemLen').value);
 
         fetch('/tools/SequenceAnalyzer/', {
             method: 'POST',

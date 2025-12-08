@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TCR突变位点Mini Gene提取工具
+突变位点 Mini Gene提取工具
 从Excel文件中提取HGVSc和HGVSp信息，生成29个氨基酸长度的mini gene片段
 """
 

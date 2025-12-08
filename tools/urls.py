@@ -20,4 +20,7 @@ urlpatterns = [
 
     # 5 mini gene
     path('MiniGeneExtractor/', views.MiniGeneExtractorView.as_view(), name='MiniGeneExtractor'),
+
+    # 6 Sequence Analysis API (对外开放)
+    path('api/sequence-analysis/', views.sequence_analysis_api, name='sequence_analysis_api'),
 ]

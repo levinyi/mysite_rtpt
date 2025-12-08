@@ -100,41 +100,111 @@ class DNARepeatsFinder:
         return penalty_score
 
     # 1) Tandem Repeats
-    def find_tandem_repeats(self, index=None, min_unit=3, min_copies=3):
+    def find_tandem_repeats(self, index=None, min_unit=3, min_copies=4, max_mismatch=1):
+        """
+        查找串联重复序列
+        参数:
+            min_unit: 最小重复单元长度，默认3
+            min_copies: 最小重复次数，默认4
+            max_mismatch: 允许的最大错配数，默认1（考虑中间 mismatch 的情况）
+        罚分规则: (total_length - 15) / 2 if length > 15 else 0
+        """
         s, sa, lcp = self._get_sequence_data(index)
         n = len(s)
-        
+
         repeats_temp = []
-        for i in range(n):
-            for unit_length in range(min_unit, n - sa[i]):
-                repeat_unit = s[sa[i]:sa[i] + unit_length]
+        checked_positions = set()  # 避免重复检查
+
+        # 🔧 完全重写：正确的串联重复检测逻辑
+        # 遍历序列的每个位置（不使用suffix array的方式，直接遍历）
+        MAX_UNIT_LENGTH = 50
+
+        for start_pos in range(n):
+            if start_pos in checked_positions:
+                continue
+
+            # 尝试不同的重复单元长度
+            for unit_length in range(min_unit, min(MAX_UNIT_LENGTH, (n - start_pos) // min_copies + 1)):
+                repeat_unit = s[start_pos:start_pos + unit_length]
+
+                # 跳过同聚物（由其他算法处理）
                 if self.is_homopolymer(repeat_unit):
                     continue
 
-                repeat_count = 1
-                for j in range(sa[i] + unit_length, n, unit_length):
-                    if s[j:j + unit_length] == repeat_unit:
+                # 检查从当前位置开始，这个单元重复了多少次
+                repeat_count = 0
+                total_mismatches = 0
+                pos = start_pos
+
+                while pos + unit_length <= n:
+                    current_segment = s[pos:pos + unit_length]
+                    # 计算错配数
+                    mismatches = sum(1 for k in range(unit_length) if current_segment[k] != repeat_unit[k])
+
+                    if mismatches <= max_mismatch:
                         repeat_count += 1
+                        total_mismatches += mismatches
+                        pos += unit_length
                     else:
                         break
 
+                # 如果找到了足够的重复
                 if repeat_count >= min_copies:
                     actual_length = repeat_count * unit_length
+
+                    # 🔧 修复：添加身份阈值检查，避免假阳性
+                    # 计算总体身份百分比（匹配碱基数/总碱基数）
+                    total_bases = actual_length
+                    matching_bases = total_bases - total_mismatches
+                    identity_percent = matching_bases / total_bases if total_bases > 0 else 0
+
+                    # 要求至少85%的身份（即最多15%错配率）
+                    # 这确保检测到的是真正的串联重复，而不是随机相似序列
+                    # 真正的串联重复应该是大部分copy完美匹配，只有少数突变
+                    # 例如：18bp重复，最多允许2个错配 (88.9% identity) ✓
+                    #       18bp重复，3个错配 (83.3% identity) ✗ 太多突变
+                    MIN_IDENTITY = 0.85
+
+                    if identity_percent < MIN_IDENTITY:
+                        # 身份太低，不是真正的串联重复，跳过
+                        continue
+
+                    end_pos = start_pos + actual_length - 1
+
                     repeats_temp.append({
-                        'sequence': repeat_unit * repeat_count,
-                        'start': sa[i],
-                        'end': sa[i] + actual_length - 1,
+                        'sequence': s[start_pos:start_pos + actual_length],
+                        'start': start_pos,
+                        'end': end_pos,
+                        'mismatches': total_mismatches,
+                        'unit': repeat_unit,
+                        'unit_length': unit_length,
                     })
+
+                    # 标记这些位置已检查，避免重复
+                    for p in range(start_pos, start_pos + actual_length):
+                        checked_positions.add(p)
+
+                    # 找到一个重复后，跳出unit_length循环
+                    break
+
         # 根据start位置对repeats_temp进行排序
         repeats_temp.sort(key=lambda x: x['start'])
-        # 合并重复序列
+
+        # 🔧 修复：改进合并逻辑，只合并相同重复单元的重复
         repeats = []
         for repeat in repeats_temp:
             if repeats and repeats[-1]['end'] >= repeat['start'] - 1:
-                old_end = repeats[-1]['end']
-                new_end = max(old_end, repeat['end'])
-                repeats[-1]['end'] = new_end
-                repeats[-1]['sequence'] = s[repeats[-1]['start']:new_end + 1]
+                # 检查重复单元是否相同
+                if repeats[-1].get('unit') == repeat.get('unit'):
+                    # 相同重复单元，可以合并
+                    old_end = repeats[-1]['end']
+                    new_end = max(old_end, repeat['end'])
+                    repeats[-1]['end'] = new_end
+                    repeats[-1]['sequence'] = s[repeats[-1]['start']:new_end + 1]
+                else:
+                    # 不同重复单元，选择更长的保留
+                    if repeat['end'] - repeat['start'] > repeats[-1]['end'] - repeats[-1]['start']:
+                        repeats[-1] = repeat
             else:
                 repeats.append(repeat)
 
@@ -142,6 +212,12 @@ class DNARepeatsFinder:
             repeat['length'] = len(repeat['sequence'])
             repeat['gc_content'] = self.gc_percent(repeat['sequence'])
             repeat['penalty_score'] = self.calculate_tandem_repeats_penalty_score(repeat['length'])
+            # 🔧 修复：清理临时字段
+            repeat.pop('unit', None)
+            repeat.pop('unit_length', None)
+
+        # 🔧 过滤：只保留长度>15bp的串联重复（因为≤15bp的罚分都是0，不需要报告）
+        repeats = [r for r in repeats if r['length'] > 15]
 
         return repeats
 
@@ -210,67 +286,143 @@ class DNARepeatsFinder:
 
     # 3) Palindrome Repeats
     def find_palindrome_repeats(self, index=None, min_len=15):
+        """
+        查找DNA回文序列（Palindromic Sequences）
+
+        DNA回文定义：序列等于其反向互补序列
+        例如：
+        - ATCGAT → 反向互补 ATCGAT (相同，是DNA回文)
+        - GAATTC → 反向互补 GAATTC (EcoRI限制性位点)
+        - CGGGGGC → 反向互补 GCCCCCG (不同，不是DNA回文)
+
+        注意：这不是字符串回文！字符串回文如 "ABCBA"，但DNA回文基于碱基互补配对。
+
+        参数:
+            min_len: 最小回文长度，默认15 (必须是偶数)
+        排除规则: 排除两个碱基交替组合的 repeats（如 ATATATAT），长度≥8
+        罚分规则: (length - 15) / 2 if length > 15 else 0
+        """
         s, sa, lcp = self._get_sequence_data(index)
 
         n = len(s)
         palindromes = []
-        excluded_combinations = {"AT", "TA", "CG", "GC","AC", "CA", "GT", "TG"}
+        excluded_combinations = {"AT", "TA", "CG", "GC", "AC", "CA", "GT", "TG"}
+
+        # 🔧 修复：DNA回文必须是偶数长度，确保 min_len 是偶数
+        if min_len % 2 != 0:
+            min_len += 1  # 如果是奇数，调整为下一个偶数
 
         def is_excluded(sequence):
-            if len(set(sequence)) == 2 and sequence[:2] in excluded_combinations:
-                return True
-            return False
-        
-        # 遍历每个可能的中心点
-        for center in range(n):
-            # 奇数长度的回文
-            start, end = center, center
-            while start >= 0 and end < n and s[start] == s[end]:
-                if end - start + 1 >= min_len:
-                    palindromes.append({
-                        'sequence': s[start:end+1],
-                        'start': start,
-                        'end': end,
-                        'length': end - start + 1,
-                        'penalty_score': self.calculate_palindrome_repeats_penalty_score(end - start + 1),
-                    })
-                start -= 1
-                end += 1
-            
-            # 偶数长度的回文
-            start, end = center, center + 1
-            while start >= 0 and end < n and s[start] == s[end]:
-                if end - start + 1 >= min_len:
-                    palindromes.append({
-                        'sequence': s[start:end+1],
-                        'start': start,
-                        'end': end,
-                        'length': end - start + 1,
-                        'penalty_score': self.calculate_palindrome_repeats_penalty_score(end - start + 1),
-                    })
-                start -= 1
-                end += 1
-        
-        # 合并重复序列
-        palindromes.sort(key=lambda x: x['start'])
+            """
+            检查是否应该排除：
+            - 长度≥8
+            - 只包含两种碱基
+            - 这两种碱基交替出现（如 ATATAT 或 CGCGCG）
+            """
+            if len(sequence) < 8:
+                return False
 
-        merged_palindromes = []
-        for palindrome in palindromes:
-            if merged_palindromes and merged_palindromes[-1]['end'] >= palindrome['start'] - 1:
-                old_end = merged_palindromes[-1]['end']
-                new_end = max(old_end, palindrome['end'])
-                merged_palindromes[-1]['end'] = new_end
-                merged_palindromes[-1]['sequence'] = s[merged_palindromes[-1]['start']:new_end + 1]
-                merged_palindromes[-1]['length'] = new_end - merged_palindromes[-1]['start'] + 1
-                merged_palindromes[-1]['gc_content'] = self.gc_percent(merged_palindromes[-1]['sequence'])
-                merged_palindromes[-1]['penalty_score'] = self.calculate_palindrome_repeats_penalty_score(merged_palindromes[-1]['length'])
-            else:
-                merged_palindromes.append(palindrome)
+            unique_bases = set(sequence)
+            if len(unique_bases) != 2:
+                return False
 
-        return merged_palindromes
+            # 检查前两个字符的组合是否在排除列表中
+            if sequence[:2] not in excluded_combinations:
+                return False
 
-    # 4) Inverted Repeats
-    def find_inverted_repeats(self, index=None, min_len=10):
+            # 检查是否为交替模式
+            pattern = sequence[:2]
+            expected = (pattern * (len(sequence) // 2 + 1))[:len(sequence)]
+            return sequence == expected
+
+        def reverse_complement(seq):
+            """计算反向互补序列"""
+            complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
+            return ''.join(complement[base] for base in reversed(seq.upper()))
+
+        def is_dna_palindrome(seq):
+            """检查是否是DNA回文（序列 == 反向互补）"""
+            return seq == reverse_complement(seq)
+
+        # 遍历所有可能的子序列，查找DNA回文
+        # DNA回文必须是偶数长度（因为序列必须等于其反向互补）
+        for start in range(n - min_len + 1):
+            # 只检查偶数长度的序列
+            for length in range(min_len, min(n - start + 1, 200), 2):  # 限制最大长度200以提高效率
+                end = start + length - 1
+                seq = s[start:end + 1]
+
+                # 检查是否是DNA回文
+                if is_dna_palindrome(seq):
+                    # 应用排除规则
+                    if not is_excluded(seq):
+                        palindromes.append({
+                            'sequence': seq,
+                            'start': start,
+                            'end': end,
+                            'length': length,
+                            'gc_content': self.gc_percent(seq),
+                            'penalty_score': self.calculate_palindrome_repeats_penalty_score(length),
+                        })
+
+        # 过滤重叠的回文，保留较长的
+        filtered_palindromes = self._filter_overlapping_palindromes(palindromes)
+
+        # 按起始位置排序
+        filtered_palindromes.sort(key=lambda x: x['start'])
+
+        return filtered_palindromes
+
+    def _filter_overlapping_palindromes(self, palindromes):
+        """
+        过滤重叠的回文序列，保留较长的
+        策略：如果两个回文重叠超过50%，只保留较长的
+        """
+        if not palindromes:
+            return []
+
+        # 按长度降序排序
+        sorted_palindromes = sorted(palindromes, key=lambda x: x['length'], reverse=True)
+
+        selected = []
+        for candidate in sorted_palindromes:
+            # 检查是否与已选择的回文显著重叠
+            is_overlapping = False
+
+            for selected_item in selected:
+                overlap = self._calculate_overlap(
+                    candidate['start'], candidate['end'],
+                    selected_item['start'], selected_item['end']
+                )
+
+                # 计算重叠比例
+                candidate_len = candidate['end'] - candidate['start'] + 1
+                overlap_ratio = overlap / candidate_len if candidate_len > 0 else 0
+
+                # 如果重叠超过50%，认为显著重叠
+                if overlap_ratio > 0.5:
+                    is_overlapping = True
+                    break
+
+            if not is_overlapping:
+                selected.append(candidate)
+
+        return selected
+
+    # 4) Inverted Repeats (包含 Hairpin 和 Inverted Repeats)
+    def find_inverted_repeats(self, index=None, min_stem_len=10):
+        """
+        查找倒置重复序列（包括 hairpin 和 inverted repeats）
+        参数:
+            min_stem_len: 最小 stem 长度，默认10
+
+        分类和罚分规则:
+        1. Hairpin: Stem >= 10, loop 4-8 bp
+           罚分: stem_length - 9
+
+        2. Inverted Repeats: Stem >= 16, loop >= 8 or <= 3
+           罚分: ((stem_length - 15) / 2) * count
+        """
         s, sa, lcp = self._get_sequence_data(index)
         n = len(s)
 
@@ -278,38 +430,174 @@ class DNARepeatsFinder:
             complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
             return ''.join(complement[base] for base in reversed(seq.upper()))
 
-        # 构建反向互补序列的索引
-        rev_comp_index = {}
-        for i in range(n):
-            for length in range(min_len, n - i + 1):
-                segment = s[i:i + length]
-                rev_comp = reverse_complement(segment)
-                if rev_comp not in rev_comp_index:
-                    rev_comp_index[rev_comp] = []
-                rev_comp_index[rev_comp].append((i, length))
-
+        hairpins = []
         inverted_repeats = []
-        # 检索可能的倒置重复
-        for i in range(n - min_len + 1):
-            for length in range(min_len, n - i + 1):
-                segment = s[i:i + length]
-                if segment in rev_comp_index:
-                    for j, l in rev_comp_index[segment]:
-                        if i + length <= j:  # 确保不重叠
-                            distance = j - (i + length)
-                            inverted_repeats.append({
-                                'sequence': segment,
-                                'inverted_sequence': segment,
-                                'start1': i,
-                                'end1': i + length - 1,
-                                'start2': j,
-                                'end2': j + l - 1,
-                                'length': l,
-                                'distance': distance,
-                                'penalty_score': self.calculate_inverted_repeats_penalty_score(len(segment), distance),
-                            })
 
-        return inverted_repeats
+        # 统计相同 stem 序列出现的次数（用于 inverted repeats 的 count）
+        stem_counts = {}
+
+        # 遍历序列查找所有可能的倒置重复
+        for i in range(n):
+            max_stem = min(n - i, 100)  # 限制最大 stem 长度以提高效率
+
+            for stem_len in range(min_stem_len, max_stem):
+                stem1 = s[i:i + stem_len]
+                stem1_rc = reverse_complement(stem1)
+
+                # 在 stem1 之后查找其反向互补序列
+                search_start = i + stem_len
+
+                # 使用字符串查找方法寻找反向互补序列
+                pos = search_start
+                while pos < n:
+                    idx = s.find(stem1_rc, pos)
+                    if idx == -1:
+                        break
+
+                    # 计算 loop 长度
+                    loop_length = idx - (i + stem_len)
+
+                    if loop_length < 0:  # 重叠的情况，跳过
+                        pos = idx + 1
+                        continue
+
+                    stem2_end = idx + stem_len
+
+                    # 分类为 hairpin 或 inverted repeats
+                    if stem_len >= 10 and 4 <= loop_length <= 8:
+                        # Hairpin 结构
+                        penalty = stem_len - 9
+                        hairpins.append({
+                            'type': 'hairpin',
+                            'stem_sequence': stem1,
+                            'stem_length': stem_len,
+                            'stem1_start': i,
+                            'stem1_end': i + stem_len - 1,
+                            'stem2_start': idx,
+                            'stem2_end': stem2_end - 1,
+                            'loop_sequence': s[i + stem_len:idx],
+                            'loop_length': loop_length,
+                            'full_sequence': s[i:stem2_end],
+                            'penalty_score': round(penalty, 1),
+                        })
+
+                    elif stem_len >= 16 and (loop_length >= 8 or loop_length <= 3):
+                        # Inverted Repeats 结构
+                        # 统计这个 stem 序列的出现次数
+                        stem_key = (stem1, stem_len)
+                        if stem_key not in stem_counts:
+                            stem_counts[stem_key] = []
+                        stem_counts[stem_key].append({
+                            'stem1_start': i,
+                            'stem1_end': i + stem_len - 1,
+                            'stem2_start': idx,
+                            'stem2_end': stem2_end - 1,
+                            'loop_length': loop_length,
+                            'loop_sequence': s[i + stem_len:idx],
+                            'full_sequence': s[i:stem2_end],
+                        })
+
+                    pos = idx + 1
+
+        # 处理 inverted repeats，计算每个 stem 的 count 和罚分
+        for (stem_seq, stem_len), occurrences in stem_counts.items():
+            count = len(occurrences)
+            base_penalty = (stem_len - 15) / 2 if stem_len > 15 else 0
+            total_penalty = base_penalty * count
+
+            for occ in occurrences:
+                inverted_repeats.append({
+                    'type': 'inverted_repeat',
+                    'stem_sequence': stem_seq,
+                    'stem_length': stem_len,
+                    'stem1_start': occ['stem1_start'],
+                    'stem1_end': occ['stem1_end'],
+                    'stem2_start': occ['stem2_start'],
+                    'stem2_end': occ['stem2_end'],
+                    'loop_sequence': occ['loop_sequence'],
+                    'loop_length': occ['loop_length'],
+                    'full_sequence': occ['full_sequence'],
+                    'count': count,
+                    'penalty_score': round(total_penalty, 1),
+                })
+
+        # 合并 hairpins 和 inverted_repeats
+        all_results = hairpins + inverted_repeats
+
+        # 过滤重叠的结构，保留最显著的
+        filtered_results = self._filter_overlapping_inverted_repeats(all_results)
+
+        # 按起始位置排序
+        filtered_results.sort(key=lambda x: x['stem1_start'])
+
+        return filtered_results
+
+    def _filter_overlapping_inverted_repeats(self, results):
+        """
+        过滤重叠的倒置重复结构，保留最显著的
+        策略：
+        1. 优先保留 stem 更长的结构
+        2. 对于相同起始位置的结构，只保留最长的
+        3. 对于显著重叠（>50% overlap）的结构，保留更高分的
+        """
+        if not results:
+            return []
+
+        # 按 stem_length 降序排序（优先保留长的）, 然后按 penalty_score 降序
+        sorted_results = sorted(results,
+                               key=lambda x: (x['stem_length'], x['penalty_score']),
+                               reverse=True)
+
+        selected = []
+
+        for candidate in sorted_results:
+            # 检查是否与已选择的结构显著重叠
+            is_overlapping = False
+
+            for selected_item in selected:
+                if self._has_significant_overlap(candidate, selected_item):
+                    is_overlapping = True
+                    break
+
+            if not is_overlapping:
+                selected.append(candidate)
+
+        return selected
+
+    def _has_significant_overlap(self, struct1, struct2):
+        """
+        检查两个倒置重复结构是否显著重叠
+        判断标准：
+        - 如果 stem1 区域重叠超过50%，认为显著重叠
+        - 或者 stem2 区域重叠超过50%，认为显著重叠
+        """
+        # 计算 stem1 的重叠
+        stem1_overlap = self._calculate_overlap(
+            struct1['stem1_start'], struct1['stem1_end'],
+            struct2['stem1_start'], struct2['stem1_end']
+        )
+
+        # 计算 stem2 的重叠
+        stem2_overlap = self._calculate_overlap(
+            struct1['stem2_start'], struct1['stem2_end'],
+            struct2['stem2_start'], struct2['stem2_end']
+        )
+
+        # 计算重叠比例
+        len1 = struct1['stem1_end'] - struct1['stem1_start'] + 1
+        len2 = struct2['stem1_end'] - struct2['stem1_start'] + 1
+
+        stem1_overlap_ratio = stem1_overlap / min(len1, len2) if min(len1, len2) > 0 else 0
+        stem2_overlap_ratio = stem2_overlap / min(len1, len2) if min(len1, len2) > 0 else 0
+
+        # 如果任一区域重叠超过50%，认为显著重叠
+        return stem1_overlap_ratio > 0.5 or stem2_overlap_ratio > 0.5
+
+    def _calculate_overlap(self, start1, end1, start2, end2):
+        """计算两个区间的重叠长度"""
+        overlap_start = max(start1, start2)
+        overlap_end = min(end1, end2)
+        return max(0, overlap_end - overlap_start + 1)
 
     # 5) Homopolymers
     def find_homopolymers(self, index=None, min_len=7):
@@ -514,8 +802,20 @@ class DNARepeatsFinder:
 
 
 def convert_gene_table_to_RepeatsFinder_Format(gene_table, long_repeats_min_len=16, homopolymers_min_len=7,
-                                               min_w_length=12, min_s_length=12, window_size=30, 
-                                               min_gc_content=20, max_gc_content=80):
+                                               min_w_length=12, min_s_length=12, window_size=30,
+                                               min_gc_content=20, max_gc_content=80,
+                                               tandem_min_unit=3, tandem_min_copies=4, tandem_max_mismatch=1,
+                                               palindrome_min_len=15, inverted_min_stem_len=10):
+    """
+    将基因表格转换为 RepeatsFinder 格式
+
+    新增参数:
+        tandem_min_unit: Tandem Repeats 最小单元长度，默认3
+        tandem_min_copies: Tandem Repeats 最小重复次数，默认4
+        tandem_max_mismatch: Tandem Repeats 最大错配数，默认1
+        palindrome_min_len: Palindrome Repeats 最小长度，默认15
+        inverted_min_stem_len: Inverted Repeats 最小 stem 长度，默认10
+    """
     finder_dataset = DNARepeatsFinder(data_set=gene_table)
 
     results = {}
@@ -529,9 +829,16 @@ def convert_gene_table_to_RepeatsFinder_Format(gene_table, long_repeats_min_len=
             'lowGC': finder_dataset.find_low_gc_content(index=index, window_size=window_size, min_GC_content=min_gc_content),
             # 'LCC': finder_dataset.get_lcc(index=index),
             'doubleNT': finder_dataset.find_dinucleotide_repeats(index=index, threshold=12),
+            # ========== 新增三个分析方法 ==========
+            'TandemRepeats': finder_dataset.find_tandem_repeats(index=index, min_unit=tandem_min_unit,
+                                                                min_copies=tandem_min_copies,
+                                                                max_mismatch=tandem_max_mismatch),
+            'PalindromeRepeats': finder_dataset.find_palindrome_repeats(index=index, min_len=palindrome_min_len),
+            'InvertedRepeats': finder_dataset.find_inverted_repeats(index=index, min_stem_len=inverted_min_stem_len),
+            # ====================================
             'length': len(finder_dataset._get_sequence_data(index)[0])
         }
-    
+
     # print(json.dumps(results, indent=4))
     return results
 
@@ -591,14 +898,26 @@ def process_gene_table_results(data):
         highGC_penalty = calculate_total_penalty_score(details.get("highGC", []))
         lowGC_penalty = calculate_total_penalty_score(details.get("lowGC", []))
         doubleNT_penalty = calculate_total_penalty_score(details.get("doubleNT", []))
+        # ========== 新增三个特征的惩罚分 ==========
+        tandem_repeats_penalty = calculate_total_penalty_score(details.get("TandemRepeats", []))
+        palindrome_repeats_penalty = calculate_total_penalty_score(details.get("PalindromeRepeats", []))
+        inverted_repeats_penalty = calculate_total_penalty_score(details.get("InvertedRepeats", []))
 
-        # 2) 各特征总长度  ←←← 新增
+        # 2) 各特征总长度
         long_repeats_len = calculate_total_feature_length(details.get("LongRepeats", []))
         homopolymers_len = calculate_total_feature_length(details.get("Homopolymers", []))
         w12s12motifs_len = calculate_total_feature_length(details.get("W12S12Motifs", []))
         highGC_len = calculate_total_feature_length(details.get("highGC", []))
         lowGC_len = calculate_total_feature_length(details.get("lowGC", []))
         doubleNT_len = calculate_total_feature_length(details.get("doubleNT", []))
+        # ========== 新增三个特征的总长度 ==========
+        tandem_repeats_len = calculate_total_feature_length(details.get("TandemRepeats", []))
+        palindrome_repeats_len = calculate_total_feature_length(details.get("PalindromeRepeats", []))
+        # InvertedRepeats 长度计算需要特殊处理（stem1 + loop + stem2）
+        inverted_repeats_len = sum(
+            item.get('stem_length', 0) * 2 + item.get('loop_length', 0)
+            for item in details.get("InvertedRepeats", [])
+        )
 
         record = {
             "GeneName": gene,
@@ -616,6 +935,16 @@ def process_gene_table_results(data):
             "LowGC_penalty_score": lowGC_penalty,
             "DoubleNT": format_feature_data(details.get("doubleNT", []), ["sequence", "start", "end", "length", "gc_content"]),
             "DoubleNT_penalty_score": doubleNT_penalty,
+            # ========== 新增三个特征 ==========
+            "TandemRepeats": format_feature_data(details.get("TandemRepeats", []), ["sequence", "start", "end", "length", "gc_content"]),
+            "TandemRepeats_penalty_score": tandem_repeats_penalty,
+            "PalindromeRepeats": format_feature_data(details.get("PalindromeRepeats", []), ["sequence", "start", "end", "length", "gc_content"]),
+            "PalindromeRepeats_penalty_score": palindrome_repeats_penalty,
+            "InvertedRepeats": format_feature_data(details.get("InvertedRepeats", []),
+                                                    ["type", "stem_sequence", "stem_length", "stem1_start", "stem1_end",
+                                                     "stem2_start", "stem2_end", "loop_length", "loop_sequence"]),
+            "InvertedRepeats_penalty_score": inverted_repeats_penalty,
+            # ====================================
             # ------------- ★ 新增的总长度列 ★ -------------
             "LongRepeats_total_length": long_repeats_len,
             "Homopolymers_total_length": homopolymers_len,
@@ -623,6 +952,11 @@ def process_gene_table_results(data):
             "HighGC_total_length": highGC_len,
             "LowGC_total_length": lowGC_len,
             "DoubleNT_total_length": doubleNT_len,
+            # ========== 新增三个特征的总长度 ==========
+            "TandemRepeats_total_length": tandem_repeats_len,
+            "PalindromeRepeats_total_length": palindrome_repeats_len,
+            "InvertedRepeats_total_length": inverted_repeats_len,
+            # ====================================
         }
         records.append(record)
 

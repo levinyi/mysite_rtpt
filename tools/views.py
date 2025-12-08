@@ -400,6 +400,15 @@ def SequenceAnalyzer(request):
         window_size = int(request.POST.get('windowSize', 30))
         min_gc_content = int(request.POST.get('minGCContent', 20))
         max_gc_content = int(request.POST.get('maxGCContent', 80))
+        # ========== 新增三个特征的参数 ==========
+        tandem_min_unit = int(request.POST.get('tandemMinUnit', 3))
+        tandem_min_copies = int(request.POST.get('tandemMinCopies', 4))
+        # Validate tandem_max_mismatch: only allow 0, 1, 2
+        tandem_max_mismatch = int(request.POST.get('tandemMaxMismatch', 1))
+        if tandem_max_mismatch not in [0, 1, 2]:
+            tandem_max_mismatch = 1  # Default to standard mode
+        palindrome_min_len = int(request.POST.get('palindromeMinLen', 15))
+        inverted_min_stem_len = int(request.POST.get('invertedMinStemLen', 10))
 
         data = convert_gene_table_to_RepeatsFinder_Format(
             gene_table,
@@ -409,7 +418,13 @@ def SequenceAnalyzer(request):
             min_s_length=min_s_length,
             window_size=window_size,
             min_gc_content=min_gc_content,
-            max_gc_content=max_gc_content
+            max_gc_content=max_gc_content,
+            # ========== 新增三个特征的参数 ==========
+            tandem_min_unit=tandem_min_unit,
+            tandem_min_copies=tandem_min_copies,
+            tandem_max_mismatch=tandem_max_mismatch,
+            palindrome_min_len=palindrome_min_len,
+            inverted_min_stem_len=inverted_min_stem_len
         )
         # 处理数据并获取结果 DataFrame
         result_df = process_gene_table_results(data)
@@ -426,10 +441,12 @@ def SequenceAnalyzer(request):
         # weights_path = 'tools/scripts/best_rf_weights_12.npy'
         # scale_path = None
         # result_df = predict_new_data_from_df(result_df, model_path, scaler=scale_path, weights_path=weights_path)
-        # 不预测就没有 ‘total_penalty_score’ 这一列, 所以要单独添加
+        # 不预测就没有 'total_penalty_score' 这一列, 所以要单独添加
         feature_columns = [
-            'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score','LongRepeats_penalty_score', 
-            'Homopolymers_penalty_score', 'DoubleNT_penalty_score'
+            'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score','LongRepeats_penalty_score',
+            'Homopolymers_penalty_score', 'DoubleNT_penalty_score',
+            # ========== 新增三个特征的惩罚分 ==========
+            'TandemRepeats_penalty_score', 'PalindromeRepeats_penalty_score', 'InvertedRepeats_penalty_score'
         ]
         result_df['total_penalty_score'] = sum(result_df[col] for col in feature_columns).round(2)
         
@@ -990,6 +1007,254 @@ def SplitEnzymeSite(request):
 
 def Seq2AA(request):
     return render(request, 'tools/tools_Seq2AA.html')
+
+
+# ==================== Sequence Analysis API ====================
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def sequence_analysis_api(request):
+    """
+    对外开放的序列分析 API
+
+    接受 POST 请求，分析 DNA 序列的重复特征和 GC 含量。
+
+    **请求格式 (JSON):**
+    ```json
+    {
+        "sequences": [
+            {
+                "gene_id": "Gene1",
+                "sequence": "ATCGATCGATCG..."
+            },
+            {
+                "gene_id": "Gene2",
+                "sequence": "GCTAGCTAGCTA..."
+            }
+        ],
+        "parameters": {
+            "long_repeats_min_len": 16,
+            "homopolymers_min_len": 7,
+            "min_w_length": 12,
+            "min_s_length": 12,
+            "window_size": 30,
+            "min_gc_content": 20,
+            "max_gc_content": 80,
+            "tandem_min_unit": 3,
+            "tandem_min_copies": 4,
+            "tandem_max_mismatch": 1,
+            "palindrome_min_len": 15,
+            "inverted_min_stem_len": 10
+        }
+    }
+    ```
+
+    **响应格式 (JSON):**
+    ```json
+    {
+        "status": "success",
+        "message": "Analysis completed successfully",
+        "data": {
+            "Gene1": {
+                "summary": {
+                    "total_length": 1000,
+                    "total_penalty_score": 25.5,
+                    "LongRepeats_penalty_score": 5.0,
+                    "Homopolymers_penalty_score": 3.5,
+                    "W12S12Motifs_penalty_score": 2.0,
+                    "HighGC_penalty_score": 4.0,
+                    "LowGC_penalty_score": 3.0,
+                    "DoubleNT_penalty_score": 2.0,
+                    "TandemRepeats_penalty_score": 3.0,
+                    "PalindromeRepeats_penalty_score": 2.0,
+                    "InvertedRepeats_penalty_score": 1.0
+                },
+                "features": {
+                    "LongRepeats": [...],
+                    "Homopolymers": [...],
+                    "W12S12Motifs": [...],
+                    "HighGC": [...],
+                    "LowGC": [...],
+                    "DoubleNT": [...],
+                    "TandemRepeats": [...],
+                    "PalindromeRepeats": [...],
+                    "InvertedRepeats": [...]
+                }
+            }
+        }
+    }
+    ```
+
+    **错误响应:**
+    ```json
+    {
+        "status": "error",
+        "message": "Error description"
+    }
+    ```
+    """
+    try:
+        # 1. 解析请求数据
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid JSON format'
+            }, status=400)
+
+        # 2. 验证必需字段
+        if 'sequences' not in data:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Missing required field: sequences'
+            }, status=400)
+
+        sequences = data.get('sequences', [])
+        if not sequences:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'sequences list cannot be empty'
+            }, status=400)
+
+        # 3. 验证序列数量限制（防止滥用）
+        MAX_SEQUENCES = 1000
+        if len(sequences) > MAX_SEQUENCES:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Too many sequences. Maximum allowed: {MAX_SEQUENCES}'
+            }, status=400)
+
+        # 4. 提取参数（使用默认值）
+        params = data.get('parameters', {})
+        long_repeats_min_len = params.get('long_repeats_min_len', 16)
+        homopolymers_min_len = params.get('homopolymers_min_len', 7)
+        min_w_length = params.get('min_w_length', 12)
+        min_s_length = params.get('min_s_length', 12)
+        window_size = params.get('window_size', 30)
+        min_gc_content = params.get('min_gc_content', 20)
+        max_gc_content = params.get('max_gc_content', 80)
+        tandem_min_unit = params.get('tandem_min_unit', 3)
+        tandem_min_copies = params.get('tandem_min_copies', 4)
+        # Validate tandem_max_mismatch: only allow 0, 1, 2
+        tandem_max_mismatch = params.get('tandem_max_mismatch', 1)
+        if tandem_max_mismatch not in [0, 1, 2]:
+            tandem_max_mismatch = 1  # Default to standard mode
+        palindrome_min_len = params.get('palindrome_min_len', 15)
+        inverted_min_stem_len = params.get('inverted_min_stem_len', 10)
+
+        # 5. 构建 DataFrame
+        gene_data = []
+        for seq_item in sequences:
+            if 'gene_id' not in seq_item or 'sequence' not in seq_item:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Each sequence must have gene_id and sequence fields'
+                }, status=400)
+
+            gene_id = seq_item['gene_id']
+            sequence = seq_item['sequence'].upper().replace(' ', '').replace('\n', '').replace('\r', '')
+
+            # 验证序列只包含 ATCG
+            if not all(base in 'ATCG' for base in sequence):
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Invalid sequence for {gene_id}. Only ATCG characters allowed.'
+                }, status=400)
+
+            # 验证序列长度
+            if len(sequence) == 0:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Empty sequence for {gene_id}'
+                }, status=400)
+
+            if len(sequence) > 50000:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Sequence too long for {gene_id}. Maximum length: 50000 bp'
+                }, status=400)
+
+            gene_data.append({
+                'gene_id': gene_id,
+                'sequence': sequence
+            })
+
+        # 6. 转换为 DataFrame
+        gene_table = pd.DataFrame(gene_data)
+
+        # 7. 调用分析函数
+        analysis_results = convert_gene_table_to_RepeatsFinder_Format(
+            gene_table,
+            long_repeats_min_len=long_repeats_min_len,
+            homopolymers_min_len=homopolymers_min_len,
+            min_w_length=min_w_length,
+            min_s_length=min_s_length,
+            window_size=window_size,
+            min_gc_content=min_gc_content,
+            max_gc_content=max_gc_content,
+            tandem_min_unit=tandem_min_unit,
+            tandem_min_copies=tandem_min_copies,
+            tandem_max_mismatch=tandem_max_mismatch,
+            palindrome_min_len=palindrome_min_len,
+            inverted_min_stem_len=inverted_min_stem_len
+        )
+
+        # 8. 处理结果
+        result_df = process_gene_table_results(analysis_results)
+
+        # 9. 计算总惩罚分
+        feature_columns = [
+            'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score', 'LongRepeats_penalty_score',
+            'Homopolymers_penalty_score', 'DoubleNT_penalty_score',
+            'TandemRepeats_penalty_score', 'PalindromeRepeats_penalty_score', 'InvertedRepeats_penalty_score'
+        ]
+        result_df['total_penalty_score'] = sum(result_df[col] for col in feature_columns).round(2)
+
+        # 10. 格式化输出
+        response_data = []
+        for _, row in result_df.iterrows():
+            gene_id = row['GeneName']
+            response_data.append({
+                'gene_id': gene_id,
+                'summary': {
+                    'total_length': int(row['Total_Length']),
+                    'total_penalty_score': float(row['total_penalty_score']),
+                    'LongRepeats_penalty_score': float(row['LongRepeats_penalty_score']),
+                    'Homopolymers_penalty_score': float(row['Homopolymers_penalty_score']),
+                    'W12S12Motifs_penalty_score': float(row['W12S12Motifs_penalty_score']),
+                    'HighGC_penalty_score': float(row['HighGC_penalty_score']),
+                    'LowGC_penalty_score': float(row['LowGC_penalty_score']),
+                    'DoubleNT_penalty_score': float(row['DoubleNT_penalty_score']),
+                    'TandemRepeats_penalty_score': float(row['TandemRepeats_penalty_score']),
+                    'PalindromeRepeats_penalty_score': float(row['PalindromeRepeats_penalty_score']),
+                    'InvertedRepeats_penalty_score': float(row['InvertedRepeats_penalty_score']),
+                    'LongRepeats_total_length': int(row['LongRepeats_total_length']),
+                    'Homopolymers_total_length': int(row['Homopolymers_total_length']),
+                    'W12S12Motifs_total_length': int(row['W12S12Motifs_total_length']),
+                    'HighGC_total_length': int(row['HighGC_total_length']),
+                    'LowGC_total_length': int(row['LowGC_total_length']),
+                    'DoubleNT_total_length': int(row['DoubleNT_total_length']),
+                    'TandemRepeats_total_length': int(row['TandemRepeats_total_length']),
+                    'PalindromeRepeats_total_length': int(row['PalindromeRepeats_total_length']),
+                    'InvertedRepeats_total_length': int(row['InvertedRepeats_total_length']),
+                },
+                'features': analysis_results[gene_id]
+            })
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Analysis completed successfully',
+            'data': response_data
+        }, status=200)
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Internal server error: {str(e)}'
+        }, status=500)
 
 
 def MiniGeneExtractor(request):

@@ -173,7 +173,7 @@
             </div>
 
             <!-- Findings summary row: preview + toggle on the same line -->
-            {% if g.total_penalty_score > 0 or g.LongRepeats_total_length or g.Homopolymers_total_length or g.W12S12Motifs_total_length or g.HighGC_total_length or g.LowGC_total_length or g.DoubleNT_total_length %}
+            {% if g.total_penalty_score > 0 or g.LongRepeats_total_length or g.Homopolymers_total_length or g.W12S12Motifs_total_length or g.HighGC_total_length or g.LowGC_total_length or g.DoubleNT_total_length or g.TandemRepeats_total_length or g.PalindromeRepeats_total_length or g.InvertedRepeats_total_length %}
             <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
               {% if g.total_penalty_score > 0 %}
               <span class="finding-chip preview-issues" data-target="#seq-{{ forloop.counter }}" data-scope="#features-{{ forloop.counter }}" title="Hover to highlight problematic segments">Show Problematic Features Only</span>
@@ -199,24 +199,42 @@
               {% if g.DoubleNT_total_length %}
                 <span class="finding-chip"><i class="bi bi-shuffle text-secondary"></i>Dinucleotide Repeats <span class="badge bg-light text-secondary border">{{ g.DoubleNT_total_length }} bp</span></span>
               {% endif %}
+              {# ========== 新增三个特征的芯片显示 ========== #}
+              {% if g.TandemRepeats_total_length %}
+                <span class="finding-chip"><i class="bi bi-arrow-repeat text-secondary"></i>Tandem Repeats <span class="badge bg-light text-secondary border">{{ g.TandemRepeats_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.PalindromeRepeats_total_length %}
+                <span class="finding-chip"><i class="bi bi-symmetry-vertical text-secondary"></i>Palindrome Repeats <span class="badge bg-light text-secondary border">{{ g.PalindromeRepeats_total_length }} bp</span></span>
+              {% endif %}
+              {% if g.InvertedRepeats_total_length %}
+                <span class="finding-chip"><i class="bi bi-arrow-left-right text-secondary"></i>Inverted Repeats <span class="badge bg-light text-secondary border">{{ g.InvertedRepeats_total_length }} bp</span></span>
+              {% endif %}
             </div>
             {% endif %}
             {% if g.total_penalty_score > 0 %}
             <div class="collapse mt-2" id="collapse{{ forloop.counter }}">
               <div id="features-{{ forloop.counter }}">
                 <ul class="feature-list list-group list-group-flush">
-                      {% if g.tandem_repeats_sequence %}
-                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="tandem" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.tandem_repeats|escapejs }}">
-                          <div><i class="bi bi-record-circle text-warning me-1"></i>Tandem Repeats: {{ g.tandem_repeats }}</div>
-                          <span class="badge bg-light text-secondary border">Score {{ g.tandem_repeats_penalty_score }}</span>
+                      {# ========== 新增三个特征的详细显示 ========== #}
+                      {% if g.TandemRepeats %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="tandem" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.TandemRepeats|escapejs }}">
+                          <div><i class="bi bi-arrow-repeat text-warning me-1"></i>Tandem Repeats: {{ g.TandemRepeats }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.TandemRepeats_penalty_score }}</span>
                         </li>
                       {% endif %}
-                      {% if g.inverted_repeats_sequence %}
-                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="inv" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.inverted_repeats|escapejs }}">
-                          <div><i class="bi bi-arrow-left-right text-warning me-1"></i>Inverted Repeats: {{ g.inverted_repeats }}</div>
-                          <span class="badge bg-light text-secondary border">Score {{ g.inverted_repeats_penalty_score }}</span>
+                      {% if g.PalindromeRepeats %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="pal" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.PalindromeRepeats|escapejs }}">
+                          <div><i class="bi bi-symmetry-vertical text-warning me-1"></i>Palindrome Repeats: {{ g.PalindromeRepeats }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.PalindromeRepeats_penalty_score }}</span>
                         </li>
                       {% endif %}
+                      {% if g.InvertedRepeats %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="inv" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.InvertedRepeats|escapejs }}">
+                          <div><i class="bi bi-arrow-left-right text-warning me-1"></i>Inverted Repeats: {{ g.InvertedRepeats }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.InvertedRepeats_penalty_score }}</span>
+                        </li>
+                      {% endif %}
+                      {# ========== 原有特征 ========== #}
                       {% if g.W12S12Motifs %}
                         <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="ws" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.W12S12Motifs|escapejs }}">
                           <div><i class="bi bi-crosshair text-warning me-1"></i>W12S12 motif: {{ g.W12S12Motifs }}</div>
@@ -235,10 +253,10 @@
                           <span class="badge bg-light text-secondary border">Score {{ g.LongRepeats_penalty_score }}</span>
                         </li>
                       {% endif %}
-                      {% if g.palindromes %}
-                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="pal" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.Palindromes|escapejs }}">
-                          <div><i class="bi bi-arrow-repeat text-warning me-1"></i>Palindromes: {{ g.Palindromes }}</div>
-                          <span class="badge bg-light text-secondary border">Score {{ g.Palindromes_penalty_score }}</span>
+                      {% if g.DoubleNT %}
+                        <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-feature="double" data-target="#seq-{{ forloop.counter }}" data-raw="{{ g.DoubleNT|escapejs }}">
+                          <div><i class="bi bi-shuffle text-warning me-1"></i>Dinucleotide Repeats: {{ g.DoubleNT }}</div>
+                          <span class="badge bg-light text-secondary border">Score {{ g.DoubleNT_penalty_score }}</span>
                         </li>
                       {% endif %}
                       {% if g.LowGC %}
