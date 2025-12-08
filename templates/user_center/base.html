@@ -7,43 +7,51 @@
     <title>{% block title %}{% endblock %}</title> 
     <style>
         .leftslider {
-            width: 250px; /* 默认宽度 */
-            transition: width 0.3s ease, padding 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            width: 100%; /* 填满父容器 */
+            height: calc(100vh - 80px); /* 全高度减去顶部导航栏 */
+            transition: all 0.3s ease;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
         .leftslider .link-text {
-            display: inline; /* default value */
+            display: inline;
             opacity: 1;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s ease;
             white-space: nowrap;
         }
         .leftslider.collapsed {
-            width: 60px;
             padding: 0.5rem 0.25rem !important;
         }
         .leftslider.collapsed .link-text {
             opacity: 0;
+            width: 0;
             display: none;
         }
         .leftslider.collapsed hr {
-            margin: 0.5rem 0;
+            margin: 0.5rem auto;
+            width: 70%;
         }
         .leftslider.collapsed .nav-link {
-            padding: 0.5rem;
+            padding: 0.5rem 0;
             text-align: center;
             justify-content: center;
+            display: flex;
+            margin: 0.25rem 0;
         }
         .leftslider.collapsed .nav-link i {
             margin: 0 !important;
+            font-size: 1.1rem;
         }
         .sidebar-col {
             transition: all 0.3s ease;
             flex: 0 0 auto;
-            width: 250px; /* 固定宽度而不是百分比 */
+            width: 250px;
+            padding: 0;
         }
         .sidebar-col.collapsed {
-            width: 70px; /* 收起时的固定宽度 */
+            width: 65px;
         }
         .content-col {
             transition: all 0.3s ease;
@@ -52,45 +60,47 @@
         }
         .toggle-sidebar-btn {
             position: absolute;
-            top: 5px;
-            right: 5px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.8);
+            top: 8px;
+            right: 8px;
+            z-index: 1001;
+            background: #fff;
             border: 1px solid #dee2e6;
             border-radius: 4px;
-            font-size: 1rem;
+            font-size: 0.9rem;
             cursor: pointer;
-            padding: 0.25rem 0.4rem;
+            padding: 0;
             transition: all 0.3s ease;
-            color: #495057;
-            width: 28px;
-            height: 28px;
+            color: #6c757d;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
+            line-height: 1;
         }
         .toggle-sidebar-btn:hover {
-            background: rgba(255, 255, 255, 1);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: #f8f9fa;
+            color: #495057;
+            border-color: #adb5bd;
         }
         .leftslider.collapsed .toggle-sidebar-btn {
             left: 50%;
             right: auto;
             transform: translateX(-50%);
+            top: 8px;
         }
         @media (max-width: 768px) {
-            .leftslider {
-                width: 60px;
-                padding: 0.75rem 0.5rem !important;
+            .sidebar-col {
+                width: 65px;
             }
             .leftslider .link-text {
                 display: none;
             }
-            .sidebar-col {
-                width: 70px;
-            }
             .content-col {
                 flex: 1;
+            }
+            .toggle-sidebar-btn {
+                display: none;
             }
         }
         /* 可选：悬浮状态下的样式变化 */
