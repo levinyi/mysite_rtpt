@@ -6,98 +6,109 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"> 
     <title>{% block title %}{% endblock %}</title> 
     <style>
-        .leftslider {
-            width: 100%; /* 填满父容器 */
-            height: calc(100vh - 80px); /* 全高度减去顶部导航栏 */
-            transition: all 0.3s ease;
-            position: sticky;
-            top: 0;
-            overflow-y: auto;
-            overflow-x: hidden;
+        /* 主布局容器 */
+        .main-layout {
+            display: flex;
+            width: 100%;
         }
+
+        /* 侧边栏容器 */
+        .sidebar-wrapper {
+            width: 250px;
+            transition: width 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .sidebar-wrapper.collapsed {
+            width: 60px;
+        }
+
+        /* 侧边栏内容 */
+        .leftslider {
+            width: 100%;
+            min-height: calc(100vh - 100px);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
         .leftslider .link-text {
             display: inline;
             opacity: 1;
             transition: opacity 0.2s ease;
             white-space: nowrap;
         }
-        .leftslider.collapsed {
+
+        .sidebar-wrapper.collapsed .leftslider {
             padding: 0.5rem 0.25rem !important;
         }
-        .leftslider.collapsed .link-text {
+
+        .sidebar-wrapper.collapsed .link-text {
             opacity: 0;
-            width: 0;
             display: none;
         }
-        .leftslider.collapsed hr {
+
+        .sidebar-wrapper.collapsed hr {
             margin: 0.5rem auto;
-            width: 70%;
+            width: 60%;
         }
-        .leftslider.collapsed .nav-link {
-            padding: 0.5rem 0;
+
+        .sidebar-wrapper.collapsed .nav-link {
+            padding: 0.5rem;
             text-align: center;
             justify-content: center;
-            display: flex;
-            margin: 0.25rem 0;
         }
-        .leftslider.collapsed .nav-link i {
+
+        .sidebar-wrapper.collapsed .nav-link i {
             margin: 0 !important;
-            font-size: 1.1rem;
         }
-        .sidebar-col {
+
+        /* 主内容区域 */
+        .content-wrapper {
+            flex: 1;
+            min-width: 0;
             transition: all 0.3s ease;
-            flex: 0 0 auto;
-            width: 250px;
-            padding: 0;
         }
-        .sidebar-col.collapsed {
-            width: 65px;
-        }
-        .content-col {
-            transition: all 0.3s ease;
-            flex: 1; /* 自动填充剩余空间 */
-            min-width: 0; /* 防止内容溢出 */
-        }
+
+        /* 切换按钮 */
         .toggle-sidebar-btn {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            z-index: 1001;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
             background: #fff;
             border: 1px solid #dee2e6;
             border-radius: 4px;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             cursor: pointer;
-            padding: 0;
+            padding: 4px 6px;
             transition: all 0.3s ease;
             color: #6c757d;
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            line-height: 1;
         }
+
         .toggle-sidebar-btn:hover {
             background: #f8f9fa;
             color: #495057;
             border-color: #adb5bd;
         }
-        .leftslider.collapsed .toggle-sidebar-btn {
+
+        .sidebar-wrapper.collapsed .toggle-sidebar-btn {
             left: 50%;
             right: auto;
             transform: translateX(-50%);
-            top: 8px;
         }
+
+        /* 移动端响应式 */
         @media (max-width: 768px) {
-            .sidebar-col {
-                width: 65px;
+            .sidebar-wrapper {
+                width: 60px;
             }
             .leftslider .link-text {
                 display: none;
-            }
-            .content-col {
-                flex: 1;
             }
             .toggle-sidebar-btn {
                 display: none;
@@ -141,10 +152,12 @@
 </head> 
 <body class="d-flex flex-column min-vh-100"> 
     {% include 'header.html' %}
-    <div class="container-fluid">
-        <div class="row">
-            <div class="sidebar-col"> {% include 'user_center/leftslider.html' %}</div>
-            <div class="content-col">
+    <div class="container-fluid p-0">
+        <div class="main-layout">
+            <div class="sidebar-wrapper">
+                {% include 'user_center/leftslider.html' %}
+            </div>
+            <div class="content-wrapper">
                 {% block content %}
                 {% endblock %}
             </div>
@@ -191,33 +204,31 @@
         // Toggle sidebar functionality
         document.addEventListener('DOMContentLoaded', function() {
             const toggleBtn = document.getElementById('toggleSidebarBtn');
-            const sidebar = document.querySelector('.leftslider');
-            const sidebarCol = document.querySelector('.sidebar-col');
+            const sidebarWrapper = document.querySelector('.sidebar-wrapper');
+
+            if (!toggleBtn || !sidebarWrapper) return;
 
             // Check localStorage for saved state
             const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (isCollapsed && toggleBtn) {
-                sidebar.classList.add('collapsed');
-                sidebarCol.classList.add('collapsed');
+            if (isCollapsed) {
+                sidebarWrapper.classList.add('collapsed');
                 toggleBtn.innerHTML = '<i class="bi bi-chevron-right"></i>';
             }
 
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    sidebar.classList.toggle('collapsed');
-                    sidebarCol.classList.toggle('collapsed');
+            // Toggle button click handler
+            toggleBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                sidebarWrapper.classList.toggle('collapsed');
 
-                    // Toggle icon
-                    if (sidebar.classList.contains('collapsed')) {
-                        this.innerHTML = '<i class="bi bi-chevron-right"></i>';
-                        localStorage.setItem('sidebarCollapsed', 'true');
-                    } else {
-                        this.innerHTML = '<i class="bi bi-chevron-left"></i>';
-                        localStorage.setItem('sidebarCollapsed', 'false');
-                    }
-                });
-            }
+                // Toggle icon and save state
+                if (sidebarWrapper.classList.contains('collapsed')) {
+                    this.innerHTML = '<i class="bi bi-chevron-right"></i>';
+                    localStorage.setItem('sidebarCollapsed', 'true');
+                } else {
+                    this.innerHTML = '<i class="bi bi-chevron-left"></i>';
+                    localStorage.setItem('sidebarCollapsed', 'false');
+                }
+            });
         });
     </script>
     {% block javascript %}{% endblock %}
