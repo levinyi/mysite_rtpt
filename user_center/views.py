@@ -5,6 +5,9 @@ import zipfile
 import uuid
 import pandas as pd
 import numpy as np
+import time
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
 from django.http import HttpResponse, JsonResponse
@@ -44,14 +47,19 @@ def dashboard(request):
 def order_create(request):
     '''创建订单页'''
     if request.method == 'POST':
+        start_time = time.time()  # 性能监控
+        logger = logging.getLogger(__name__)
+
         # check if user is authenticated
         if not request.user.is_authenticated:
             return JsonResponse({'status': 'error', 'message': 'Please login first.'})
-        
+
         # Parse JSON data from request
         data = json.loads(request.body.decode('utf-8'))
         vector_id = data.get("vectorId")
         gene_table = data.get("genetable")
+
+        logger.info(f"Processing {len(gene_table)} sequences for user {request.user.username}")
 
         # validate Vector ID
         try:
@@ -81,34 +89,60 @@ def order_create(request):
             
             df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
             df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row.get("i5nc","")}{row["OriginalSeq"]}{row.get("i3nc","")}{vector.id20.lower()}', axis=1)
-            # 计算GC含量, 将序列转换为大写后计算GC含量
-            df['original_gc_content'] = df['OriginalSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
-            df['modified_gc_content'] = df['CombinedSeq'].apply(lambda x: round((x.upper().count('G') + x.upper().count('C')) / len(x) * 100, 2))
+            # 计算GC含量 - 使用向量化操作优化性能
+            def calc_gc_content(seq):
+                upper_seq = seq.upper()
+                return round((upper_seq.count('G') + upper_seq.count('C')) / len(seq) * 100, 2) if len(seq) > 0 else 0
+
+            df['original_gc_content'] = df['OriginalSeq'].apply(calc_gc_content)
+            df['modified_gc_content'] = df['CombinedSeq'].apply(calc_gc_content)
 
             # 清理序列并检查是否包含非法碱基
             df['CombinedSeq'], df['Error'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
 
             ##########################################################################################################################
-            # Forbidden Check List
-            forbidden_list_objects = GeneSynEnzymeCutSite.objects.all()
+            # Forbidden Check List - 优化：提前查询并缓存，只查询一次
+            forbidden_list_objects = GeneSynEnzymeCutSite.objects.only('enzyme_seq').all()
             built_in_forbidden_list = [obj.enzyme_seq for obj in forbidden_list_objects]
-            df['forbidden_info'] = df.apply(
-                lambda row: check_forbidden_seq(row['CombinedSeq'], built_in_forbidden_list), axis=1
-            )
+
+            # 并行处理 forbidden sequence 检查以提升性能
+            def check_forbidden_parallel(sequences, forbidden_list, max_workers=4):
+                results = [None] * len(sequences)
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_idx = {
+                        executor.submit(check_forbidden_seq, seq, forbidden_list): idx
+                        for idx, seq in enumerate(sequences)
+                    }
+                    for future in as_completed(future_to_idx):
+                        idx = future_to_idx[future]
+                        results[idx] = future.result()
+                return results
+
+            # 根据数据量决定是否使用并行处理
+            if len(df) > 10:  # 超过10条序列时使用并行处理
+                df['forbidden_info'] = check_forbidden_parallel(df['CombinedSeq'].tolist(), built_in_forbidden_list)
+            else:
+                df['forbidden_info'] = df['CombinedSeq'].apply(
+                    lambda seq: check_forbidden_seq(seq, built_in_forbidden_list)
+                )
 
             ###############################################################################################################################
             # Repeats Finder. sequence 和 gene_id 是查找repeats时必须的字段, 给这两列重新赋值，不需要重命名。
+            repeats_start = time.time()
             df['gene_id'] = df['GeneName']
             df['sequence'] = df['CombinedSeq']
             data_json = convert_gene_table_to_RepeatsFinder_Format(df)
             result_df = process_gene_table_results(data_json)
+            logger.info(f"Repeats analysis took {time.time() - repeats_start:.2f}s")
 
             # model_path = os.path.join(settings.BASE_DIR, 'tools', 'scripts', 'best_rf_model_12.pkl')
             # weights_path = os.path.join(settings.BASE_DIR, 'tools','scripts','best_rf_weights_12.npy')
             # predicted_data = predict_new_data_from_df(result_df, model_path=model_path, scaler=None, weights_path=weights_path)
             feature_columns = [
-                'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score','LongRepeats_penalty_score', 
-                'Homopolymers_penalty_score', 'DoubleNT_penalty_score'
+                'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score','LongRepeats_penalty_score',
+                'Homopolymers_penalty_score', 'DoubleNT_penalty_score',
+                # ========== 新增三个特征的惩罚分 ==========
+                'TandemRepeats_penalty_score', 'PalindromeRepeats_penalty_score', 'InvertedRepeats_penalty_score'
             ]
             result_df['total_penalty_score'] = sum(result_df[col] for col in feature_columns).round(2)
             # 将结果合并到原始数据中
@@ -181,9 +215,10 @@ def order_create(request):
                 GeneInfo.objects.bulk_create(gene_objects)
 
                 # Retrieve the gene objects from the database with their IDs
-                gene_objects_with_ids = GeneInfo.objects.filter(
-                    user=request.user, 
-                    gene_name__in=df['gene_id'], 
+                # 优化：使用 select_related 减少数据库查询
+                gene_objects_with_ids = GeneInfo.objects.select_related('vector', 'species').filter(
+                    user=request.user,
+                    gene_name__in=df['gene_id'],
                     create_date__gte=current_timestamp
                 )
 
@@ -246,9 +281,10 @@ def order_create(request):
                 GeneInfo.objects.bulk_create(gene_objects)
 
                 # Retrieve the gene objects from the database with their IDs
-                gene_objects_with_ids = GeneInfo.objects.filter(
-                    user=request.user, 
-                    gene_name__in=df['GeneName'], 
+                # 优化：使用 select_related 减少数据库查询
+                gene_objects_with_ids = GeneInfo.objects.select_related('vector', 'species').filter(
+                    user=request.user,
+                    gene_name__in=df['GeneName'],
                     create_date__gte=current_timestamp
                 )
 
@@ -258,7 +294,10 @@ def order_create(request):
 
         # Store the new gene IDs in the session for later use
         request.session['new_gene_ids'] = new_gene_ids_for_session
-        
+
+        total_time = time.time() - start_time
+        logger.info(f"Total processing time: {total_time:.2f}s for {len(gene_table)} sequences ({total_time/len(gene_table):.3f}s per sequence)")
+
         return JsonResponse({'status': 'success', 'message': 'Data saved successfully'})
     else:
         company_vectors = Vector.objects.filter(user=None)
@@ -349,33 +388,64 @@ def process_highlights_positions(row):
     pattern = r'\d+'
 
     # 遍历每种分析类型以处理 start 和 end 位置
-    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT']:
+    # ========== 新增三个特征类型 ==========
+    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT',
+                          'TandemRepeats', 'PalindromeRepeats', 'InvertedRepeats']:
         # 分割该类型的字符串值
         if analysis_type not in row:
             continue
         analysis_data = row[analysis_type].split('|')
-        
+
         # 找到 start 和 end 的值
-        start_data = [data.strip() for data in analysis_data if 'start' in data]
-        end_data = [data.strip() for data in analysis_data if 'end' in data]
+        # InvertedRepeats 有两组 start/end (stem1 和 stem2)，需要特殊处理
+        if analysis_type == 'InvertedRepeats':
+            stem1_start_data = [data.strip() for data in analysis_data if 'stem1_start' in data]
+            stem1_end_data = [data.strip() for data in analysis_data if 'stem1_end' in data]
+            stem2_start_data = [data.strip() for data in analysis_data if 'stem2_start' in data]
+            stem2_end_data = [data.strip() for data in analysis_data if 'stem2_end' in data]
 
-        # 确保同时存在 start 和 end 值
-        if start_data and end_data:
-            # 提取所有的 start 和 end 数值
-            start_results = list(map(int, re.findall(pattern, start_data[0])))
-            end_results = list(map(int, re.findall(pattern, end_data[0])))
+            # 处理 stem1
+            if stem1_start_data and stem1_end_data:
+                stem1_starts = list(map(int, re.findall(pattern, stem1_start_data[0])))
+                stem1_ends = list(map(int, re.findall(pattern, stem1_end_data[0])))
+                for i in range(min(len(stem1_starts), len(stem1_ends))):
+                    highlights_positions.append({
+                        'start': stem1_starts[i],
+                        'end': stem1_ends[i],
+                        'type': 'text-warning',
+                    })
 
-            # 确保 start 和 end 列表长度一致
-            if len(start_results) != len(end_results):
-                continue  # 如果不一致，跳过当前分析类型
+            # 处理 stem2
+            if stem2_start_data and stem2_end_data:
+                stem2_starts = list(map(int, re.findall(pattern, stem2_start_data[0])))
+                stem2_ends = list(map(int, re.findall(pattern, stem2_end_data[0])))
+                for i in range(min(len(stem2_starts), len(stem2_ends))):
+                    highlights_positions.append({
+                        'start': stem2_starts[i],
+                        'end': stem2_ends[i],
+                        'type': 'text-warning',
+                    })
+        else:
+            start_data = [data.strip() for data in analysis_data if 'start' in data]
+            end_data = [data.strip() for data in analysis_data if 'end' in data]
 
-            # 遍历提取出的 start 和 end 位置，并添加到 highlights_positions
-            for index in range(len(start_results)):
-                highlights_positions.append({
-                    'start': start_results[index],
-                    'end': end_results[index],
-                    'type': 'text-warning',
-                })
+            # 确保同时存在 start 和 end 值
+            if start_data and end_data:
+                # 提取所有的 start 和 end 数值
+                start_results = list(map(int, re.findall(pattern, start_data[0])))
+                end_results = list(map(int, re.findall(pattern, end_data[0])))
+
+                # 确保 start 和 end 列表长度一致
+                if len(start_results) != len(end_results):
+                    continue  # 如果不一致，跳过当前分析类型
+
+                # 遍历提取出的 start 和 end 位置，并添加到 highlights_positions
+                for index in range(len(start_results)):
+                    highlights_positions.append({
+                        'start': start_results[index],
+                        'end': end_results[index],
+                        'type': 'text-warning',
+                    })
 
     # 处理 forbidden_info 和 warnings 字段
     if 'forbidden_info' in row:
@@ -396,10 +466,12 @@ def process_highlights_positions(row):
     return highlights_positions
 
 def deal_repeats_warnings(row):
-    '''在LongRepeats，Homopolymers，W12S12Motifs，HighGC，LowGC，DoubleNT中查询，
+    '''在LongRepeats，Homopolymers，W12S12Motifs，HighGC，LowGC，DoubleNT，TandemRepeats，PalindromeRepeats，InvertedRepeats中查询，
     只要任意一个有值，warnings就为True
     '''
-    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT']:
+    # ========== 新增三个特征类型 ==========
+    for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT',
+                          'TandemRepeats', 'PalindromeRepeats', 'InvertedRepeats']:
         if analysis_type in row and row[analysis_type]:
             return True
 

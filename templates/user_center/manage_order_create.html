@@ -155,7 +155,13 @@
                                     <i class="bi bi-question-circle"></i> Forbidden Sequence format: separate by ';' without spaces. Example: AAATTT;GGGCCC;AAAAAA. Sequences longer than 10,000 bp are not analyzed.
                                 </div>
                             </div>
-                            <button onclick="postDataFromAaSequence()" class="btn btn-primary mt-4"><i class="bi bi-clipboard-pulse"></i> Submit</button>
+                            <button id="submitBtnAA" onclick="postDataFromAaSequence()" class="btn btn-primary mt-4">
+                                <span class="btn-text"><i class="bi bi-clipboard-pulse"></i> Submit</span>
+                                <span class="btn-loading" style="display: none;">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Processing...
+                                </span>
+                            </button>
                         </div>
                         <!-- For NT Sequence Tab Pane -->
                         <div class="tab-pane fade" id="nt_sequence" role="tabpanel" aria-labelledby="nt_sequence_tab">   
@@ -164,7 +170,13 @@
                                 <button id="addRowBtn" class="btn d-block"><i class="bi bi-plus-circle-dotted"></i></button>
                                 <p class="mt-3 section-hint mb-0">Provide gene names and DNA sequences, then click Submit for evaluation. Template is available <a href="{% static 'files/RootPath_Submit_Sequence_Template.xlsx' %}" class="text-decoration-none">here</a>.</p>
                             </div>
-                            <button onclick="postDataFromNtSequence()" class="btn btn-primary mt-3"><i class="bi bi-clipboard-pulse"></i> Submit</button>
+                            <button id="submitBtnNT" onclick="postDataFromNtSequence()" class="btn btn-primary mt-3">
+                                <span class="btn-text"><i class="bi bi-clipboard-pulse"></i> Submit</span>
+                                <span class="btn-loading" style="display: none;">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Processing...
+                                </span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -331,11 +343,11 @@
     function postDataFromNtSequence() {
         // 获取当前活动Tab的Handsontable数据
         const hotData = hot1.getData();
-       
+
         // 获取下拉菜单的值
         const vectorSelect = document.querySelector('#vector_id');
         const vectorId = vectorSelect.options[vectorSelect.selectedIndex].value;
-        
+
         // 检查是否选择了vector
         if (!vectorId) {
             alert('Please select a vector.');
@@ -368,6 +380,13 @@
             return;
         }
 
+        // 显示加载状态
+        const submitBtn = document.getElementById('submitBtnNT');
+        submitBtn.disabled = true;
+        submitBtn.querySelector('.btn-text').style.display = 'none';
+        submitBtn.querySelector('.btn-loading').style.display = 'inline-block';
+        showLoading(); // 显示全局loading
+
         // 使用fetch API发送数据到服务器
         fetch('/user_center/order_create/', {
             method: 'POST',
@@ -379,18 +398,26 @@
         })
         .then(response => response.json())
         .then(data => {
-            // console.log('Success:', data);
+            hideLoading(); // 隐藏全局loading
             if(data.status == 'error') {
+                // 恢复按钮状态
+                submitBtn.disabled = false;
+                submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+                submitBtn.querySelector('.btn-loading').style.display = 'none';
                 alert(data.message);
             } else {
                 // 跳转到载体分析页面
-                // window.location.href = '/user_center/gene_detail/';
                 window.location.href = '/user_center/view_cart/';
             }
         })
         .catch((error) => {
+            hideLoading(); // 隐藏全局loading
+            // 恢复按钮状态
+            submitBtn.disabled = false;
+            submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+            submitBtn.querySelector('.btn-loading').style.display = 'none';
             console.error('Error:', error);
-            alert('An Error occurred while sending the data:', error);
+            alert('An Error occurred while sending the data: ' + error);
         });
     }
 
@@ -430,6 +457,13 @@
             return;
         }
 
+        // 显示加载状态
+        const submitBtn = document.getElementById('submitBtnAA');
+        submitBtn.disabled = true;
+        submitBtn.querySelector('.btn-text').style.display = 'none';
+        submitBtn.querySelector('.btn-loading').style.display = 'inline-block';
+        showLoading(); // 显示全局loading
+
         // 使用fetch API发送数据到服务器
         fetch('/user_center/order_create/', {
             method: 'POST',
@@ -441,24 +475,29 @@
         })
         .then(response => response.json())
         .then(data => {
-            // console.log('Success:', data);
+            hideLoading(); // 隐藏全局loading
             if(data.status == 'error') {
+                // 恢复按钮状态
+                submitBtn.disabled = false;
+                submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+                submitBtn.querySelector('.btn-loading').style.display = 'none';
                 alert(data.message);
             } else if (data.status === 'info') {
-                // 当收到状态为 'info' 的响应时显示弹窗
-                // alert(data.message);
-                // 当收到状态为info的响应时跳转到指定页面
-                // window.location.href = '/user_center/submit_notification/';
+                // 当收到状态为 'info' 的响应时跳转到指定页面
                 window.location.href = '/user_center/view_cart/';
-                
             } else {
                 // 跳转到载体分析页面
                 window.location.href = '/user_center/view_cart/';
             }
         })
         .catch((error) => {
+            hideLoading(); // 隐藏全局loading
+            // 恢复按钮状态
+            submitBtn.disabled = false;
+            submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+            submitBtn.querySelector('.btn-loading').style.display = 'none';
             console.error('Error:', error);
-            alert('An Error occurred while sending the data:', error);
+            alert('An Error occurred while sending the data: ' + error);
         });
     }
 </script>
