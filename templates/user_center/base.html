@@ -20,47 +20,63 @@
         }
         .leftslider.collapsed {
             width: 60px;
-            padding: 0.75rem 0.5rem !important;
+            padding: 0.5rem 0.25rem !important;
         }
         .leftslider.collapsed .link-text {
             opacity: 0;
             display: none;
         }
         .leftslider.collapsed hr {
-            margin-left: 0;
-            margin-right: 0;
+            margin: 0.5rem 0;
+        }
+        .leftslider.collapsed .nav-link {
+            padding: 0.5rem;
+            text-align: center;
+            justify-content: center;
+        }
+        .leftslider.collapsed .nav-link i {
+            margin: 0 !important;
         }
         .sidebar-col {
             transition: all 0.3s ease;
             flex: 0 0 auto;
-            width: 16.66666667%; /* col-2 */
+            width: 250px; /* 固定宽度而不是百分比 */
         }
         .sidebar-col.collapsed {
-            width: 4%; /* 更窄的宽度 */
+            width: 70px; /* 收起时的固定宽度 */
         }
         .content-col {
             transition: all 0.3s ease;
-            flex: 0 0 auto;
-            width: 75%; /* col-9 */
-        }
-        .content-col.expanded {
-            width: 91%; /* 当侧边栏收起时扩展 */
+            flex: 1; /* 自动填充剩余空间 */
+            min-width: 0; /* 防止内容溢出 */
         }
         .toggle-sidebar-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 5px;
+            right: 5px;
             z-index: 1000;
-            background: transparent;
-            border: none;
-            font-size: 1.2rem;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 1rem;
             cursor: pointer;
-            padding: 0.25rem 0.5rem;
+            padding: 0.25rem 0.4rem;
             transition: all 0.3s ease;
+            color: #495057;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle-sidebar-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .leftslider.collapsed .toggle-sidebar-btn {
-            right: 50%;
-            transform: translateX(50%);
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
         }
         @media (max-width: 768px) {
             .leftslider {
@@ -71,10 +87,10 @@
                 display: none;
             }
             .sidebar-col {
-                width: 8%;
+                width: 70px;
             }
             .content-col {
-                width: 92%;
+                flex: 1;
             }
         }
         /* 可选：悬浮状态下的样式变化 */
@@ -167,14 +183,12 @@
             const toggleBtn = document.getElementById('toggleSidebarBtn');
             const sidebar = document.querySelector('.leftslider');
             const sidebarCol = document.querySelector('.sidebar-col');
-            const contentCol = document.querySelector('.content-col');
 
             // Check localStorage for saved state
             const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (isCollapsed) {
+            if (isCollapsed && toggleBtn) {
                 sidebar.classList.add('collapsed');
                 sidebarCol.classList.add('collapsed');
-                contentCol.classList.add('expanded');
                 toggleBtn.innerHTML = '<i class="bi bi-chevron-right"></i>';
             }
 
@@ -183,7 +197,6 @@
                     e.preventDefault();
                     sidebar.classList.toggle('collapsed');
                     sidebarCol.classList.toggle('collapsed');
-                    contentCol.classList.toggle('expanded');
 
                     // Toggle icon
                     if (sidebar.classList.contains('collapsed')) {
