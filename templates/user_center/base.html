@@ -15,7 +15,6 @@
         /* 侧边栏容器 */
         .sidebar-wrapper {
             width: 250px;
-            transition: width 0.3s ease;
             flex-shrink: 0;
         }
 
@@ -28,13 +27,11 @@
             width: 100%;
             min-height: calc(100vh - 100px);
             position: relative;
-            transition: all 0.3s ease;
         }
 
         .leftslider .link-text {
             display: inline;
             opacity: 1;
-            transition: opacity 0.2s ease;
             white-space: nowrap;
         }
 
@@ -66,7 +63,6 @@
         .content-wrapper {
             flex: 1;
             min-width: 0;
-            transition: all 0.3s ease;
         }
 
         /* 切换按钮 */
@@ -81,7 +77,6 @@
             font-size: 0.875rem;
             cursor: pointer;
             padding: 4px 6px;
-            transition: all 0.3s ease;
             color: #6c757d;
             width: 26px;
             height: 26px;
@@ -208,25 +203,18 @@
 
             if (!toggleBtn || !sidebarWrapper) return;
 
-            // Check localStorage for saved state
-            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (isCollapsed) {
-                sidebarWrapper.classList.add('collapsed');
-                toggleBtn.innerHTML = '<i class="bi bi-chevron-right"></i>';
-            }
+            // 默认展开，不从 localStorage 读取状态
 
             // Toggle button click handler
             toggleBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 sidebarWrapper.classList.toggle('collapsed');
 
-                // Toggle icon and save state
+                // Toggle icon (不保存到 localStorage)
                 if (sidebarWrapper.classList.contains('collapsed')) {
                     this.innerHTML = '<i class="bi bi-chevron-right"></i>';
-                    localStorage.setItem('sidebarCollapsed', 'true');
                 } else {
                     this.innerHTML = '<i class="bi bi-chevron-left"></i>';
-                    localStorage.setItem('sidebarCollapsed', 'false');
                 }
             });
         });
