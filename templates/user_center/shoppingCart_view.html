@@ -266,16 +266,29 @@
         </div>
         <!-- select Status form-->
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-4 mb-2">
+                <label for="statusFilter" class="form-label small mb-1">Sequence Status:</label>
                 <select class="form-control" id="statusFilter">
                     <option value="all">All Statuses</option>
                     <option value="forbidden">Forbidden</option>
                     <option value="validated">Validated</option>
-                    <option value="optimizing">Optimizing</option>
-                    <option value="optimized">Optimized</option>
-                    <option value="Error">Error</option>
-                    <option value="forbidden">Forbidden</option>
-                    <!-- 其他状态 -->
+                    <option value="saved">Saved</option>
+                    <option value="warning">Warning</option>
+                    <option value="error">Error</option>
+                </select>
+            </div>
+            <div class="col-md-4 mb-2">
+                <label for="optimizationStatusFilter" class="form-label small mb-1">Optimization Status:</label>
+                <select class="form-control" id="optimizationStatusFilter">
+                    <option value="all">All Optimization Statuses</option>
+                    <option value="NotOptimized">Not Optimized</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Optimizing">Optimizing</option>
+                    <option value="Optimized">Optimized</option>
+                    <option value="NeedsOptimization">Needs Optimization</option>
+                    <option value="OptimizeFailed">Optimize Failed</option>
+                    <option value="Skipped">Skipped</option>
+                    <option value="failed">Failed</option>
                 </select>
             </div>
         </div>
@@ -938,7 +951,19 @@
         // 监听复选框状态变化，实时更新分类和总价
         $('input.gene-checkbox').change(function() {
             updateTotalPrice();
+            updateSelectAllCheckboxes();
         });
+
+        // 更新"Select All"复选框状态
+        function updateSelectAllCheckboxes() {
+            const visibleCheckboxes = $('input.gene-checkbox').filter(function() {
+                return $(this).closest('tr').css('display') !== 'none';
+            });
+            const visibleCheckedCount = visibleCheckboxes.filter(':checked').length;
+            const allChecked = visibleCheckboxes.length > 0 && visibleCheckedCount === visibleCheckboxes.length;
+
+            $('#selectAllTop, #selectAllBottom').prop('checked', allChecked);
+        }
 
         // 为可编辑的数量、单价、折扣率单元格添加事件监听器，更新总价
         $('#price-detail-table').on('input', 'td', function() {
@@ -969,14 +994,34 @@
             updateTotalPrice();
         });
 
-        // 监听状态筛选器的变化
+        // 监听序列状态筛选器的变化
         $('#statusFilter').on('change', function() {
-            const selectedStatus = this.value;
-            $('tbody tr[data-status]').each(function() {
-                $(this).toggle(selectedStatus === 'all' || $(this).data('status') === selectedStatus);
-            });
-            updateTotalPrice();
+            applyFilters();
         });
+
+        // 监听优化状态筛选器的变化
+        $('#optimizationStatusFilter').on('change', function() {
+            applyFilters();
+        });
+
+        // 应用筛选器函数
+        function applyFilters() {
+            const selectedStatus = $('#statusFilter').val();
+            const selectedOptStatus = $('#optimizationStatusFilter').val();
+
+            $('tbody tr[data-status]').each(function() {
+                const rowStatus = $(this).data('status');
+                const rowOptStatus = $(this).data('optimization-status');
+
+                const statusMatch = selectedStatus === 'all' || rowStatus === selectedStatus;
+                const optStatusMatch = selectedOptStatus === 'all' || rowOptStatus === selectedOptStatus;
+
+                $(this).toggle(statusMatch && optStatusMatch);
+            });
+
+            updateTotalPrice();
+            updateSelectAllCheckboxes();
+        }
 
         // 提交按钮处理
         $('#checkoutButton').on('click', function () {
