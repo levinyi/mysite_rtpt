@@ -995,6 +995,7 @@
             let hasOptimizing = false;
             let hasOptimizeFailed = false;
             let hasError = false;
+            let hasPending = false;
 
             $('input.gene-checkbox:checked').each(function () {
                 const row = $(this).closest('tr');
@@ -1012,6 +1013,9 @@
                 }
                 if (optimizationStatus === 'OptimizeFailed') {
                     hasOptimizeFailed = true;
+                }
+                if (optimizationStatus === 'Pending') {
+                    hasPending = true;
                 }
                 if (sequenceStatus === 'error') {
                     hasError = true;
@@ -1031,6 +1035,11 @@
 
             if (hasOptimizing) {
                 alert('Some items are still optimizing. Please wait for the optimization to finish.');
+                return;
+            }
+
+            if (hasPending) {
+                alert('Some items have pending optimization status. Please wait for the optimization to start or complete.');
                 return;
             }
 
