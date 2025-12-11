@@ -48,6 +48,17 @@ class GeneInfo(models.Model):
 
 
 class OrderInfo(models.Model):
+    # Order status choices for production workflow
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),              # 待确认
+        ('Confirmed', 'Confirmed'),          # 已确认
+        ('InProduction', 'In Production'),   # 生产中
+        ('QualityCheck', 'Quality Check'),   # 质检中
+        ('Shipping', 'Shipping'),            # 配送中
+        ('Completed', 'Completed'),          # 已完成
+        ('Cancelled', 'Cancelled'),          # 已取消
+    ]
+
     def user_directory_path(instance, filename):
         # 文件将被上传到 MEDIA_ROOT/user_<id>/vector_file/<filename>
         return 'user_{0}/report_file/{1}'.format(instance.id, filename)
@@ -56,13 +67,25 @@ class OrderInfo(models.Model):
     gene_infos = models.ManyToManyField(GeneInfo)
     order_time = models.DateTimeField(auto_now_add=True)
     inquiry_id = models.CharField(max_length=100, null=True, blank=True)
-    status = models.CharField(max_length=100, default='Pending')
+    status = models.CharField(
+        max_length=100,
+        choices=STATUS_CHOICES,
+        default='Pending'
+    )
 
     url = models.URLField(verbose_name="report url", blank=True)
     report_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
 
     def __str__(self):
         return f"Order {self.id} by {self.user.username}"
+
+    def is_completed(self):
+        """Check if order is completed"""
+        return self.status == 'Completed'
+
+    def is_in_progress(self):
+        """Check if order is in progress (not completed or cancelled)"""
+        return self.status not in ['Completed', 'Cancelled']
 
 
 class Cart(models.Model):
