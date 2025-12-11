@@ -92,6 +92,51 @@
     #gene-table-datatable_wrapper {
         overflow-x: auto;
     }
+
+    /* Row severity styling with left border */
+    #shopping-cart-table tbody tr[data-status] {
+        border-left: 4px solid transparent;
+    }
+
+    #shopping-cart-table tbody tr.severity-ok {
+        border-left-color: #198754;
+    }
+
+    #shopping-cart-table tbody tr.severity-warn {
+        border-left-color: #ffc107;
+    }
+
+    #shopping-cart-table tbody tr.severity-high {
+        border-left-color: #dc3545;
+    }
+
+    /* Simplify status badges - use subtle styling */
+    .status-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .status-icon {
+        font-size: 0.9rem;
+        margin-right: 0.25rem;
+    }
+
+    /* Penalty Score with emphasis */
+    .penalty-score-cell {
+        font-weight: 600;
+    }
+
+    .penalty-score-ok {
+        color: #198754;
+    }
+
+    .penalty-score-warn {
+        color: #856404;
+    }
+
+    .penalty-score-high {
+        color: #dc3545;
+    }
 </style>
 {% endblock %}
 {% block content %}
@@ -321,7 +366,8 @@
                     <td colspan="12" class="table-info text-start"> {{ group.date }}</td>
                 </tr>
                 {% for gene in group.genes %}
-                <tr data-status="{{ gene.status }}" data-optimization-status="{{ gene.optimization_status }}">
+                <tr data-status="{{ gene.status }}" data-optimization-status="{{ gene.optimization_status }}"
+                    class="{% if gene.penalty_score == 0 or gene.penalty_score == None %}severity-ok{% elif gene.penalty_score <= 28 %}severity-warn{% else %}severity-high{% endif %}">
                     <td>
                         <!-- 复选框 -->
                         <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}" 
@@ -339,31 +385,27 @@
                         </a>
                     </td>
                     <td>
-                        {% if gene.seq_type == 'NT' %}
-                            <span class="badge rounded-pill text-bg-info">NT</span>
-                        {% else %}
-                            <span class="badge rounded-pill text-bg-purple">{{ gene.seq_type }}</span>
-                        {% endif %}
+                        <span class="status-text">{{ gene.seq_type }}</span>
                     </td>
                     <td>
                         <span class="">{{ gene.vector }} </span>
                     </td>
                     <td>{{ gene.species }}</td>
-                    <td> 
+                    <td>
                         {% if gene.status == 'forbidden' %}
-                            <span class="badge rounded-pill" style="background-color: #dc3545;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Forbidden sequence, can be optimized">
-                                Forbidden</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="Forbidden sequence, can be optimized">
+                                <i class="bi bi-exclamation-triangle-fill status-icon text-danger"></i>Forbidden</span>
                         {% elif gene.status == 'validated' %}
-                            <span class="badge rounded-pill" style="background-color: #198754;" data-bs-toggle="tooltip" data-bs-replacement="top" title="validated sequence, good">
-                                Validated</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="Validated sequence, good">
+                                <i class="bi bi-check-circle-fill status-icon text-success"></i>Validated</span>
                         {% elif gene.status == 'warning' %}
-                            <span class="badge rounded-pill" style="background-color: #fd7e14;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Warning: Better to optimize">
-                                Warning</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="Warning: Better to optimize">
+                                <i class="bi bi-exclamation-circle-fill status-icon text-warning"></i>Warning</span>
                         {% elif gene.status == 'error' %}
-                            <span class="badge rounded-pill" style="background-color: #880808;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Error: Please fix your sequence first">
-                                Error</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="Error: Please fix your sequence first">
+                                <i class="bi bi-x-circle-fill status-icon text-danger"></i>Error</span>
                         {% else %}
-                            <span class="badge bg-secondary rounded-pill">{{ gene.status }}</span>
+                            <span class="status-text">{{ gene.status }}</span>
                         {% endif %}
                     </td>
                     <td>
@@ -384,37 +426,31 @@
                     </td>
                     <td>
                         {% if gene.optimization_status == 'Pending' %}
-                            <span class="badge rounded-pill" style="background-color: #6c757d;">{{ gene.optimization_status }}</span>
+                            <span class="status-text"><i class="bi bi-hourglass-split status-icon text-secondary"></i>Pending</span>
                         {% elif gene.optimization_status == 'Optimizing' %}
-                            <span class="badge rounded-pill" style="background-color: #0d6efd;">{{ gene.optimization_status }}</span>
+                            <span class="status-text"><i class="bi bi-arrow-repeat status-icon text-primary"></i>Optimizing</span>
                         {% elif gene.optimization_status == 'NotOptimized' %}
-                            {% if gene.status == 'warning' %}
-                                <span class="badge rounded-pill" style="background-color: #fd7e14;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Optimization Suggestion: Better to Optimize">
-                                    {{ gene.optimization_status }}</span>
-                            {% else %}
-                                <span class="badge rounded-pill" style="background-color: #ffc107;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Optimization Suggestion: Up to You">
-                                    {{ gene.optimization_status }}</span>
-                            {% endif %}
+                            <span class="status-text" data-bs-toggle="tooltip" title="{% if gene.status == 'warning' %}Better to optimize{% else %}Up to you{% endif %}">
+                                <i class="bi bi-dash-circle status-icon"></i>Not Optimized</span>
                         {% elif gene.optimization_status == 'Optimized' %}
-                            <span class="badge rounded-pill" style="background-color: #198754;">{{ gene.optimization_status }}</span>
+                            <span class="status-text"><i class="bi bi-check-circle-fill status-icon text-success"></i>Optimized</span>
                         {% elif gene.optimization_status == 'NeedsOptimization' %}
-                            <span class="badge rounded-pill" style="background-color: #fd7e14" data-bs-toggle="tooltip" data-bs-replacement="top" title="Must do Optimization first before submission">
-                                {{ gene.optimization_status }}</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="Must optimize before submission">
+                                <i class="bi bi-exclamation-triangle-fill status-icon text-warning"></i>Needs Opt.</span>
                         {% elif gene.optimization_status == 'OptimizeFailed' %}
-                            <span class="badge rounded-pill" style="background-color: #dc3545;">{{ gene.optimization_status }}</span>
+                            <span class="status-text"><i class="bi bi-x-circle-fill status-icon text-danger"></i>Failed</span>
                         {% elif gene.optimization_status == 'Skipped' %}
-                            <span class="badge rounded-pill" style="background-color: #0dcaf0;">{{ gene.optimization_status }}</span>
+                            <span class="status-text"><i class="bi bi-skip-forward status-icon text-info"></i>Skipped</span>
                         {% elif gene.optimization_status == 'failed' %}
-                            <span class="badge rounded-pill" style="background-color: #880808;" data-bs-toggle="tooltip" data-bs-replacement="top" title="{{gene.optimization_message}}">
-                                {{ gene.optimization_status }}</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="{{gene.optimization_message}}">
+                                <i class="bi bi-x-circle-fill status-icon text-danger"></i>Failed</span>
                         {% else %}
-                            <span class="badge rounded-pill" style="background-color: #880808;" data-bs-toggle="tooltip" data-bs-replacement="top" title="Can not optimize unitil you fix your sequence first.">
-                                {{ gene.optimization_status }}</span>
+                            <span class="status-text" data-bs-toggle="tooltip" title="Cannot optimize until you fix your sequence">
+                                <i class="bi bi-question-circle status-icon"></i>{{ gene.optimization_status }}</span>
                         {% endif %}
                     </td>
-                    <td>
-                        <!-- Penalty Score -->
-                        {{ gene.penalty_score }}
+                    <td class="penalty-score-cell {% if gene.penalty_score == 0 or gene.penalty_score == None %}penalty-score-ok{% elif gene.penalty_score <= 28 %}penalty-score-warn{% else %}penalty-score-high{% endif %}">
+                        {{ gene.penalty_score|default:"0" }}
                     </td>
                     <td>
                         <!-- Synthesis Success Rate -->
