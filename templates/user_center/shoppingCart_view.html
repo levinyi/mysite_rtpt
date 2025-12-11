@@ -66,6 +66,32 @@
         padding: 0.5rem;
         font-size: 0.9rem;
     }
+
+    /* Bulk Optimization Modal - Gene Table styles */
+    #gene-table-datatable {
+        width: 100% !important;
+        table-layout: auto;
+    }
+
+    /* Limit GeneName column width in modal table */
+    #gene-table-datatable td:nth-child(3) {
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Make modal table more compact */
+    #gene-table-datatable th,
+    #gene-table-datatable td {
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    /* Ensure modal table wrapper is scrollable */
+    #gene-table-datatable_wrapper {
+        overflow-x: auto;
+    }
 </style>
 {% endblock %}
 {% block content %}
