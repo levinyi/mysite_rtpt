@@ -57,6 +57,25 @@
         .card {
             flex: 1;
         }
+
+        /* Sequence Analysis Results styling */
+        .sequence-highlighter {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        .sequence-highlighter:hover {
+            background-color: #f8f9fa;
+        }
+        .list-group-item {
+            border-left: none;
+            border-right: none;
+        }
+        .list-group-item:first-child {
+            border-top: none;
+        }
+        .list-group-item:last-child {
+            border-bottom: none;
+        }
     </style>
 {% endblock %}
 {% block content %}
@@ -382,39 +401,76 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- 罚分 box -->
+                        <!-- 序列分析结果 box -->
                         <div class="row mt-2">
                             <div class="col-md-10 col-12">
                                 <div class="card">
-                                    <ul>
-                                        {% if gene.analysis_results.tandem_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.tandem_repeats_positions }}">Check Tandem Repeats: {{ gene.analysis_results.tandem_repeats_sequence }},score: {{ gene.analysis_results.tandem_repeats_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.inverted_repeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.inverted_repeats_sequence }}">Check Inverted Repeats: {{ gene.analysis_results.inverted_repeats_sequence }}, score: {{ gene.analysis_results.inverted_repeats_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.W12S12Motifs_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.W12S12Motifs_sequence }}">Check W8S8 motif: {{ gene.analysis_results.W12S12Motifs_sequence }}, score: {{ gene.analysis_results.W12S12Motifs_penalty_score }}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.homopolymers_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.homopolymers_sequence }}">Check Homopolymers: {{ gene.analysis_results.homopolymers_sequence }}, score: {{ gene.analysis_results.homopolymers_penalty_score }}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.LongRepeats_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.long_repeats_sequence }}">Check Long Repeats: {{ gene.analysis_results.LongRepeats_sequence }}, score: {{ gene.analysis_results.LongRepeats_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.local_gc_content_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.local_gc_content_sequence }}">Check Local GC content: {{ gene.analysis_results.local_gc_content_sequence }}, score: {{ gene.analysis_results.local_gc_content_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.palindromes_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.palindromes_sequence }}">Check Palindromes: {{ gene.analysis_results.palindromes_sequence }}, score: {{gene.analysis_results.palindromes_penalty_score}}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.lowGC_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.lowGC_sequence }}"> Check LowGC: {{ gene.analysis_results.lowGC_sequence }}, score: {{ gene.analysis_results.lowGC_penalty_score }}</li>
-                                        {% endif %}
-                                        {% if gene.analysis_results.highGC_sequence %}
-                                        <li class="sequence-highlighter" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.highGC_sequence }}"> Check HighGC: {{ gene.analysis_results.highGC_sequence }}, score: {{ gene.analysis_results.highGC_penalty_score }}</li>
-                                        {% endif %}
-                                    </ul>
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-activity me-2 text-primary"></i>Sequence Analysis Results
+                                            {% if gene.penalty_score is not None %}
+                                                <span class="badge {% if gene.penalty_score == 0 %}bg-success{% elif gene.penalty_score <= 28 %}bg-warning text-dark{% else %}bg-danger{% endif %} ms-2">
+                                                    Total Score: {{ gene.penalty_score }}
+                                                </span>
+                                            {% endif %}
+                                        </h6>
+                                        <ul class="list-group list-group-flush">
+                                            {% if gene.analysis_results.tandem_repeats_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.tandem_repeats_positions }}">
+                                                <div><i class="bi bi-arrow-repeat text-warning me-2"></i>Tandem Repeats: {{ gene.analysis_results.tandem_repeats_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.tandem_repeats_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.inverted_repeats_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.inverted_repeats_sequence }}">
+                                                <div><i class="bi bi-arrow-left-right text-warning me-2"></i>Inverted Repeats: {{ gene.analysis_results.inverted_repeats_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.inverted_repeats_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.palindromes_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.palindromes_sequence }}">
+                                                <div><i class="bi bi-symmetry-vertical text-warning me-2"></i>Palindrome Repeats: {{ gene.analysis_results.palindromes_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.palindromes_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.W12S12Motifs_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.W12S12Motifs_sequence }}">
+                                                <div><i class="bi bi-crosshair text-warning me-2"></i>W12S12 Motifs: {{ gene.analysis_results.W12S12Motifs_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.W12S12Motifs_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.homopolymers_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.homopolymers_sequence }}">
+                                                <div><i class="bi bi-grip-horizontal text-warning me-2"></i>Homopolymers: {{ gene.analysis_results.homopolymers_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.homopolymers_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.LongRepeats_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.long_repeats_sequence }}">
+                                                <div><i class="bi bi-infinity text-warning me-2"></i>Long Repeats: {{ gene.analysis_results.LongRepeats_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.LongRepeats_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.lowGC_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.lowGC_sequence }}">
+                                                <div><i class="bi bi-thermometer-low text-primary me-2"></i>Low GC: {{ gene.analysis_results.lowGC_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.lowGC_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.highGC_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.highGC_sequence }}">
+                                                <div><i class="bi bi-thermometer-high text-danger me-2"></i>High GC: {{ gene.analysis_results.highGC_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.highGC_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                            {% if gene.analysis_results.local_gc_content_sequence %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.local_gc_content_sequence }}">
+                                                <div><i class="bi bi-bar-chart text-info me-2"></i>Local GC Content: {{ gene.analysis_results.local_gc_content_sequence }}</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.local_gc_content_penalty_score|default:"0" }}</span>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
