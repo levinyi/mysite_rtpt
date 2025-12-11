@@ -415,59 +415,67 @@
                                             {% endif %}
                                         </h6>
                                         <ul class="list-group list-group-flush">
-                                            {% if gene.analysis_results.tandem_repeats_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.tandem_repeats_positions }}">
-                                                <div><i class="bi bi-arrow-repeat text-warning me-2"></i>Tandem Repeats: {{ gene.analysis_results.tandem_repeats_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.tandem_repeats_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.TandemRepeats %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}">
+                                                <div><i class="bi bi-arrow-repeat text-warning me-2"></i>Tandem Repeats: {{ gene.analysis_results.TandemRepeats|length }} occurrence(s)</div>
+                                                <span class="badge bg-light text-secondary border">Total {{ gene.analysis_results.TandemRepeats|length }} items</span>
                                             </li>
                                             {% endif %}
-                                            {% if gene.analysis_results.inverted_repeats_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.inverted_repeats_sequence }}">
-                                                <div><i class="bi bi-arrow-left-right text-warning me-2"></i>Inverted Repeats: {{ gene.analysis_results.inverted_repeats_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.inverted_repeats_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.InvertedRepeats %}
+                                            {% for item in gene.analysis_results.InvertedRepeats %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-arrow-left-right text-warning me-2"></i>Inverted Repeats ({{ item.type }}): {{ item.full_sequence }} (stem: {{ item.stem_length }}bp, loop: {{ item.loop_length }}bp)</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
+                                            {% endfor %}
                                             {% endif %}
-                                            {% if gene.analysis_results.palindromes_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.palindromes_sequence }}">
-                                                <div><i class="bi bi-symmetry-vertical text-warning me-2"></i>Palindrome Repeats: {{ gene.analysis_results.palindromes_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.palindromes_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.PalindromeRepeats %}
+                                            {% for item in gene.analysis_results.PalindromeRepeats %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-symmetry-vertical text-warning me-2"></i>Palindrome: {{ item.sequence }} ({{ item.length }}bp, GC:{{ item.gc_content|floatformat:1 }}%)</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
+                                            {% endfor %}
                                             {% endif %}
-                                            {% if gene.analysis_results.W12S12Motifs_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.W12S12Motifs_sequence }}">
-                                                <div><i class="bi bi-crosshair text-warning me-2"></i>W12S12 Motifs: {{ gene.analysis_results.W12S12Motifs_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.W12S12Motifs_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.W12S12Motifs %}
+                                            {% for item in gene.analysis_results.W12S12Motifs %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-crosshair text-warning me-2"></i>W12S12 Motif ({{ item.motif_type }}): {{ item.sequence }} ({{ item.length }}bp)</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
+                                            {% endfor %}
                                             {% endif %}
-                                            {% if gene.analysis_results.homopolymers_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.homopolymers_sequence }}">
-                                                <div><i class="bi bi-grip-horizontal text-warning me-2"></i>Homopolymers: {{ gene.analysis_results.homopolymers_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.homopolymers_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.Homopolymers %}
+                                            {% for item in gene.analysis_results.Homopolymers %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-grip-horizontal text-warning me-2"></i>Homopolymer: {{ item.sequence }} ({{ item.length }}bp, pos:{{ item.start }}-{{ item.end }})</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
+                                            {% endfor %}
                                             {% endif %}
-                                            {% if gene.analysis_results.LongRepeats_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.long_repeats_sequence }}">
-                                                <div><i class="bi bi-infinity text-warning me-2"></i>Long Repeats: {{ gene.analysis_results.LongRepeats_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.LongRepeats_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.LongRepeats %}
+                                            {% for item in gene.analysis_results.LongRepeats %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-infinity text-warning me-2"></i>Long Repeat: {{ item.sequence }} ({{ item.length }}bp, GC:{{ item.gc_content|floatformat:1 }}%)</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
+                                            {% endfor %}
                                             {% endif %}
-                                            {% if gene.analysis_results.lowGC_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.lowGC_sequence }}">
-                                                <div><i class="bi bi-thermometer-low text-primary me-2"></i>Low GC: {{ gene.analysis_results.lowGC_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.lowGC_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.lowGC %}
+                                            {% for item in gene.analysis_results.lowGC %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-thermometer-low text-primary me-2"></i>Low GC: {{ item.sequence }} ({{ item.length }}bp, GC:{{ item.gc_content|floatformat:1 }}%, pos:{{ item.start }}-{{ item.end }})</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
+                                            {% endfor %}
                                             {% endif %}
-                                            {% if gene.analysis_results.highGC_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.highGC_sequence }}">
-                                                <div><i class="bi bi-thermometer-high text-danger me-2"></i>High GC: {{ gene.analysis_results.highGC_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.highGC_penalty_score|default:"0" }}</span>
+                                            {% if gene.analysis_results.highGC %}
+                                            {% for item in gene.analysis_results.highGC %}
+                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.parentloop.counter }}">
+                                                <div><i class="bi bi-thermometer-high text-danger me-2"></i>High GC: {{ item.sequence }} ({{ item.length }}bp, GC:{{ item.gc_content|floatformat:1 }}%, pos:{{ item.start }}-{{ item.end }})</div>
+                                                <span class="badge bg-light text-secondary border">Score {{ item.penalty_score|default:"0" }}</span>
                                             </li>
-                                            {% endif %}
-                                            {% if gene.analysis_results.local_gc_content_sequence %}
-                                            <li class="sequence-highlighter list-group-item d-flex align-items-center justify-content-between" data-target="#seq-{{ forloop.counter }}" data-positions="{{ gene.analysis_results.local_gc_content_sequence }}">
-                                                <div><i class="bi bi-bar-chart text-info me-2"></i>Local GC Content: {{ gene.analysis_results.local_gc_content_sequence }}</div>
-                                                <span class="badge bg-light text-secondary border">Score {{ gene.analysis_results.local_gc_content_penalty_score|default:"0" }}</span>
-                                            </li>
+                                            {% endfor %}
                                             {% endif %}
                                         </ul>
                                     </div>
