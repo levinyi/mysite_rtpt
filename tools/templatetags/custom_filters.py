@@ -156,3 +156,57 @@ def multiply(value, factor):
         return int(value) * int(factor)
     except (ValueError, TypeError):
         return value
+
+@register.filter
+def calc_synthesis_rate(gene):
+    """
+    计算基因的合成成功率
+
+    参数:
+        gene: GeneInfo 对象
+
+    返回:
+        格式化的成功率字符串 (如 "95.50%") 或 "N/A"
+    """
+    try:
+        from user_center.utils.synthesis_calculator import (
+            calculate_synthesis_success_rate,
+            format_success_rate
+        )
+
+        sequence = gene.saved_seq if gene.saved_seq else gene.original_seq
+        if not sequence:
+            return "N/A"
+
+        analysis_results = gene.analysis_results
+        rate = calculate_synthesis_success_rate(sequence, analysis_results)
+        return format_success_rate(rate, format_type='percentage')
+    except Exception as e:
+        return "N/A"
+
+@register.filter
+def synthesis_rate_color(gene):
+    """
+    根据合成成功率返回颜色类名
+
+    参数:
+        gene: GeneInfo 对象
+
+    返回:
+        CSS 类名 (如 "text-success", "text-warning", "text-danger")
+    """
+    try:
+        from user_center.utils.synthesis_calculator import (
+            calculate_synthesis_success_rate,
+            get_success_rate_color_class
+        )
+
+        sequence = gene.saved_seq if gene.saved_seq else gene.original_seq
+        if not sequence:
+            return "text-secondary"
+
+        analysis_results = gene.analysis_results
+        rate = calculate_synthesis_success_rate(sequence, analysis_results)
+        return get_success_rate_color_class(rate)
+    except Exception as e:
+        return "text-secondary"

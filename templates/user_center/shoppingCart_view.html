@@ -295,16 +295,17 @@
                     <th scope="col">GC%</th>
                     <th scope="col">Optimization Status</th>
                     <th scope="col">Penalty Score</th>
+                    <th scope="col">Success Rate</th>
                     <th scope="col">Action</th>
                 </tr>
             </thead>
             <tbody>
                 {% for group in grouped_shopping_cart %}
                 <tr class="date-header">
-                    <td class="table-info" > 
-                        <input type="checkbox" class="date-select-checkbox" data-date="{{ group.date }}"> 
+                    <td class="table-info" >
+                        <input type="checkbox" class="date-select-checkbox" data-date="{{ group.date }}">
                     </td>
-                    <td colspan="11" class="table-info text-start"> {{ group.date }}</td>
+                    <td colspan="12" class="table-info text-start"> {{ group.date }}</td>
                 </tr>
                 {% for gene in group.genes %}
                 <tr data-status="{{ gene.status }}" data-optimization-status="{{ gene.optimization_status }}">
@@ -401,6 +402,12 @@
                     <td>
                         <!-- Penalty Score -->
                         {{ gene.penalty_score }}
+                    </td>
+                    <td>
+                        <!-- Synthesis Success Rate -->
+                        <span class="{{ gene|synthesis_rate_color }}" data-bs-toggle="tooltip" data-bs-placement="top" title="Synthesis success rate based on sequence features">
+                            {{ gene|calc_synthesis_rate }}
+                        </span>
                     </td>
                     <td>
                         {% if gene.status == 'optimizing' or gene.status == 'optimized' or gene.status == 'failed' %}
