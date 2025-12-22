@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""
+验证剩余的3个检测是否是真正的串联重复
+"""
+
+user_sequence = "ATGACTACATATAATACGAACGAACCCCTAGGTTCTGCTAGCGCAAAAGTTCTGTACGACAACGCCCAAAACTTTGATCACCTGAGCAATGACCGCGTTAATGAAACCTGGGATGACCGCTTCGGCGTGCCGCGTCTGACCTGGCACGGCATGGAAGAGCGTTACAAAACCGCGCTGGCAAATCTGGGCTTAAATCCGGTTGGGACGTTTCAGGGTGGCGCAGTGATCAACTCGGCGGGTGACATTATCCAAGACGAGACTACCGGCGCTTGGTATCGCTGGGACGATCTGACCACCCTGCCGAAGACCGTGCCACCGGGATCGACCCCTGATAGCAGCGGTGGTACCGGTGTCGGTAAATGGCTGGCTGTCGATGTCTCCGATGTGCTGAGACGTGAACTGGCGCTTCCGACCGGCGCGGATCAGATTGGCTACGGCGACGTTACCGTTGCAGAGCGCCTCAGCTATGATGTGTACTTCACCGGCGGTAGCGGAGCAACCAAAGAGGAGATCCAGGCGTTTCTGGATGAGAACGCGGGTCGAAACTGCCATTTTCCGCCAGGTGACTTCGACATCGAGTGGGGTATGATTCCGCGTAATACCACCATTACCGGTGCGCAAGCTGTGACCGTCCGTAGCCACAGTATGCGCCACGAAGCTACGACTCTGGCAACTCTCATTTCGGATCCGGGTTTTACCCGTTTCAACTTGAAGGGCACGCCGGCGACATACGTTTTGACAGACGTGGTTGAAGGTGCCGATGACCCGGCGATTAGCGCGGGTCTGTGCATCTGCGACCACGGTATTAGCATTAACAACGTGGTCCTTATGGGTTGGCGTAAACGTACCGATGGCACCCTGGAAGCACCGAGCTTAACCGGGGTCGATGATGTTGGTGCCACTGCGTGTTTCAGCTATGGTCTGTTCGTGCCGGCAGTATCTGGCCTGACCCTCTCTGGTACTGCGGTGATCGGCTACTTTGCCAACGACGCAGTTTTGCTGGACTGTAGCCGTAGCGACCAGAATAACGGTAGCGGTAATACCTTTAATATCAATGGCCGTATTAATTCCCAATCCATGTGCGATCTGTCCTTCGATAATTTTTTCGCGTGGCCGCTGGACCCGAAGCAGCCGACACAGCTGGTTTCCGCGATCTCAAGCTACGGCCTCAAGTTGAAGGGCACGGATCGTGATATTCGTGACGGGACCAAGTATCCGCAGGGTGCGAACGGCTACGCTCTGAACTGGATTTGGGGTGGTACGGGCACGTCAGACTTGTTCTTCTCTAACTCCGTGATCAGAGGTGTTTATCTGGATGCGGCGATTAACACGGCGGAAAAACCCGCCAACCGTATGAACGATTATGCAACCGACGGATCCGGCAGCGGCACGACCAGCGTGAACGGTTACCCAAAGGAGTGGCAGGACGGTCGCGGTTCGAAGCTGTTCTTTGTTAACACCACCATCCGCGTGGGCAACCTATATATGAATCGTGTCGCGAACGTGAATCTTGTTAACACGTACAGCGAAGCTGGCACTCATTATATGACCAATTTGACCGGTCGTGTTTCGATCATCGGGGGACATAATGGTCTGGGCGTTTCCGACCTGACGGTGAACAATGTTGACGGTTCTGCTCCGACCGCGTATAACCGTTTGTTCAGCGCGAACTGGATCTGCATTGGCACCGCTAACCCGATGCGTTTGGGACCGGTGTACGAAAGCGGCAGCCACGCCTATCTGCGTCCGCATCGTGATGGCACAATTTCCCTGGGTACTGACGAGGGCACCGGCGTCGGCGCTCTGCGCTACCGCTACGCTGTGATCCATGTTGTGTCTGGCAGCTTTGGTAACATTACCAGCCCGAATAACGTTATCCAAGCGAACAAACCGGTTCGCATCCCGTCTTTCACCACTGCGCTGCGTCCGAGCCTCAACGCGGCTGACGCTGGTGCGCAAATCCTGGACACCACCCTGGGCTACGCCATCACGTGGACCGGTAGTGCGTGGAAAGATGGTGTGGGTAACATCGTG"
+
+detections = [
+    {'pos': (885, 896), 'seq': 'GATGATGTTGGT', 'unit': 'GAT'},
+    {'pos': (1274, 1285), 'seq': 'CTTGTTCTTCTC', 'unit': 'CTT'},
+    {'pos': (1790, 1801), 'seq': 'CGGCGTCGGCGC', 'unit': 'CGG'},
+]
+
+print("="*100)
+print(" 手动验证剩余的3个检测")
+print("="*100)
+
+for i, det in enumerate(detections, 1):
+    start, end = det['pos']
+    seq = det['seq']
+    unit = det['unit']
+    unit_len = len(unit)
+
+    # 从完整序列中提取
+    actual_seq = user_sequence[start:end+1]
+
+    print(f"\n{'─'*100}")
+    print(f"检测 #{i}: 位置 {start}-{end}")
+    print(f"{'─'*100}")
+    print(f"声称的序列: {seq}")
+    print(f"实际序列:   {actual_seq}")
+    print(f"匹配: {'✅' if seq == actual_seq else '❌'}")
+    print(f"\n重复单元: {unit} (长度={unit_len})")
+
+    # 手动分割并检查
+    print(f"\n分割分析:")
+    copies = []
+    mismatches_per_copy = []
+
+    for j in range(0, len(seq), unit_len):
+        copy = seq[j:j+unit_len]
+        if len(copy) == unit_len:
+            copies.append(copy)
+            # 计算错配
+            mismatches = sum(1 for k in range(unit_len) if copy[k] != unit[k])
+            mismatches_per_copy.append(mismatches)
+            match_str = "✅" if mismatches <= 1 else "❌"
+            print(f"  拷贝 {len(copies)}: {copy} (错配={mismatches}) {match_str}")
+
+    total_mismatches = sum(mismatches_per_copy)
+    identity = (len(seq) - total_mismatches) / len(seq) * 100
+
+    print(f"\n总结:")
+    print(f"  总拷贝数: {len(copies)}")
+    print(f"  总错配数: {total_mismatches}")
+    print(f"  身份百分比: {identity:.1f}%")
+
+    # 判断
+    is_valid = (
+        len(copies) >= 4 and
+        identity >= 80 and
+        all(m <= 1 for m in mismatches_per_copy)
+    )
+
+    print(f"  是否是有效串联重复: {'✅ 是' if is_valid else '❌ 否'}")
+
+    if not is_valid:
+        print(f"\n  🔍 为什么无效:")
+        if len(copies) < 4:
+            print(f"     - 拷贝数不足 ({len(copies)} < 4)")
+        if identity < 80:
+            print(f"     - 身份太低 ({identity:.1f}% < 80%)")
+        if not all(m <= 1 for m in mismatches_per_copy):
+            print(f"     - 有拷贝的错配数 > 1")
+
+print(f"\n{'='*100}\n")

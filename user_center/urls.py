@@ -43,6 +43,11 @@ urlpatterns = [
     path('validation_save/<int:id>/', views.validation_save, name='validation_save'),
     path('vector_download/<int:vector_id>/<str:file_type>/', views.vector_download, name='vector_download'),
 
+    # 载体改造自动化设计
+    path('vector_automation_design_trigger/', views.vector_automation_design_trigger, name='vector_automation_design_trigger'),
+    path('vector_automation_design_status/', views.vector_automation_design_status, name='vector_automation_design_status'),
+    path('vector_automation_design_download/<int:vector_id>/', views.vector_automation_design_download, name='vector_automation_design_download'),
+
     # api
     path('api/generate-genbank/', views.generate_genbank, name='generate_genbank'),
     path('test/', views.test, name='test'),

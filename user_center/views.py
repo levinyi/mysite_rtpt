@@ -1543,8 +1543,9 @@ def manage_vector(request):
 def customer_vector_data_api(request):
     '''获取用户的vector数据'''
     vector_list = Vector.objects.filter(user=request.user).values(
-        'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20', 
-        'status', 'user__username', 'vector_file', 'vector_png', 'vector_gb'
+        'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
+        'status', 'user__username', 'vector_file', 'vector_png', 'vector_gb',
+        'design_status', 'cloning_method', 'i5NC', 'i3NC'
     )
     data = list(vector_list)
     return JsonResponse({'data': data}, safe=False)
@@ -1582,19 +1583,163 @@ def vector_upload(request):
 @login_required
 def vector_delete(request):
     if request.method == 'POST':
-        vector_id = request.POST.get('vector_id')
-        vector = Vector.objects.get(user=request.user, id=vector_id)
+        try:
+            vector_id = request.POST.get('vector_id')
+            vector = Vector.objects.get(user=request.user, id=vector_id)
 
-        # 删除与之关联的文件
-        if vector.vector_file:
-            file_path = vector.vector_file.path
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            # 删除与之关联的文件
+            # 删除原始GenBank文件
+            if vector.vector_file and vector.vector_file.name:
+                try:
+                    file_path = vector.vector_file.path
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    print(f"Error deleting vector_file: {e}")
 
-        vector.delete()
-        return JsonResponse({'status': 'success', 'message': 'Gene deleted successfully'})
+            # 删除改造后的GenBank文件
+            if vector.vector_gb and vector.vector_gb.name:
+                try:
+                    gb_path = vector.vector_gb.path
+                    if os.path.exists(gb_path):
+                        os.remove(gb_path)
+                except Exception as e:
+                    print(f"Error deleting vector_gb: {e}")
+
+            # 删除PNG图片文件
+            if vector.vector_png and vector.vector_png.name:
+                try:
+                    png_path = vector.vector_png.path
+                    if os.path.exists(png_path):
+                        os.remove(png_path)
+                except Exception as e:
+                    print(f"Error deleting vector_png: {e}")
+
+            vector.delete()
+            return JsonResponse({'status': 'success', 'message': 'Vector deleted successfully'})
+        except Vector.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Vector not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     else:
         return render(request, 'user_center/manage_vector.html')
+
+
+@login_required
+def vector_automation_design_trigger(request):
+    """
+    触发载体改造自动化设计
+    """
+    if request.method == 'POST':
+        vector_id = request.POST.get('vector_id')
+        try:
+            vector = Vector.objects.get(user=request.user, id=vector_id)
+
+            # 检查是否已上传文件
+            if not vector.vector_file:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '请先上传载体文件'
+                })
+
+            # 重置设计状态
+            vector.design_status = 'Pending'
+            vector.design_error = None
+            vector.save()
+
+            # 触发异步任务
+            from user_center.tasks import async_vector_automation_design
+            task = async_vector_automation_design.delay(vector_id)
+
+            return JsonResponse({
+                'status': 'success',
+                'message': '载体改造设计任务已启动',
+                'task_id': task.id
+            })
+
+        except Vector.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '载体不存在'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'启动设计任务失败: {str(e)}'
+            })
+
+    return JsonResponse({'status': 'error', 'message': '仅支持POST请求'})
+
+
+@login_required
+def vector_automation_design_status(request):
+    """
+    查询载体改造自动化设计状态
+    """
+    if request.method == 'GET':
+        vector_id = request.GET.get('vector_id')
+        try:
+            vector = Vector.objects.get(user=request.user, id=vector_id)
+
+            response_data = {
+                'status': 'success',
+                'design_status': vector.design_status,
+                'cloning_method': vector.cloning_method,
+                'design_error': vector.design_error
+            }
+
+            # 如果设计完成，返回详细信息
+            if vector.design_status == 'Completed':
+                response_data.update({
+                    'v5nc': vector.NC5,
+                    'v3nc': vector.NC3,
+                    'i5nc': vector.i5NC,
+                    'i3nc': vector.i3NC,
+                    'iu20': vector.iu20,
+                    'id20': vector.id20,
+                    'primer_forward': vector.primer_forward,
+                    'primer_reverse': vector.primer_reverse,
+                    'primer_forward_tm': vector.primer_forward_tm,
+                    'primer_reverse_tm': vector.primer_reverse_tm,
+                    'has_genbank': bool(vector.vector_gb)
+                })
+
+            return JsonResponse(response_data)
+
+        except Vector.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '载体不存在'
+            })
+
+    return JsonResponse({'status': 'error', 'message': '仅支持GET请求'})
+
+
+@login_required
+def vector_automation_design_download(request, vector_id):
+    """
+    下载改造后的GenBank文件
+    """
+    try:
+        vector = Vector.objects.get(user=request.user, id=vector_id)
+
+        if not vector.vector_gb:
+            return JsonResponse({
+                'status': 'error',
+                'message': '改造后的GenBank文件不存在'
+            })
+
+        # 返回文件
+        response = HttpResponse(vector.vector_gb, content_type='application/octet-stream')
+        filename = os.path.basename(vector.vector_gb.name)
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Vector.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '载体不存在'
+        })
 
 
 @login_required

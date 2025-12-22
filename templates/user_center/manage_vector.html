@@ -117,10 +117,10 @@
                         {% csrf_token %}
                         <label for="vector_name" class="form-label mt-3">Vector Name</label>
                         <input type="text" name="vector_name" class="form-control" required="required"
-                            placeholder="Enter vector name, eg. Vector1">
+                            placeholder="Enter vector name, eg. pCVa001(Amp)-description">
 
-                        <label for="vector_file" class="form-label mt-3">Select a DNA file (.dna/.fasta/.txt/.pdf)</label>
-                        <input type="file" name="vector_file" class="form-control" accept=".txt, .pdf, .fa, .fasta, .dna" required="required" onchange="fileChange(this);">
+                        <label for="vector_file" class="form-label mt-3">Select a GenBank file (.gb)</label>
+                        <input type="file" name="vector_file" class="form-control" accept=".gb, .genbank" required="required" onchange="fileChange(this);">
                     </form>
                 </div>
             </div>
@@ -131,50 +131,157 @@
         </div>
     </div>
 </div>
+
+<!-- Modal for Design Results -->
+<div class="modal fade" id="designResultsModal" tabindex="-1" aria-labelledby="designResultsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="designResultsModalLabel">Vector Automation Design Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="designResultsContent">
+                    <!-- Results will be dynamically loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="downloadModifiedGenbank" style="display:none;">
+                    <i class="bi bi-download"></i> Download Modified GenBank
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% block javascript %}
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         showLoading();
         fetch("{% url 'user_center:customer_vector_data_api' %}")
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             hideLoading();
+            console.log('Vector data received:', data);
+            console.log('Number of vectors:', data.data.length);
+
+            if (!data.data || data.data.length === 0) {
+                console.warn('No vector data found');
+            }
+
             new gridjs.Grid({
                 columns: [
                     { name: '#', width: '50px' },
-                    { name: 'Vector Name', width: '170px' },
-                    { name: 'Vector File(Original)', formatter: (cell, row) => {
-                        const vectorId = row.cells[7].data;
-                        return gridjs.html(`
-                            <a href="/user_center/vector_download/${vectorId}/file/" 
-                                data-bs-toggle="tooltip" data-bs-placement="top" title="See details" class="text-decoration-none">
-                                ${cell}
-                            </a>`);
-                    }},
+                    { name: 'Vector Name', width: '150px' },
+                    {
+                        name: 'Original File',
+                        width: '150px',
+                        formatter: (cell, row) => {
+                            // GridJS passes the whole row data, use _cells to access the raw data
+                            const rowData = row._cells;
+                            const vectorId = rowData[10];
+                            const fileName = rowData[2];
+                            if (fileName) {
+                                return gridjs.html(`
+                                    <a href="/user_center/vector_download/${vectorId}/file/"
+                                        class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="tooltip"
+                                        title="Download original file">
+                                        <i class="bi bi-file-earmark"></i> Download
+                                    </a>
+                                `);
+                            }
+                            return gridjs.html(`<span class="text-muted">-</span>`);
+                        }
+                    },
                     { name: 'Status', formatter: (cell, row) => {
                         const badgeClass = cell === 'readyToUse' ? 'bg-primary' : 'bg-info';
                         return gridjs.html(`<span class="badge ${badgeClass}">${cell}</span>`);
                     }},
-                    { name: 'Vector ID' },
-                    { name: 'iU20' },
-                    { name: 'iD20' },
-                    { 
-                        name: 'Download Map & GenBank',
+                    { name: 'Vector ID', width: '100px' },
+                    { name: 'iU20', width: '80px' },
+                    { name: 'iD20', width: '80px' },
+                    {
+                        name: 'Automation Design',
+                        width: '200px',
                         formatter: (cell, row) => {
-                            const vectorId = row.cells[7].data;
+                            const rowData = row._cells;
+                            const vectorId = rowData[10];
+                            const designStatus = rowData[8];
+                            const cloningMethod = rowData[9];
+
+                            let statusDisplay = '';
+                            let buttons = '';
+
+                            if (designStatus === 'Completed') {
+                                statusDisplay = `<div class="mb-2"><span class="badge bg-success">${cloningMethod}</span></div>`;
+                                buttons = `
+                                    <button class="btn btn-sm btn-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-info" onclick="viewDesignResults(${vectorId})" title="View Results">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                `;
+                            } else if (designStatus === 'Processing') {
+                                statusDisplay = `<div class="mb-2"><span class="badge bg-warning text-dark">Processing...</span></div>`;
+                                buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
+                            } else if (designStatus === 'Failed') {
+                                statusDisplay = `<div class="mb-2"><span class="badge bg-danger">Failed</span></div>`;
+                                buttons = `<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry Design"><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
+                            } else {
+                                statusDisplay = `<div class="mb-2"><span class="badge bg-secondary">Not Designed</span></div>`;
+                                buttons = `<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`;
+                            }
+
                             return gridjs.html(`
-                                <div style="display: flex; justify-content: center;">
-                                    <a href="/user_center/vector_download/${vectorId}/map" data-bs-toggle="tooltip" title="Click to download map"><i class="bi bi-filetype-png"></i></a>
-                                    <a href="/user_center/vector_download/${vectorId}/gb" data-bs-toggle="tooltip" title="Download genebank"><i class="bi bi-file-earmark-binary"></i></a>
+                                <div style="text-align: center;">
+                                    ${statusDisplay}
+                                    ${buttons}
                                 </div>
                             `);
                         }
                     },
-                    { 
-                        name: 'Delete', width: '50px', 
+                    {
+                        name: 'Download Modified Files',
+                        width: '180px',
                         formatter: (cell, row) => {
-                            const vectorId = row.cells[7].data;
+                            const rowData = row._cells;
+                            const vectorId = rowData[10];
+                            const designStatus = rowData[8];
+
+                            if (designStatus === 'Completed') {
+                                return gridjs.html(`
+                                    <div style="display: flex; justify-content: center; gap: 10px;">
+                                        <a href="/user_center/vector_automation_design_download/${vectorId}/"
+                                           class="btn btn-sm btn-success"
+                                           data-bs-toggle="tooltip"
+                                           title="Download Modified GenBank">
+                                            <i class="bi bi-download"></i> GenBank
+                                        </a>
+                                    </div>
+                                `);
+                            } else {
+                                return gridjs.html(`
+                                    <div style="text-align: center; color: #999;">
+                                        <small>Design first</small>
+                                    </div>
+                                `);
+                            }
+                        }
+                    },
+                    {
+                        name: 'Delete', width: '50px',
+                        formatter: (cell, row) => {
+                            const rowData = row._cells;
+                            const vectorId = rowData[10];
                             return gridjs.html(`
                                 <a data-bs-toggle="tooltip" title="Delete" href="javascript:" onclick="del_vector(this, ${vectorId})" class="text-decoration-none">
                                     <i class="bi bi-trash text-danger"></i>
@@ -183,17 +290,22 @@
                         }
                     }
                 ],
-                data: data.data.map((vector, index) => [
-                    index + 1,
-                    vector.vector_name,
-                    vector.vector_file ? vector.vector_file.split('/').pop() : '',
-                    vector.status,
-                    vector.vector_id,
-                    vector.iu20,
-                    vector.id20,
-                    vector.id,  // For download links
-                    ''  // Placeholder to maintain correct cell count if necessary
-                ]),
+                data: data.data.map((vector, index) => {
+                    return [
+                        index + 1,                                              // 0: #
+                        vector.vector_name || '',                               // 1: Vector Name
+                        vector.vector_file ? vector.vector_file.split('/').pop() : '', // 2: File name (for Original File column)
+                        '',                                                     // 3: Original File (formatted)
+                        vector.status || 'Submitted',                           // 4: Status
+                        vector.vector_id || '-',                                // 5: Vector ID
+                        vector.iu20 || '-',                                     // 6: iU20
+                        vector.id20 || '-',                                     // 7: iD20
+                        vector.design_status || 'Pending',                      // 8: Design Status
+                        vector.cloning_method || '',                            // 9: Cloning Method
+                        vector.id,                                              // 10: Vector ID (for links)
+                        ''                                                      // 11: Placeholder
+                    ];
+                }),
                 pagination: {
                     enabled: true,
                 },
@@ -210,6 +322,11 @@
                     }
                 }
             }).render(document.getElementById("customer-vector-table"));
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Error loading vector data:', error);
+            document.getElementById("customer-vector-table").innerHTML = '<div class="alert alert-danger">Error loading data. Please refresh the page.</div>';
         });
         showLoading();
         fetch("{% url 'user_center:rootpath_vector_data_api' %}")
@@ -266,12 +383,12 @@
 
     function fileChange(target) {
         var fileSize = 0;
-        var filetypes = [".txt", ".pdf", ".fa", ".fasta", ".dna"];
+        var filetypes = [".gb", ".genbank"];
         var filepath = target.value;
-        var filemaxsize = 1024 * 2;//2M
+        var filemaxsize = 1024 * 5;//5M (GenBank files can be larger)
         if (filepath) {
             var isnext = false;
-            var fileend = filepath.substring(filepath.lastIndexOf("."));
+            var fileend = filepath.substring(filepath.lastIndexOf(".")).toLowerCase();
             if (filetypes && filetypes.length > 0) {
                 for (var i = 0; i < filetypes.length; i++) {
                     if (filetypes[i] == fileend) {
@@ -281,7 +398,7 @@
                 }
             }
             if (!isnext) {
-                alert("Please upload the correct format file");
+                alert("Please upload a GenBank file (.gb or .genbank format only)");
                 target.value = "";
                 return false;
             }
@@ -304,7 +421,7 @@
 
         var size = fileSize / 1024;
         if (size > filemaxsize) {
-            alert("File cannot be larger than 2M");
+            alert("File cannot be larger than 5M");
             target.value = "";
             return false;
         }
@@ -412,6 +529,233 @@
     function hidePreview(id) {
         var preview = document.getElementById('imagePreview' + id);
         preview.style.display = 'none';
+    }
+</script>
+
+<script>
+    // 载体改造自动化设计功能
+    function startAutomationDesign(vectorId) {
+        if (!confirm('Are you sure you want to start the automation design for this vector?')) {
+            return;
+        }
+
+        showLoading();
+
+        $.ajax({
+            url: "{% url 'user_center:vector_automation_design_trigger' %}",
+            type: "POST",
+            data: {
+                'csrfmiddlewaretoken': '{{ csrf_token }}',
+                'vector_id': vectorId,
+            },
+            dataType: "json",
+            success: function (data) {
+                hideLoading();
+                if (data.status === 'success') {
+                    layer.msg('Design task started successfully! Please wait for completion.', { icon: 1 });
+
+                    // 开始轮询状态
+                    pollDesignStatus(vectorId);
+                } else {
+                    layer.msg(data.message, { icon: 2 });
+                }
+            },
+            error: function (xhr, errmsg, err) {
+                hideLoading();
+                layer.msg('Failed to start design task!', { icon: 2 });
+            }
+        });
+    }
+
+    function pollDesignStatus(vectorId, maxAttempts = 60) {
+        let attempts = 0;
+
+        const interval = setInterval(() => {
+            attempts++;
+
+            $.ajax({
+                url: "{% url 'user_center:vector_automation_design_status' %}",
+                type: "GET",
+                data: {
+                    'vector_id': vectorId,
+                },
+                dataType: "json",
+                success: function (data) {
+                    if (data.status === 'success') {
+                        const designStatus = data.design_status;
+
+                        if (designStatus === 'Completed') {
+                            clearInterval(interval);
+                            layer.msg('Design completed successfully!', { icon: 1 });
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        } else if (designStatus === 'Failed') {
+                            clearInterval(interval);
+                            layer.msg('Design failed: ' + (data.design_error || 'Unknown error'), { icon: 2 });
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        }
+                        // 如果是Processing状态，继续轮询
+                    }
+                },
+                error: function () {
+                    // 忽略轮询错误，继续尝试
+                }
+            });
+
+            // 超时停止轮询
+            if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                layer.msg('Design is taking longer than expected. Please refresh the page later.', { icon: 3 });
+            }
+        }, 5000); // 每5秒轮询一次
+    }
+
+    function viewDesignResults(vectorId) {
+        showLoading();
+
+        $.ajax({
+            url: "{% url 'user_center:vector_automation_design_status' %}",
+            type: "GET",
+            data: {
+                'vector_id': vectorId,
+            },
+            dataType: "json",
+            success: function (data) {
+                hideLoading();
+
+                if (data.status === 'success' && data.design_status === 'Completed') {
+                    displayDesignResults(data, vectorId);
+
+                    // 显示模态框
+                    const modal = new bootstrap.Modal(document.getElementById('designResultsModal'));
+                    modal.show();
+                } else {
+                    layer.msg('Design results not available', { icon: 2 });
+                }
+            },
+            error: function (xhr, errmsg, err) {
+                hideLoading();
+                layer.msg('Failed to load design results!', { icon: 2 });
+            }
+        });
+    }
+
+    function displayDesignResults(data, vectorId) {
+        const content = document.getElementById('designResultsContent');
+
+        let html = `
+            <div class="container">
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h5 class="text-primary">Cloning Method: ${data.cloning_method}</h5>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <strong>v5NC Sequence</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="font-monospace small">${data.v5nc || 'N/A'}</p>
+                                ${data.i5nc ? `<p class="text-muted small">Shifted bases (i5NC): ${data.i5nc}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <strong>v3NC Sequence</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="font-monospace small">${data.v3nc || 'N/A'}</p>
+                                ${data.i3nc ? `<p class="text-muted small">Shifted bases (i3NC): ${data.i3nc}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <strong>iU20 Sequence</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="font-monospace small">${data.iu20 || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <strong>iD20 Sequence</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="font-monospace small">${data.id20 || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        `;
+
+        // 如果是Gibson方法，显示引物信息
+        if (data.cloning_method === 'Gibson' && data.primer_forward) {
+            html += `
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h6 class="text-secondary">NC-PCR Primers</h6>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <strong>Forward Primer</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="font-monospace small">${data.primer_forward}</p>
+                                <p class="text-muted small">Tm: ${data.primer_forward_tm}°C</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <strong>Reverse Primer</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="font-monospace small">${data.primer_reverse}</p>
+                                <p class="text-muted small">Tm: ${data.primer_reverse_tm}°C</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+
+        content.innerHTML = html;
+
+        // 配置下载按钮
+        const downloadBtn = document.getElementById('downloadModifiedGenbank');
+        if (data.has_genbank) {
+            downloadBtn.style.display = 'inline-block';
+            downloadBtn.onclick = function() {
+                window.location.href = `/user_center/vector_automation_design_download/${vectorId}/`;
+            };
+        } else {
+            downloadBtn.style.display = 'none';
+        }
     }
 </script>
 
