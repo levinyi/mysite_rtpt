@@ -15,3 +15,4 @@ media/
 *.tar
 *.sql
 staticfiles
+test_*.py

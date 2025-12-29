@@ -28,6 +28,18 @@ from urllib.parse import quote
 from django.core.mail import send_mail
 from decouple import config
 from Bio import SeqIO
+from user_center.utils.vector_automation import VectorAutomationDesigner
+from user_center.utils.sequence_fragmenter import fragment_sequence_by_penalty
+from user_center.utils.sequence_processing import (
+    clean_and_check_dna_sequence,
+    check_forbidden_seq,
+    process_contained_forbidden_list,
+    process_highlights_positions,
+    deal_repeats_warnings,
+    process_status
+)
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 @login_required()
@@ -59,21 +71,19 @@ def order_create(request):
         vector_id = data.get("vectorId")
         gene_table = data.get("genetable")
 
-        logger.info(f"Processing {len(gene_table)} sequences for user {request.user.username}")
-
         # validate Vector ID
         try:
             vector = Vector.objects.get(id=vector_id)
         except Vector.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Invalid vector ID'})
-        
+
         # 将 gene_table 转换为 DataFrame，并删除空行，重置索引，如果为空则返回错误信息
         df = pd.DataFrame(gene_table)
         df = df.dropna(how='all').reset_index(drop=True) # 删除空行,
 
         if df.empty:
             return JsonResponse({'status': 'error', 'message': 'No gene data provided'})
-        
+
         # Get or create a shopping cart for the user
         cart, created = Cart.objects.get_or_create(user=request.user)
 
@@ -86,9 +96,10 @@ def order_create(request):
             # 如果i5nc和i3nc为空，填充为''
             df['i5nc'] = df['i5nc'].fillna('')
             df['i3nc'] = df['i3nc'].fillna('')
-            
+
             df['OriginalSeq'] = df['OriginalSeq'].str.replace("\n","").str.replace("\r","").str.replace(" ","").str.replace("\t", '')  # 去掉换行符和空格
             df['CombinedSeq'] = df.apply(lambda row: f'{vector.iu20.lower()}{row.get("i5nc","")}{row["OriginalSeq"]}{row.get("i3nc","")}{vector.id20.lower()}', axis=1)
+
             # 计算GC含量 - 使用向量化操作优化性能
             def calc_gc_content(seq):
                 upper_seq = seq.upper()
@@ -178,7 +189,9 @@ def order_create(request):
                     optimization_status = 'NotOptimized'
                 else:
                     optimization_status = 'NotOptimized'
-                # 创建 GeneInfo 对象，存储分析结果
+
+                # 创建 GeneInfo 对象
+                # 注意：fragments_data 字段暂时为 None（切割功能已禁用）
                 gene_objects.append(
                     GeneInfo(
                         user=request.user,
@@ -186,7 +199,7 @@ def order_create(request):
                         original_seq=row['OriginalSeq'],
                         vector=vector,
                         species=row.get('species', None),
-                        status=row.get('status', 'validated'),  # check if status is valid 
+                        status=row.get('status', 'validated'),  # check if status is valid
                         forbid_seq=row.get('forbidden_check_list', ''),
                         combined_seq=row['CombinedSeq'],
                         i5nc=row.get('i5nc', ''),
@@ -203,7 +216,10 @@ def order_create(request):
                         optimization_status=optimization_status, # 标记优化状态
 
                         # 存储从 data_json 匹配到的分析结果
-                        analysis_results=analysis_results  # 假设你有一个 JSONField 或 TextField 存储分析结果
+                        analysis_results=analysis_results,  # 假设你有一个 JSONField 或 TextField 存储分析结果
+
+                        # 存储片段数据（暂时为None）
+                        fragments_data=None
                     )
                 )
 
@@ -227,6 +243,31 @@ def order_create(request):
 
             # Extend the new_gene_ids_for_session with the IDs of the retrieved objects
             new_gene_ids_for_session.extend([gene.id for gene in gene_objects_with_ids])
+
+            # ========== 片段切割功能（暂时禁用，等待客户优化序列后再启用） ==========
+            # TODO: 考虑在序列优化完成后再触发切割，而不是在初始提交时
+            # 原因：序列可能需要先被客户优化，优化后的序列才需要切割
+            # 触发异步片段切割任务（只对罚分>28的基因）
+            # genes_need_fragmentation = [
+            #     gene for gene in gene_objects_with_ids
+            #     if gene.penalty_score and gene.penalty_score > 28
+            # ]
+            #
+            # if genes_need_fragmentation:
+            #     from user_center.tasks import async_fragment_genes
+            #     gene_ids_to_fragment = [gene.id for gene in genes_need_fragmentation]
+            #     task = async_fragment_genes.delay(gene_ids_to_fragment)
+            #     logger.info(f"Triggered async fragmentation for {len(gene_ids_to_fragment)} genes (task: {task.id})")
+            #
+            #     # 将 task_id 存入 session，前端可以查询进度
+            #     if 'fragmentation_tasks' not in request.session:
+            #         request.session['fragmentation_tasks'] = []
+            #     request.session['fragmentation_tasks'].append({
+            #         'task_id': task.id,
+            #         'gene_ids': gene_ids_to_fragment,
+            #         'started_at': timezone.now().isoformat()
+            #     })
+            #     request.session.modified = True
         else:
             # print("Processing AA sequence")
 
@@ -387,27 +428,29 @@ def process_highlights_positions(row):
     # 定义一个正则表达式模式来提取所有数字
     pattern = r'\d+'
 
+    def extract_field_numbers(item, field_name):
+        match = re.search(rf'{field_name}\s*:\s*([^|]+)', item)
+        if not match:
+            return []
+        return list(map(int, re.findall(pattern, match.group(1))))
+
     # 遍历每种分析类型以处理 start 和 end 位置
     # ========== 新增三个特征类型 ==========
     for analysis_type in ['LongRepeats', 'Homopolymers', 'W12S12Motifs', 'HighGC', 'LowGC', 'DoubleNT',
                           'TandemRepeats', 'PalindromeRepeats', 'InvertedRepeats']:
-        # 分割该类型的字符串值
         if analysis_type not in row:
             continue
-        analysis_data = row[analysis_type].split('|')
+        analysis_value = row[analysis_type]
+        if not isinstance(analysis_value, str) or not analysis_value.strip():
+            continue
 
-        # 找到 start 和 end 的值
+        items = [item.strip() for item in analysis_value.split(';') if item.strip()]
+
         # InvertedRepeats 有两组 start/end (stem1 和 stem2)，需要特殊处理
         if analysis_type == 'InvertedRepeats':
-            stem1_start_data = [data.strip() for data in analysis_data if 'stem1_start' in data]
-            stem1_end_data = [data.strip() for data in analysis_data if 'stem1_end' in data]
-            stem2_start_data = [data.strip() for data in analysis_data if 'stem2_start' in data]
-            stem2_end_data = [data.strip() for data in analysis_data if 'stem2_end' in data]
-
-            # 处理 stem1
-            if stem1_start_data and stem1_end_data:
-                stem1_starts = list(map(int, re.findall(pattern, stem1_start_data[0])))
-                stem1_ends = list(map(int, re.findall(pattern, stem1_end_data[0])))
+            for item in items:
+                stem1_starts = extract_field_numbers(item, 'stem1_start')
+                stem1_ends = extract_field_numbers(item, 'stem1_end')
                 for i in range(min(len(stem1_starts), len(stem1_ends))):
                     highlights_positions.append({
                         'start': stem1_starts[i],
@@ -415,10 +458,8 @@ def process_highlights_positions(row):
                         'type': 'text-warning',
                     })
 
-            # 处理 stem2
-            if stem2_start_data and stem2_end_data:
-                stem2_starts = list(map(int, re.findall(pattern, stem2_start_data[0])))
-                stem2_ends = list(map(int, re.findall(pattern, stem2_end_data[0])))
+                stem2_starts = extract_field_numbers(item, 'stem2_start')
+                stem2_ends = extract_field_numbers(item, 'stem2_end')
                 for i in range(min(len(stem2_starts), len(stem2_ends))):
                     highlights_positions.append({
                         'start': stem2_starts[i],
@@ -426,21 +467,10 @@ def process_highlights_positions(row):
                         'type': 'text-warning',
                     })
         else:
-            start_data = [data.strip() for data in analysis_data if 'start' in data]
-            end_data = [data.strip() for data in analysis_data if 'end' in data]
-
-            # 确保同时存在 start 和 end 值
-            if start_data and end_data:
-                # 提取所有的 start 和 end 数值
-                start_results = list(map(int, re.findall(pattern, start_data[0])))
-                end_results = list(map(int, re.findall(pattern, end_data[0])))
-
-                # 确保 start 和 end 列表长度一致
-                if len(start_results) != len(end_results):
-                    continue  # 如果不一致，跳过当前分析类型
-
-                # 遍历提取出的 start 和 end 位置，并添加到 highlights_positions
-                for index in range(len(start_results)):
+            for item in items:
+                start_results = extract_field_numbers(item, 'start')
+                end_results = extract_field_numbers(item, 'end')
+                for index in range(min(len(start_results), len(end_results))):
                     highlights_positions.append({
                         'start': start_results[index],
                         'end': end_results[index],
@@ -827,11 +857,135 @@ def view_cart(request):
     species_list = Species.objects.all()
     species_names = sorted([species.species_name for species in species_list])
 
+    # 获取正在进行的切割任务
+    fragmentation_tasks = request.session.get('fragmentation_tasks', [])
+
+    # 清理超过1小时的旧任务
+    if fragmentation_tasks:
+        from datetime import datetime, timedelta
+        now = timezone.now()
+        fragmentation_tasks = [
+            task for task in fragmentation_tasks
+            if (now - datetime.fromisoformat(task['started_at'].replace('Z', '+00:00'))).total_seconds() < 3600
+        ]
+        request.session['fragmentation_tasks'] = fragmentation_tasks
+        request.session.modified = True
+
     context = {
         'grouped_shopping_cart': grouped_shopping_cart,
         'species_names': species_names,
+        'fragmentation_tasks': json.dumps(fragmentation_tasks),  # 传递任务给前端
     }
     return render(request, 'user_center/shoppingCart_view.html', context)
+
+
+@login_required
+def get_fragmentation_status(request):
+    """
+    获取片段切割任务的状态
+    """
+    from django.core.cache import cache
+
+    task_ids = request.GET.get('task_ids', '').split(',')
+    if not task_ids or task_ids == ['']:
+        return JsonResponse({'status': 'error', 'message': 'No task IDs provided'})
+
+    results = {}
+    for task_id in task_ids:
+        task_id = task_id.strip()
+        if not task_id:
+            continue
+
+        cache_key = f'fragment_task_{task_id}'
+        task_data = cache.get(cache_key)
+
+        if task_data:
+            results[task_id] = task_data
+        else:
+            # 如果缓存中没有，可能任务已经很久之前完成了
+            results[task_id] = {
+                'status': 'unknown',
+                'message': 'Task information not available'
+            }
+
+    return JsonResponse({'status': 'success', 'tasks': results})
+
+
+@login_required
+@require_POST
+def trigger_gene_fragmentation(request):
+    """
+    手动触发基因序列片段切割
+    用户可以选择特定的基因进行切割
+    """
+    try:
+        gene_ids = request.POST.getlist('gene_ids[]')
+
+        if not gene_ids:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No genes selected for fragmentation'
+            }, status=400)
+
+        # 获取用户的基因
+        genes = GeneInfo.objects.filter(
+            user=request.user,
+            id__in=gene_ids
+        ).select_related('vector')
+
+        if not genes.exists():
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No valid genes found'
+            }, status=404)
+
+        # 过滤出罚分 > 28 的基因
+        genes_need_fragmentation = [
+            gene for gene in genes
+            if gene.penalty_score and gene.penalty_score > 28
+        ]
+
+        if not genes_need_fragmentation:
+            return JsonResponse({
+                'status': 'info',
+                'message': 'None of the selected genes require fragmentation (all penalty scores ≤ 28)',
+                'total_selected': len(gene_ids),
+                'need_fragmentation': 0
+            })
+
+        # 触发异步切割任务
+        from user_center.tasks import async_fragment_genes
+        gene_ids_to_fragment = [gene.id for gene in genes_need_fragmentation]
+        task = async_fragment_genes.delay(gene_ids_to_fragment)
+
+        logger.info(f"User {request.user.username} manually triggered fragmentation for {len(gene_ids_to_fragment)} genes (task: {task.id})")
+
+        # 将 task_id 存入 session，前端可以查询进度
+        if 'fragmentation_tasks' not in request.session:
+            request.session['fragmentation_tasks'] = []
+        request.session['fragmentation_tasks'].append({
+            'task_id': task.id,
+            'gene_ids': gene_ids_to_fragment,
+            'started_at': timezone.now().isoformat()
+        })
+        request.session.modified = True
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Fragmentation started for {len(gene_ids_to_fragment)} genes',
+            'task_id': task.id,
+            'total_selected': len(gene_ids),
+            'need_fragmentation': len(gene_ids_to_fragment),
+            'skipped': len(gene_ids) - len(genes_need_fragmentation)
+        })
+
+    except Exception as e:
+        logger.error(f"Error triggering fragmentation: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Failed to trigger fragmentation: {str(e)}'
+        }, status=500)
+
 
 # checked
 @login_required
@@ -1183,20 +1337,79 @@ def bulk_download_geneinfo_excel(request):
         if not gene_ids:
             return JsonResponse({"error": "No genes selected"}, status=400)
 
-        gene_info_list = GeneInfo.objects.filter(user=request.user, id__in=gene_ids)
-        gene_info_list = gene_info_list.values(
-            'gene_name', 'species__species_name', 'vector__vector_name', 'vector__vector_id', 
-            'i5nc', 'i3nc', 'forbid_seq', 'original_seq','original_gc_content','saved_seq',
-            'modified_gc_content','status', 'penalty_score'
-        )
-        # analysis_result 要处理一下，不能直接加入到DataFrame中
-        # 以后处理
+        # 获取完整的GeneInfo对象(需要fragments_data字段)
+        gene_info_list = GeneInfo.objects.filter(user=request.user, id__in=gene_ids).select_related('species', 'vector')
 
-        df = pd.DataFrame(gene_info_list)
-        # 重新修改一下列名
-        df.columns = ['GeneName', 'Species', 'VectorName', 'VectorID', 'i5nc', 'i3nc', 'ForbiddenSeqs', 
-                      'OriginalSeq', 'OriginalGCContent', 'ModifiedSeq', 'ModifiedGCContent', 'Status',
-                      'PenaltyScore']
+        # 构建数据列表
+        data_rows = []
+        for gene in gene_info_list:
+            row = {
+                'GeneName': gene.gene_name,
+                'Species': gene.species.species_name if gene.species else '',
+                'VectorName': gene.vector.vector_name if gene.vector else '',
+                'VectorID': gene.vector.vector_id if gene.vector else '',
+                'v5NC': gene.vector.NC5 if gene.vector else '',
+                'v3NC': gene.vector.NC3 if gene.vector else '',
+                'i5nc': gene.i5nc or '',
+                'i3nc': gene.i3nc or '',
+                'ForbiddenSeqs': gene.forbid_seq or '',
+                'OriginalSeq': gene.original_seq or '',
+                'OriginalGCContent': gene.original_gc_content or '',
+                'ModifiedSeq': gene.saved_seq or '',
+                'ModifiedGCContent': gene.modified_gc_content or '',
+                'Status': gene.status or '',
+                'PenaltyScore': gene.penalty_score or '',
+            }
+
+            # 处理片段信息
+            if gene.fragments_data:
+                frag_data = gene.fragments_data
+                row['IsFragmented'] = 'Yes' if frag_data.get('need_fragmentation') else 'No'
+                row['CloningMethod'] = frag_data.get('cloning_method', '')
+                row['TotalFragments'] = frag_data.get('total_fragments', 1)
+                row['MustCut'] = frag_data.get('mustcut_positions', '')
+
+                # 片段详情(格式: "Frag1(0-1000,25.5);Frag2(1000-2000,27.8)")
+                fragments = frag_data.get('fragments', [])
+                if fragments:
+                    frag_details = []
+                    for frag in fragments:
+                        frag_details.append(f"Frag{frag['index']}({frag['start']}-{frag['end']},{frag['penalty_score']})")
+                    row['FragmentDetails'] = '; '.join(frag_details)
+                else:
+                    row['FragmentDetails'] = ''
+
+                # 警告信息
+                row['FragmentWarning'] = frag_data.get('warning', '')
+            else:
+                row['IsFragmented'] = 'No'
+                row['CloningMethod'] = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else ''
+                row['TotalFragments'] = 1
+                row['MustCut'] = ''
+                row['FragmentDetails'] = ''
+                row['FragmentWarning'] = ''
+
+            data_rows.append(row)
+
+        df = pd.DataFrame(data_rows)
+
+        # 添加 fullSeq 列：v5NC + i5NC + ModifiedSeq + i3NC + v3NC
+        df['FullSeq'] = (
+            df['v5NC'].fillna('') +
+            df['i5nc'].fillna('') +
+            df['ModifiedSeq'].fillna('') +
+            df['i3nc'].fillna('') +
+            df['v3NC'].fillna('')
+        )
+
+        # 调整列顺序
+        column_order = [
+            'GeneName', 'Species', 'VectorName', 'VectorID', 'v5NC', 'v3NC', 'i5nc', 'i3nc',
+            'ForbiddenSeqs', 'OriginalSeq', 'OriginalGCContent', 'ModifiedSeq',
+            'ModifiedGCContent', 'Status', 'PenaltyScore', 'FullSeq',
+            'IsFragmented', 'CloningMethod', 'TotalFragments', 'MustCut', 'FragmentDetails', 'FragmentWarning'
+        ]
+        df = df[column_order]
 
         # Prepare response with Excel content
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -1237,6 +1450,53 @@ def checkout(request):
 
     # 重定向到订单详情页面
     return JsonResponse({'status': 'success', 'message': 'Order created successfully', 'redirect_url': f'/user_center/manage_order/'})
+
+
+@login_required
+@require_POST
+def get_task_status(request):
+    """
+    API: 查询异步任务状态
+
+    POST参数:
+        process_task_id: ProcessTask对象的ID
+
+    返回:
+        {
+            'status': 'pending' | 'processing' | 'completed' | 'failed',
+            'progress': int,  # 已处理数量
+            'total': int,  # 总数量
+            'percentage': int,  # 进度百分比
+            'error_message': str | null,
+            'gene_ids': list | null  # 完成后的基因ID列表
+        }
+    """
+    from user_center.models import ProcessTask
+
+    try:
+        process_task_id = request.POST.get('process_task_id')
+        if not process_task_id:
+            return JsonResponse({'error': 'process_task_id is required'}, status=400)
+
+        # 获取ProcessTask对象
+        process_task = ProcessTask.objects.get(pk=process_task_id, user=request.user)
+
+        response_data = {
+            'status': process_task.status,
+            'progress': process_task.progress,
+            'total': process_task.total,
+            'percentage': process_task.get_progress_percentage(),
+            'error_message': process_task.error_message,
+            'gene_ids': process_task.gene_ids if process_task.status == 'completed' else None
+        }
+
+        return JsonResponse(response_data)
+
+    except ProcessTask.DoesNotExist:
+        return JsonResponse({'error': 'Task not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @login_required
 def view_order_detail(request, order_id):
@@ -1681,6 +1941,12 @@ def vector_automation_design_status(request):
         try:
             vector = Vector.objects.get(user=request.user, id=vector_id)
 
+            def parse_primer(value):
+                if value and '::' in value:
+                    parts = value.split('::', 1)
+                    return parts[0], parts[1]
+                return None, value or ''
+
             response_data = {
                 'status': 'success',
                 'design_status': vector.design_status,
@@ -1690,6 +1956,15 @@ def vector_automation_design_status(request):
 
             # 如果设计完成，返回详细信息
             if vector.design_status == 'Completed':
+                forward_name, forward_seq = parse_primer(vector.primer_forward)
+                reverse_name, reverse_seq = parse_primer(vector.primer_reverse)
+                forward_hairpin_tm = VectorAutomationDesigner.calculate_hairpin_tm(forward_seq) if forward_seq else None
+                reverse_hairpin_tm = VectorAutomationDesigner.calculate_hairpin_tm(reverse_seq) if reverse_seq else None
+                forward_dg = VectorAutomationDesigner.calculate_dimer_dg(forward_seq) if forward_seq else None
+                reverse_dg = VectorAutomationDesigner.calculate_dimer_dg(reverse_seq) if reverse_seq else None
+                hetero_dg = None
+                if forward_seq and reverse_seq:
+                    hetero_dg = VectorAutomationDesigner.calculate_dimer_dg(forward_seq, reverse_seq)
                 response_data.update({
                     'v5nc': vector.NC5,
                     'v3nc': vector.NC3,
@@ -1697,10 +1972,17 @@ def vector_automation_design_status(request):
                     'i3nc': vector.i3NC,
                     'iu20': vector.iu20,
                     'id20': vector.id20,
-                    'primer_forward': vector.primer_forward,
-                    'primer_reverse': vector.primer_reverse,
+                    'primer_forward': forward_seq,
+                    'primer_reverse': reverse_seq,
+                    'primer_forward_name': forward_name,
+                    'primer_reverse_name': reverse_name,
                     'primer_forward_tm': vector.primer_forward_tm,
                     'primer_reverse_tm': vector.primer_reverse_tm,
+                    'primer_forward_hairpin_tm': forward_hairpin_tm,
+                    'primer_reverse_hairpin_tm': reverse_hairpin_tm,
+                    'primer_forward_homodimer_dg': forward_dg,
+                    'primer_reverse_homodimer_dg': reverse_dg,
+                    'primer_heterodimer_dg': hetero_dg,
                     'has_genbank': bool(vector.vector_gb)
                 })
 

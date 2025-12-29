@@ -22,3 +22,4 @@ scikit-learn
 celery
 redis
 xlsxwriter
+primer3-py

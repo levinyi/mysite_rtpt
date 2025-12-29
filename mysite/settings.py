@@ -187,6 +187,17 @@ CELERY_BROKER_URL = config('CELERY_BROKER_URL')
 # 使用Redis作为结果存储
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
 
+# Django 缓存配置（使用Redis）
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('CELERY_BROKER_URL'),  # 复用 Celery 的 Redis
+        'OPTIONS': {
+            'db': '1',  # 使用不同的 Redis database
+        }
+    }
+}
+
 # 是否必须验证邮箱，常见选项有:
 # "mandatory": 用户注册后，必须先点邮箱验证链接才能登录
 # "optional":  用户可以不验证就登录，但会提示验证

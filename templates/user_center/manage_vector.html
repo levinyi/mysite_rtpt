@@ -184,10 +184,8 @@
                         name: 'Original File',
                         width: '150px',
                         formatter: (cell, row) => {
-                            // GridJS passes the whole row data, use _cells to access the raw data
-                            const rowData = row._cells;
-                            const vectorId = rowData[10];
-                            const fileName = rowData[2];
+                            const vectorId = row.cells[10].data;
+                            const fileName = row.cells[2].data;
                             if (fileName) {
                                 return gridjs.html(`
                                     <a href="/user_center/vector_download/${vectorId}/file/"
@@ -202,43 +200,35 @@
                         }
                     },
                     { name: 'Status', formatter: (cell, row) => {
-                        const badgeClass = cell === 'readyToUse' ? 'bg-primary' : 'bg-info';
-                        return gridjs.html(`<span class="badge ${badgeClass}">${cell}</span>`);
+                        const isReady = (cell || '').toLowerCase() === 'readytouse';
+                        const badgeClass = isReady ? 'bg-primary' : 'bg-info';
+                        const label = isReady ? 'ReadyToUse' : 'Waiting for Admin';
+                        return gridjs.html(`<span class="badge ${badgeClass}">${label}</span>`);
                     }},
                     { name: 'Vector ID', width: '100px' },
                     { name: 'iU20', width: '80px' },
                     { name: 'iD20', width: '80px' },
                     {
-                        name: 'Automation Design',
+                        name: 'Design Result',
                         width: '200px',
                         formatter: (cell, row) => {
-                            const rowData = row._cells;
-                            const vectorId = rowData[10];
-                            const designStatus = rowData[8];
-                            const cloningMethod = rowData[9];
+                            const vectorId = row.cells[10].data;
+                            const vectorStatus = row.cells[3].data;
+                            const isReady = (vectorStatus || '').toLowerCase() === 'readytouse';
 
                             let statusDisplay = '';
                             let buttons = '';
 
-                            if (designStatus === 'Completed') {
-                                statusDisplay = `<div class="mb-2"><span class="badge bg-success">${cloningMethod}</span></div>`;
+                            if (isReady) {
+                                statusDisplay = `<div class="mb-2"><span class="badge bg-success">ReadyToUse</span></div>`;
                                 buttons = `
-                                    <button class="btn btn-sm btn-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design">
-                                        <i class="bi bi-arrow-clockwise"></i>
-                                    </button>
                                     <button class="btn btn-sm btn-info" onclick="viewDesignResults(${vectorId})" title="View Results">
                                         <i class="bi bi-eye"></i> View
                                     </button>
                                 `;
-                            } else if (designStatus === 'Processing') {
-                                statusDisplay = `<div class="mb-2"><span class="badge bg-warning text-dark">Processing...</span></div>`;
-                                buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
-                            } else if (designStatus === 'Failed') {
-                                statusDisplay = `<div class="mb-2"><span class="badge bg-danger">Failed</span></div>`;
-                                buttons = `<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry Design"><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
                             } else {
-                                statusDisplay = `<div class="mb-2"><span class="badge bg-secondary">Not Designed</span></div>`;
-                                buttons = `<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`;
+                                statusDisplay = `<div class="mb-2"><span class="badge bg-secondary">Waiting</span></div>`;
+                                buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-clock"></i> Waiting for Admin</button>`;
                             }
 
                             return gridjs.html(`
@@ -253,11 +243,11 @@
                         name: 'Download Modified Files',
                         width: '180px',
                         formatter: (cell, row) => {
-                            const rowData = row._cells;
-                            const vectorId = rowData[10];
-                            const designStatus = rowData[8];
+                            const vectorId = row.cells[10].data;
+                            const vectorStatus = row.cells[3].data;
+                            const isReady = (vectorStatus || '').toLowerCase() === 'readytouse';
 
-                            if (designStatus === 'Completed') {
+                            if (isReady) {
                                 return gridjs.html(`
                                     <div style="display: flex; justify-content: center; gap: 10px;">
                                         <a href="/user_center/vector_automation_design_download/${vectorId}/"
@@ -271,7 +261,7 @@
                             } else {
                                 return gridjs.html(`
                                     <div style="text-align: center; color: #999;">
-                                        <small>Design first</small>
+                                        <small>Available after ReadyToUse</small>
                                     </div>
                                 `);
                             }
@@ -280,28 +270,29 @@
                     {
                         name: 'Delete', width: '50px',
                         formatter: (cell, row) => {
-                            const rowData = row._cells;
-                            const vectorId = rowData[10];
+                            const vectorId = row.cells[10].data;
                             return gridjs.html(`
                                 <a data-bs-toggle="tooltip" title="Delete" href="javascript:" onclick="del_vector(this, ${vectorId})" class="text-decoration-none">
                                     <i class="bi bi-trash text-danger"></i>
                                 </a>
                             `);
                         }
-                    }
+                    },
+                    { name: 'Vector Internal ID', hidden: true },
+                    { name: 'Placeholder', hidden: true }
                 ],
                 data: data.data.map((vector, index) => {
                     return [
                         index + 1,                                              // 0: #
                         vector.vector_name || '',                               // 1: Vector Name
                         vector.vector_file ? vector.vector_file.split('/').pop() : '', // 2: File name (for Original File column)
-                        '',                                                     // 3: Original File (formatted)
-                        vector.status || 'Submitted',                           // 4: Status
-                        vector.vector_id || '-',                                // 5: Vector ID
-                        vector.iu20 || '-',                                     // 6: iU20
-                        vector.id20 || '-',                                     // 7: iD20
-                        vector.design_status || 'Pending',                      // 8: Design Status
-                        vector.cloning_method || '',                            // 9: Cloning Method
+                        vector.status || '',                                    // 3: Status
+                        vector.vector_id || '-',                                // 4: Vector ID
+                        vector.iu20 || '-',                                     // 5: iU20
+                        vector.id20 || '-',                                     // 6: iD20
+                        '',                                                     // 7: Design Result (formatted)
+                        '',                                                     // 8: Download Modified Files (formatted)
+                        '',                                                     // 9: Delete (formatted)
                         vector.id,                                              // 10: Vector ID (for links)
                         ''                                                      // 11: Placeholder
                     ];
@@ -533,86 +524,6 @@
 </script>
 
 <script>
-    // 载体改造自动化设计功能
-    function startAutomationDesign(vectorId) {
-        if (!confirm('Are you sure you want to start the automation design for this vector?')) {
-            return;
-        }
-
-        showLoading();
-
-        $.ajax({
-            url: "{% url 'user_center:vector_automation_design_trigger' %}",
-            type: "POST",
-            data: {
-                'csrfmiddlewaretoken': '{{ csrf_token }}',
-                'vector_id': vectorId,
-            },
-            dataType: "json",
-            success: function (data) {
-                hideLoading();
-                if (data.status === 'success') {
-                    layer.msg('Design task started successfully! Please wait for completion.', { icon: 1 });
-
-                    // 开始轮询状态
-                    pollDesignStatus(vectorId);
-                } else {
-                    layer.msg(data.message, { icon: 2 });
-                }
-            },
-            error: function (xhr, errmsg, err) {
-                hideLoading();
-                layer.msg('Failed to start design task!', { icon: 2 });
-            }
-        });
-    }
-
-    function pollDesignStatus(vectorId, maxAttempts = 60) {
-        let attempts = 0;
-
-        const interval = setInterval(() => {
-            attempts++;
-
-            $.ajax({
-                url: "{% url 'user_center:vector_automation_design_status' %}",
-                type: "GET",
-                data: {
-                    'vector_id': vectorId,
-                },
-                dataType: "json",
-                success: function (data) {
-                    if (data.status === 'success') {
-                        const designStatus = data.design_status;
-
-                        if (designStatus === 'Completed') {
-                            clearInterval(interval);
-                            layer.msg('Design completed successfully!', { icon: 1 });
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
-                        } else if (designStatus === 'Failed') {
-                            clearInterval(interval);
-                            layer.msg('Design failed: ' + (data.design_error || 'Unknown error'), { icon: 2 });
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 2000);
-                        }
-                        // 如果是Processing状态，继续轮询
-                    }
-                },
-                error: function () {
-                    // 忽略轮询错误，继续尝试
-                }
-            });
-
-            // 超时停止轮询
-            if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                layer.msg('Design is taking longer than expected. Please refresh the page later.', { icon: 3 });
-            }
-        }, 5000); // 每5秒轮询一次
-    }
-
     function viewDesignResults(vectorId) {
         showLoading();
 
@@ -721,8 +632,11 @@
                                 <strong>Forward Primer</strong>
                             </div>
                             <div class="card-body">
+                                <p class="small mb-1"><strong>Name:</strong> ${data.primer_forward_name || 'N/A'}</p>
                                 <p class="font-monospace small">${data.primer_forward}</p>
-                                <p class="text-muted small">Tm: ${data.primer_forward_tm}°C</p>
+                                <p class="text-muted small mb-1">T97: ${data.primer_forward_tm ?? 'N/A'}°C</p>
+                                <p class="text-muted small mb-1">Hairpin Tm: ${data.primer_forward_hairpin_tm ?? 'N/A'}°C</p>
+                                <p class="text-muted small">Homodimer ΔG: ${data.primer_forward_homodimer_dg ?? 'N/A'} kcal/mol</p>
                             </div>
                         </div>
                     </div>
@@ -733,10 +647,18 @@
                                 <strong>Reverse Primer</strong>
                             </div>
                             <div class="card-body">
+                                <p class="small mb-1"><strong>Name:</strong> ${data.primer_reverse_name || 'N/A'}</p>
                                 <p class="font-monospace small">${data.primer_reverse}</p>
-                                <p class="text-muted small">Tm: ${data.primer_reverse_tm}°C</p>
+                                <p class="text-muted small mb-1">T97: ${data.primer_reverse_tm ?? 'N/A'}°C</p>
+                                <p class="text-muted small mb-1">Hairpin Tm: ${data.primer_reverse_hairpin_tm ?? 'N/A'}°C</p>
+                                <p class="text-muted small">Homodimer ΔG: ${data.primer_reverse_homodimer_dg ?? 'N/A'} kcal/mol</p>
                             </div>
                         </div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <p class="text-muted small mb-0">Heterodimer ΔG: ${data.primer_heterodimer_dg ?? 'N/A'} kcal/mol</p>
                     </div>
                 </div>
             `;

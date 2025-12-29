@@ -23,6 +23,7 @@ from user_center.models import OrderInfo
 from user_center.views import \
     vector_download as uc_vector_download, \
     vector_delete as uc_vector_delete
+from user_center.utils.vector_automation import VectorAutomationDesigner
 
 # from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
@@ -498,9 +499,104 @@ def vector_data_api(request):
     '''获取所有的vector数据,展示在前端表格中'''
     vector_list = Vector.objects.values(
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20', 
-        'status','user__username', 'vector_file', 'vector_png', 'vector_gb'
+        'status','user__username', 'vector_file', 'vector_png', 'vector_gb',
+        'design_status', 'cloning_method'
     )
     return JsonResponse({'data': list(vector_list)})
+
+
+@login_required
+@require_POST
+def vector_automation_design_trigger(request):
+    """
+    管理员触发载体改造自动化设计
+    """
+    vector_id = request.POST.get('vector_id')
+    if not vector_id:
+        return JsonResponse({'status': 'error', 'message': 'Missing vector ID'})
+
+    try:
+        vector = Vector.objects.get(id=vector_id)
+    except Vector.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': '载体不存在'})
+
+    if not vector.vector_file:
+        return JsonResponse({'status': 'error', 'message': '请先上传载体文件'})
+
+    vector.design_status = 'Pending'
+    vector.design_error = None
+    vector.save()
+
+    from user_center.tasks import async_vector_automation_design
+    task = async_vector_automation_design.delay(vector_id)
+
+    return JsonResponse({
+        'status': 'success',
+        'message': '载体改造设计任务已启动',
+        'task_id': task.id
+    })
+
+
+@login_required
+@require_GET
+def vector_automation_design_status(request):
+    """
+    管理员查询载体改造自动化设计状态
+    """
+    vector_id = request.GET.get('vector_id')
+    if not vector_id:
+        return JsonResponse({'status': 'error', 'message': 'Missing vector ID'})
+
+    try:
+        vector = Vector.objects.get(id=vector_id)
+    except Vector.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': '载体不存在'})
+
+    def parse_primer(value):
+        if value and '::' in value:
+            parts = value.split('::', 1)
+            return parts[0], parts[1]
+        return None, value or ''
+
+    response_data = {
+        'status': 'success',
+        'design_status': vector.design_status,
+        'cloning_method': vector.cloning_method,
+        'design_error': vector.design_error
+    }
+
+    if vector.design_status == 'Completed':
+        forward_name, forward_seq = parse_primer(vector.primer_forward)
+        reverse_name, reverse_seq = parse_primer(vector.primer_reverse)
+        forward_hairpin_tm = VectorAutomationDesigner.calculate_hairpin_tm(forward_seq) if forward_seq else None
+        reverse_hairpin_tm = VectorAutomationDesigner.calculate_hairpin_tm(reverse_seq) if reverse_seq else None
+        forward_dg = VectorAutomationDesigner.calculate_dimer_dg(forward_seq) if forward_seq else None
+        reverse_dg = VectorAutomationDesigner.calculate_dimer_dg(reverse_seq) if reverse_seq else None
+        hetero_dg = None
+        if forward_seq and reverse_seq:
+            hetero_dg = VectorAutomationDesigner.calculate_dimer_dg(forward_seq, reverse_seq)
+        response_data.update({
+            'v5nc': vector.NC5,
+            'v3nc': vector.NC3,
+            'i5nc': vector.i5NC,
+            'i3nc': vector.i3NC,
+            'iu20': vector.iu20,
+            'id20': vector.id20,
+            'primer_forward': forward_seq,
+            'primer_reverse': reverse_seq,
+            'primer_forward_name': forward_name,
+            'primer_reverse_name': reverse_name,
+            'primer_forward_tm': vector.primer_forward_tm,
+            'primer_reverse_tm': vector.primer_reverse_tm,
+            'primer_forward_hairpin_tm': forward_hairpin_tm,
+            'primer_reverse_hairpin_tm': reverse_hairpin_tm,
+            'primer_forward_homodimer_dg': forward_dg,
+            'primer_reverse_homodimer_dg': reverse_dg,
+            'primer_heterodimer_dg': hetero_dg,
+            'has_genbank': bool(vector.vector_gb)
+        })
+
+    return JsonResponse(response_data)
 
 
 @csrf_exempt  # 使用此装饰器来禁用 CSRF 保护，如果你在 AJAX 请求中已提供 CSRF token，则不需要这个装饰器

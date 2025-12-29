@@ -43,6 +43,13 @@ class GeneInfo(models.Model):
     optimization_message = models.TextField(null=True, blank=True)
     optimization_status = models.CharField(max_length=255, null=True, blank=True)
 
+    # new field for sequence fragmentation
+    fragments_data = models.JSONField(null=True, blank=True)
+    # 格式: [
+    #   {"index": 1, "seq": "ATCG...", "start": 0, "end": 1000, "penalty_score": 25.5},
+    #   {"index": 2, "seq": "GCTA...", "start": 1000, "end": 2000, "penalty_score": 27.8}
+    # ]
+
     def __str__(self):
         return self.gene_name
 
@@ -110,3 +117,40 @@ class GeneOptimization(models.Model):
 
     def __str__(self):
         return f"Optimization for {self.gene.gene_name}"
+
+
+class ProcessTask(models.Model):
+    """
+    Track async sequence processing tasks
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+
+    task_id = models.CharField(max_length=255, unique=True, verbose_name="Celery Task ID")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    vector = models.ForeignKey(Vector, on_delete=models.SET_NULL, null=True, blank=True)
+    species = models.ForeignKey(Species, on_delete=models.SET_NULL, null=True, blank=True)
+
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
+    progress = models.IntegerField(default=0, verbose_name="Processed sequences")
+    total = models.IntegerField(default=0, verbose_name="Total sequences")
+
+    error_message = models.TextField(null=True, blank=True)
+    gene_ids = models.JSONField(null=True, blank=True, help_text="List of created GeneInfo IDs")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"ProcessTask {self.task_id} - {self.status} ({self.progress}/{self.total})"
+
+    def get_progress_percentage(self):
+        """Calculate progress percentage"""
+        if self.total == 0:
+            return 0
+        return int((self.progress / self.total) * 100)

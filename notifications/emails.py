@@ -114,13 +114,13 @@ def send_vector_uploaded_staff_notify(vector):
         send_templated_email(subject, staff_emails, template_name, context)
 
 def send_vector_approved_user_email(vector):
-    subject = f"文件已审核通过 - {vector.filename}"
+    subject = f"文件已审核通过 - {vector.vector_name}"
     template_name = 'emails/vector_approved_user.html'
     context = {'vector': vector}
     send_templated_email(subject, [vector.user.userprofile.email], template_name, context)
 
 def send_vector_approved_staff_notify(vector):
-    subject = f"文件审核完成 - {vector.filename}"
+    subject = f"文件审核完成 - {vector.vector_name}"
     template_name = 'emails/vector_approved_staff.html'
     context = {'vector': vector}
     staff_emails = get_group_emails("TechStaffGroup")

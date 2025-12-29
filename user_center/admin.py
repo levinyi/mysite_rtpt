@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import GeneInfo, OrderInfo, Cart
+from .models import GeneInfo, OrderInfo, Cart, ProcessTask
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 
@@ -27,6 +27,13 @@ class OrderInfoAdmin(ImportExportModelAdmin):
     search_fields = ('id', 'user', 'order_time', 'status')
     resource_class = OrderInfoResource
 
+class ProcessTaskAdmin(admin.ModelAdmin):
+    list_display = ('id', 'task_id', 'user', 'status', 'progress', 'total', 'created_at', 'completed_at')
+    list_filter = ('status', 'created_at', 'user')
+    search_fields = ('task_id', 'user__username')
+    readonly_fields = ('task_id', 'created_at', 'updated_at', 'completed_at')
+
 admin.site.register(GeneInfo, GeneInfoAdmin)
 admin.site.register(OrderInfo, OrderInfoAdmin)
 admin.site.register(Cart)
+admin.site.register(ProcessTask, ProcessTaskAdmin)

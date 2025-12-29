@@ -4,10 +4,16 @@
 """
 import re
 import os
+import hashlib
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
+from Bio.SeqUtils import MeltingTemp as mt
+try:
+    import primer3
+except ImportError:
+    primer3 = None
 from tools.scripts.AnalysisSequence import DNARepeatsFinder
 
 
@@ -39,7 +45,12 @@ class VectorAutomationDesigner:
             dict: 包含解析结果的字典，如果失败则返回None
         """
         try:
-            self.record = SeqIO.read(self.genbank_file_path, "genbank")
+            try:
+                with open(self.genbank_file_path, "r", encoding="utf-8") as handle:
+                    self.record = SeqIO.read(handle, "genbank")
+            except UnicodeDecodeError:
+                with open(self.genbank_file_path, "r", encoding="latin-1") as handle:
+                    self.record = SeqIO.read(handle, "genbank")
 
             # 查找iU20和iD20 feature
             for feature in self.record.features:
@@ -98,33 +109,38 @@ class VectorAutomationDesigner:
         return 2 * at_count + 4 * gc_count
 
     @staticmethod
-    def calculate_tm_t97(sequence, primer_conc=0.5, salt_conc=50):
+    def calculate_tm_t97(sequence, salt_conc=100, mg_conc=3.4, k_conc=0, tris_conc=0, dntp_conc=0, saltcorr=7):
         """
         计算引物T97值（97%分子结合时的温度）
-        使用更准确的最近邻法（Nearest Neighbor）的简化版本
+        默认采用Biopython MeltingTemp的Nearest Neighbor算法，参数可调
 
         Args:
             sequence: DNA序列
-            primer_conc: 引物浓度 (μM)
-            salt_conc: 盐浓度 (mM)
+            salt_conc: 单价阳离子浓度 (mM)
+            mg_conc: Mg2+浓度 (mM)
+            k_conc: K+浓度 (mM)
+            tris_conc: Tris浓度 (mM)
+            dntp_conc: dNTP浓度 (mM)
+            saltcorr: Salt correction model id
 
         Returns:
             float: T97值（℃）
         """
         sequence = sequence.upper()
-        gc_count = sequence.count('G') + sequence.count('C')
-        at_count = sequence.count('A') + sequence.count('T')
-
-        # 使用改进的Wallace规则
-        if len(sequence) < 14:
-            tm = 2 * at_count + 4 * gc_count
-        else:
-            # 对于较长引物，使用更准确的公式
-            tm = 64.9 + 41 * (gc_count - 16.4) / (gc_count + at_count)
-
-        # 盐浓度校正
-        salt_correction = 16.6 * (salt_conc / 1000) ** 0.5
-        tm += salt_correction
+        if len(sequence) < 2:
+            return 0.0
+        try:
+            tm = mt.Tm_NN(
+                sequence,
+                Na=salt_conc,
+                K=k_conc,
+                Tris=tris_conc,
+                Mg=mg_conc,
+                dNTPs=dntp_conc,
+                saltcorr=saltcorr
+            )
+        except Exception:
+            tm = mt.Tm_Wallace(sequence)
 
         return round(tm, 2)
 
@@ -246,6 +262,30 @@ class VectorAutomationDesigner:
         total_penalty = sum(repeat.get('penalty_score', 0) for repeat in long_repeats)
 
         return total_penalty <= max_penalty, total_penalty
+
+    def _validate_gibson_arm(self, sequence):
+        """验证Gibson臂是否符合基本要求"""
+        if len(sequence) < 30:
+            return False
+        tm_val = self.calculate_tm_simple(sequence)
+        gc_val = self.calculate_gc_content(sequence)
+        if tm_val < 48 or not (20 < gc_val < 80):
+            return False
+        if self.has_homopolymer(sequence, max_length=7, bases='GC'):
+            return False
+        if self.count_gc_in_window(sequence, 12, 11):
+            return False
+        return True
+
+    def _update_shift_records(self, design_result, parsed_data, sequence):
+        """根据当前位置重新计算i5NC/i3NC"""
+        iu20_end = parsed_data['iu20_location'][1]
+        id20_start = parsed_data['id20_location'][0]
+        v5_end = design_result['v5nc_location'][1]
+        v3_start = design_result['v3nc_location'][0]
+
+        design_result['i5nc'] = sequence[v5_end:iu20_end] if v5_end < iu20_end else ''
+        design_result['i3nc'] = sequence[id20_start:v3_start] if v3_start > id20_start else ''
 
     def design_gibson_method(self, parsed_data):
         """
@@ -473,7 +513,7 @@ class VectorAutomationDesigner:
 
         return None
 
-    def design_nc_pcr_primers(self, design_result, parsed_data, target_tm=60):
+    def design_nc_pcr_primers(self, design_result, parsed_data, vector_code=None, target_tm=60):
         """
         设计NC-PCR引物（仅Gibson方法需要）
 
@@ -489,127 +529,214 @@ class VectorAutomationDesigner:
             return None
 
         sequence = parsed_data['sequence']
-        v5nc_start, v5nc_end = design_result['v5nc_location']
-        v3nc_start, v3nc_end = design_result['v3nc_location']
-
-        # 正向引物：从v5NC的第一个核苷酸开始
-        # 反向引物：从v3NC的第一个核苷酸开始（需要反向互补）
+        original_v5_start, original_v5_end = design_result['v5nc_location']
+        original_v3_start, original_v3_end = design_result['v3nc_location']
 
         min_primer_len = 16
         max_primer_len = 35
-        tm_tolerance = 2  # Tm值容差
+        tm_tolerance = 2  # T97值容差（用于fallback）
+        max_boundary_shift = 10
+        hairpin_tm_limit = 40
+        dimer_dg_limit = 11
 
-        # 设计正向引物
-        forward_primer = None
-        for length in range(min_primer_len, max_primer_len + 1):
-            primer_seq = sequence[v5nc_start:v5nc_start + length]
-            tm = self.calculate_tm_t97(primer_seq)
+        v5_len = original_v5_end - original_v5_start
+        v3_len = original_v3_end - original_v3_start
 
-            if abs(tm - target_tm) <= tm_tolerance:
-                # 检查hairpin和自配对（简化版本）
-                if not self.has_simple_hairpin(primer_seq):
-                    forward_primer = {
+        def attempt_design(v5_start, v3_start):
+            v5_end = v5_start + v5_len
+            v3_start_adj = v3_start
+            v3_end = v3_start_adj + v3_len
+            if v5_start < 0 or v3_end > len(sequence) or v5_end > parsed_data['iu20_location'][1]:
+                return None
+            if v3_start_adj < parsed_data['id20_location'][0]:
+                return None
+
+            v5_seq = sequence[v5_start:v5_end]
+            v3_seq = sequence[v3_start_adj:v3_end]
+
+            if not self._validate_gibson_arm(v5_seq) or not self._validate_gibson_arm(v3_seq):
+                return None
+
+            forward = None
+            forward_fallback = None
+            max_forward_len = min(max_primer_len, v5_len)
+            for length in range(min_primer_len, max_forward_len + 1):
+                if v5_start + length > len(sequence):
+                    break
+                primer_seq = sequence[v5_start:v5_start + length]
+                tm = self.calculate_tm_t97(primer_seq)
+                hairpin_tm = self.calculate_hairpin_tm(primer_seq)
+                if hairpin_tm is not None and hairpin_tm >= hairpin_tm_limit:
+                    continue
+                homodimer_dg = self.calculate_dimer_dg(primer_seq)
+                if homodimer_dg is not None and abs(homodimer_dg) >= dimer_dg_limit:
+                    continue
+                if tm >= target_tm:
+                    forward = {
                         'sequence': primer_seq,
                         'tm': tm,
-                        'length': length
+                        'length': length,
+                        'hairpin_tm': hairpin_tm,
+                        'homodimer_dg': homodimer_dg
                     }
                     break
-
-        # 设计反向引物（反向互补）
-        reverse_primer = None
-        for length in range(min_primer_len, max_primer_len + 1):
-            # 从v3NC位置往前延伸
-            primer_seq_template = sequence[v3nc_start - length + 1:v3nc_start + 1]
-            primer_seq = self.reverse_complement(primer_seq_template)
-            tm = self.calculate_tm_t97(primer_seq)
-
-            if abs(tm - target_tm) <= tm_tolerance:
-                # 检查hairpin和自配对
-                if not self.has_simple_hairpin(primer_seq):
-                    reverse_primer = {
+                elif tm >= target_tm - tm_tolerance:
+                    forward_fallback = {
                         'sequence': primer_seq,
                         'tm': tm,
-                        'length': length
+                        'length': length,
+                        'hairpin_tm': hairpin_tm,
+                        'homodimer_dg': homodimer_dg
+                    }
+
+            if not forward and forward_fallback:
+                forward = forward_fallback
+
+            reverse = None
+            reverse_fallback = None
+            max_reverse_len = min(max_primer_len, v3_len)
+            for length in range(min_primer_len, max_reverse_len + 1):
+                template_start = v3_end - length
+                if template_start < 0:
+                    continue
+                if template_start < v3_start_adj:
+                    continue
+                template = sequence[template_start:v3_end]
+                primer_seq = self.reverse_complement(template)
+                tm = self.calculate_tm_t97(primer_seq)
+                hairpin_tm = self.calculate_hairpin_tm(primer_seq)
+                if hairpin_tm is not None and hairpin_tm >= hairpin_tm_limit:
+                    continue
+                homodimer_dg = self.calculate_dimer_dg(primer_seq)
+                if homodimer_dg is not None and abs(homodimer_dg) >= dimer_dg_limit:
+                    continue
+                if tm >= target_tm:
+                    reverse = {
+                        'sequence': primer_seq,
+                        'tm': tm,
+                        'length': length,
+                        'hairpin_tm': hairpin_tm,
+                        'homodimer_dg': homodimer_dg
                     }
                     break
+                elif tm >= target_tm - tm_tolerance:
+                    reverse_fallback = {
+                        'sequence': primer_seq,
+                        'tm': tm,
+                        'length': length,
+                        'hairpin_tm': hairpin_tm,
+                        'homodimer_dg': homodimer_dg
+                    }
 
-        if not forward_primer or not reverse_primer:
-            self.errors.append("NC-PCR引物设计失败：无法找到满足Tm=60℃的引物")
-            return None
+            if not reverse and reverse_fallback:
+                reverse = reverse_fallback
 
-        # 检查引物间相互配对
-        if self.check_primer_interaction(forward_primer['sequence'], reverse_primer['sequence']):
-            self.errors.append("NC-PCR引物设计失败：引物间存在明显配对")
-            return None
+            if not forward or not reverse:
+                return None
 
-        return {
-            'forward': forward_primer,
-            'reverse': reverse_primer
-        }
+            hetero_dg = self.calculate_dimer_dg(forward['sequence'], reverse['sequence'])
+            if hetero_dg is not None and abs(hetero_dg) >= dimer_dg_limit:
+                return None
+
+            return forward, reverse, (v5_start, v5_end), (v3_start_adj, v3_end), hetero_dg
+
+        for shift5 in range(0, max_boundary_shift + 1):
+            new_v5_start = max(0, original_v5_start - shift5)
+            for shift3 in range(0, max_boundary_shift + 1):
+                new_v3_start = original_v3_start + shift3
+                attempt = attempt_design(new_v5_start, new_v3_start)
+                if attempt:
+                    forward, reverse, v5_loc, v3_loc, hetero_dg = attempt
+                    design_result['v5nc_location'] = v5_loc
+                    design_result['v3nc_location'] = v3_loc
+                    design_result['v5nc'] = sequence[v5_loc[0]:v5_loc[1]]
+                    design_result['v3nc'] = sequence[v3_loc[0]:v3_loc[1]]
+                    self._update_shift_records(design_result, parsed_data, sequence)
+
+                    forward['name'] = self.generate_primer_name(vector_code, '5OL', f"{v5_loc[0]}-{v5_loc[1]}")
+                    reverse['name'] = self.generate_primer_name(vector_code, '3OLrc', f"{v3_loc[0]}-{v3_loc[1]}")
+
+                    return {
+                        'forward': forward,
+                        'reverse': reverse,
+                        'heterodimer_dg': hetero_dg
+                    }
+
+        self.errors.append("NC-PCR引物设计失败：无法在允许边界内找到满足T97=60℃的引物")
+        return None
 
     @staticmethod
-    def has_simple_hairpin(sequence, stem_length=4):
-        """
-        简化的hairpin检测
-        检查序列中是否存在可能形成hairpin的反向互补区域
-
-        Args:
-            sequence: DNA序列
-            stem_length: 最小stem长度
-
-        Returns:
-            bool: True如果可能存在hairpin
-        """
+    def calculate_hairpin_tm(sequence, stem_length=4, max_stem=6):
+        """计算序列中可能形成的hairpin的最高Tm"""
         sequence = sequence.upper()
         n = len(sequence)
+        max_tm = None
 
-        for i in range(n - stem_length * 2):
-            for j in range(i + stem_length, n - stem_length + 1):
-                stem1 = sequence[i:i + stem_length]
-                stem2 = sequence[j:j + stem_length]
-                stem2_rc = VectorAutomationDesigner.reverse_complement(stem2)
+        for sl in range(stem_length, max_stem + 1):
+            for i in range(n - sl * 2):
+                for j in range(i + sl, n - sl + 1):
+                    stem1 = sequence[i:i + sl]
+                    stem2 = sequence[j:j + sl]
+                    stem2_rc = VectorAutomationDesigner.reverse_complement(stem2)
 
-                if stem1 == stem2_rc:
-                    return True
-
-        return False
+                    if stem1 == stem2_rc:
+                        stem_tm = VectorAutomationDesigner.calculate_tm_t97(stem1)
+                        if max_tm is None or stem_tm > max_tm:
+                            max_tm = stem_tm
+        return max_tm
 
     @staticmethod
-    def check_primer_interaction(primer1, primer2, min_match=4):
+    def has_simple_hairpin(sequence, stem_length=4, tm_threshold=40):
+        hairpin_tm = VectorAutomationDesigner.calculate_hairpin_tm(sequence, stem_length)
+        return hairpin_tm is not None and hairpin_tm >= tm_threshold
+
+    @staticmethod
+    def calculate_dimer_dg(primer1, primer2=None, mv_conc=100, dv_conc=3.4, dntp_conc=0, dna_conc=0.25):
+        """使用primer3计算引物自/互二聚体ΔG"""
+        if primer3 is None:
+            return None
+        try:
+            if primer2:
+                result = primer3.calcHeterodimer(
+                    primer1,
+                    primer2,
+                    mv_conc=mv_conc,
+                    dv_conc=dv_conc,
+                    dntp_conc=dntp_conc,
+                    dna_conc=dna_conc
+                )
+            else:
+                result = primer3.calcHomodimer(
+                    primer1,
+                    mv_conc=mv_conc,
+                    dv_conc=dv_conc,
+                    dntp_conc=dntp_conc,
+                    dna_conc=dna_conc
+                )
+            if result is None:
+                return None
+            # primer3返回单位为cal/mol, 转为kcal/mol
+            return result.dg / 1000.0
+        except Exception:
+            return None
+
+    @staticmethod
+    def has_primer_dimer(primer, dg_limit=11):
+        """判断单个引物是否存在明显自二聚体"""
+        dg = VectorAutomationDesigner.calculate_dimer_dg(primer)
+        if dg is None:
+            return False
+        return abs(dg) >= dg_limit
+
+    @staticmethod
+    def check_primer_interaction(primer1, primer2, dg_limit=11):
         """
-        检查两个引物是否会相互配对
-
-        Args:
-            primer1: 第一个引物序列
-            primer2: 第二个引物序列
-            min_match: 最小连续匹配碱基数
-
-        Returns:
-            bool: True如果存在明显配对
+        检查两个引物是否会相互配对（使用primer3 ΔG）
         """
-        primer1 = primer1.upper()
-        primer2_rc = VectorAutomationDesigner.reverse_complement(primer2)
-
-        # 检查所有可能的对齐位置
-        for offset in range(-len(primer1), len(primer2_rc)):
-            match_count = 0
-            max_consecutive_match = 0
-            consecutive_match = 0
-
-            for i in range(len(primer1)):
-                j = i + offset
-                if 0 <= j < len(primer2_rc):
-                    if primer1[i] == primer2_rc[j]:
-                        match_count += 1
-                        consecutive_match += 1
-                        max_consecutive_match = max(max_consecutive_match, consecutive_match)
-                    else:
-                        consecutive_match = 0
-
-            if max_consecutive_match >= min_match:
-                return True
-
-        return False
+        dg = VectorAutomationDesigner.calculate_dimer_dg(primer1, primer2)
+        if dg is None:
+            return False
+        return abs(dg) >= dg_limit
 
     def generate_modified_genbank(self, design_result, parsed_data, primer_result, output_path, vector_name):
         """
@@ -680,6 +807,44 @@ class VectorAutomationDesigner:
         )
         modified_record.features.append(v3nc_feature)
 
+        # 4.1 NC-PCR primers (Gibson only)
+        if primer_result:
+            forward = primer_result.get('forward')
+            reverse = primer_result.get('reverse')
+
+            if forward and forward.get('sequence'):
+                forward_seq = forward['sequence']
+                forward_start = v5nc_start
+                forward_end = forward_start + len(forward_seq)
+                forward_label = forward.get('name') or 'Forward Primer'
+                forward_notes = [f"Sequence: {forward_seq}"]
+                if forward.get('tm') is not None:
+                    forward_notes.append(f"T97: {forward['tm']}C")
+                forward_feature = SeqFeature(
+                    FeatureLocation(forward_start, forward_end, strand=1),
+                    type="primer_bind",
+                    qualifiers={'label': [forward_label], 'note': forward_notes}
+                )
+                modified_record.features.append(forward_feature)
+
+            if reverse and reverse.get('sequence'):
+                reverse_seq = reverse['sequence']
+                reverse_end = v3nc_end
+                reverse_start = reverse_end - len(reverse_seq)
+                v3nc_offset = v3nc_new_start - v3nc_start
+                reverse_start += v3nc_offset
+                reverse_end += v3nc_offset
+                reverse_label = reverse.get('name') or 'Reverse Primer'
+                reverse_notes = [f"Sequence: {reverse_seq}"]
+                if reverse.get('tm') is not None:
+                    reverse_notes.append(f"T97: {reverse['tm']}C")
+                reverse_feature = SeqFeature(
+                    FeatureLocation(reverse_start, reverse_end, strand=-1),
+                    type="primer_bind",
+                    qualifiers={'label': [reverse_label], 'note': reverse_notes}
+                )
+                modified_record.features.append(reverse_feature)
+
         # 5. iD20（位置需要调整）
         id20_offset = len(modified_seq) - len(sequence)
         id20_new_start = id20_start + id20_offset
@@ -729,3 +894,25 @@ class VectorAutomationDesigner:
         if match:
             return match.group(1)
         return 'pCVa001'  # 默认值
+
+    def extract_filename_suffix(self, filename):
+        """
+        提取文件名中的描述部分（pCVaXXX(抗性)-xxxx.gb -> xxxx）
+        """
+        base = os.path.basename(filename)
+        if '-' in base:
+            suffix = base.split('-', 1)[1]
+        else:
+            suffix = os.path.splitext(base)[0]
+        suffix = os.path.splitext(suffix)[0].strip()
+        return suffix or 'Modified'
+
+    @staticmethod
+    def generate_primer_name(vector_code, suffix, token):
+        """
+        生成符合要求的引物名称
+        """
+        code = vector_code or 'Vector'
+        digest = hashlib.md5(f"{code}-{suffix}-{token}".encode()).hexdigest()
+        number = int(digest[:6], 16) % 10000
+        return f"YHY{number:04d}-{code}M1-{suffix}"

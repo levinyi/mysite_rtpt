@@ -43,13 +43,15 @@ urlpatterns = [
     path('validation_save/<int:id>/', views.validation_save, name='validation_save'),
     path('vector_download/<int:vector_id>/<str:file_type>/', views.vector_download, name='vector_download'),
 
-    # 载体改造自动化设计
-    path('vector_automation_design_trigger/', views.vector_automation_design_trigger, name='vector_automation_design_trigger'),
+    # 载体改造自动化设计（用户仅查看状态和下载结果）
     path('vector_automation_design_status/', views.vector_automation_design_status, name='vector_automation_design_status'),
     path('vector_automation_design_download/<int:vector_id>/', views.vector_automation_design_download, name='vector_automation_design_download'),
 
     # api
     path('api/generate-genbank/', views.generate_genbank, name='generate_genbank'),
+    path('api/get_task_status/', views.get_task_status, name='get_task_status'),
+    path('api/get_fragmentation_status/', views.get_fragmentation_status, name='get_fragmentation_status'),
+    path('api/trigger_gene_fragmentation/', views.trigger_gene_fragmentation, name='trigger_gene_fragmentation'),
     path('test/', views.test, name='test'),
     path('test_django_send/', views.test_django_send, name='test_django_send'),
 ]

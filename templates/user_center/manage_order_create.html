@@ -340,6 +340,66 @@
         });
     }
 
+    // 轮询任务状态
+    function pollTaskStatus(processTaskId, submitBtn) {
+        const pollInterval = 2000; // 每2秒轮询一次
+        let progressText = submitBtn.querySelector('.btn-loading');
+
+        const checkStatus = () => {
+            fetch('/user_center/api/get_task_status/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: new URLSearchParams({
+                    'process_task_id': processTaskId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    hideLoading();
+                    submitBtn.disabled = false;
+                    submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+                    progressText.style.display = 'none';
+                    alert('Error checking task status: ' + data.error);
+                    return;
+                }
+
+                // 更新进度显示
+                progressText.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processing ${data.percentage}% (${data.progress}/${data.total})`;
+
+                if (data.status === 'completed') {
+                    // 任务完成，跳转到购物车
+                    hideLoading();
+                    window.location.href = '/user_center/view_cart/';
+                } else if (data.status === 'failed') {
+                    // 任务失败
+                    hideLoading();
+                    submitBtn.disabled = false;
+                    submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+                    progressText.style.display = 'none';
+                    alert('Processing failed: ' + (data.error_message || 'Unknown error'));
+                } else {
+                    // 继续轮询
+                    setTimeout(checkStatus, pollInterval);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                submitBtn.disabled = false;
+                submitBtn.querySelector('.btn-text').style.display = 'inline-block';
+                progressText.style.display = 'none';
+                console.error('Error:', error);
+                alert('Error polling task status: ' + error);
+            });
+        };
+
+        // 开始第一次轮询
+        checkStatus();
+    }
+
     function postDataFromNtSequence() {
         // 获取当前活动Tab的Handsontable数据
         const hotData = hot1.getData();
@@ -398,15 +458,19 @@
         })
         .then(response => response.json())
         .then(data => {
-            hideLoading(); // 隐藏全局loading
             if(data.status == 'error') {
+                hideLoading(); // 隐藏全局loading
                 // 恢复按钮状态
                 submitBtn.disabled = false;
                 submitBtn.querySelector('.btn-text').style.display = 'inline-block';
                 submitBtn.querySelector('.btn-loading').style.display = 'none';
                 alert(data.message);
+            } else if (data.status === 'processing') {
+                // 异步处理：开始轮询任务状态
+                pollTaskStatus(data.process_task_id, submitBtn);
             } else {
-                // 跳转到载体分析页面
+                // 同步处理完成：直接跳转
+                hideLoading();
                 window.location.href = '/user_center/view_cart/';
             }
         })
@@ -475,18 +539,19 @@
         })
         .then(response => response.json())
         .then(data => {
-            hideLoading(); // 隐藏全局loading
             if(data.status == 'error') {
+                hideLoading(); // 隐藏全局loading
                 // 恢复按钮状态
                 submitBtn.disabled = false;
                 submitBtn.querySelector('.btn-text').style.display = 'inline-block';
                 submitBtn.querySelector('.btn-loading').style.display = 'none';
                 alert(data.message);
-            } else if (data.status === 'info') {
-                // 当收到状态为 'info' 的响应时跳转到指定页面
-                window.location.href = '/user_center/view_cart/';
+            } else if (data.status === 'processing') {
+                // 异步处理：开始轮询任务状态
+                pollTaskStatus(data.process_task_id, submitBtn);
             } else {
-                // 跳转到载体分析页面
+                // 同步处理完成或info状态：直接跳转
+                hideLoading();
                 window.location.href = '/user_center/view_cart/';
             }
         })

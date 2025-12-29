@@ -22,3 +22,4 @@ script_tool/temp/
 *.txt
 *.pkl
 *.npy
+test_*.py

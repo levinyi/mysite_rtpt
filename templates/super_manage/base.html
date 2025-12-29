@@ -2,10 +2,112 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-2 col-sm-2 col-md-2 col-lg-2 col-xl-2 col-xxl-2">
+<style>
+    .main-layout {
+        display: flex;
+        width: 100%;
+    }
+
+    .sidebar-wrapper {
+        width: 250px;
+        flex-shrink: 0;
+    }
+
+    .sidebar-wrapper.collapsed {
+        width: 60px;
+    }
+
+    .leftslider {
+        width: 100%;
+        min-height: calc(100vh - 100px);
+        position: relative;
+    }
+
+    .leftslider .link-text {
+        display: inline;
+        opacity: 1;
+        white-space: nowrap;
+    }
+
+    .sidebar-wrapper.collapsed .leftslider {
+        padding: 0.5rem 0.25rem !important;
+    }
+
+    .sidebar-wrapper.collapsed .link-text {
+        opacity: 0;
+        display: none;
+    }
+
+    .sidebar-wrapper.collapsed hr {
+        margin: 0.5rem auto;
+        width: 60%;
+    }
+
+    .sidebar-wrapper.collapsed .nav-link {
+        padding: 0.5rem;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .sidebar-wrapper.collapsed .nav-link i {
+        margin: 0 !important;
+    }
+
+    .content-wrapper {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .toggle-sidebar-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        cursor: pointer;
+        padding: 4px 6px;
+        color: #6c757d;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .toggle-sidebar-btn:hover {
+        background: #f8f9fa;
+        color: #495057;
+        border-color: #adb5bd;
+    }
+
+    .sidebar-wrapper.collapsed .toggle-sidebar-btn {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+    }
+
+    @media (max-width: 768px) {
+        .sidebar-wrapper {
+            width: 60px;
+        }
+        .leftslider .link-text {
+            display: none;
+        }
+        .toggle-sidebar-btn {
+            display: none;
+        }
+    }
+</style>
+<div class="container-fluid p-0">
+    <div class="main-layout">
+        <div class="sidebar-wrapper">
             <div class="d-flex flex-column flex-shrink-0 p-3 bg-body-tertiary mt-3 leftslider">
+                <button class="toggle-sidebar-btn" id="toggleSidebarBtn" title="Toggle Sidebar">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
                 <hr>
                 <ul class="nav nav-pills flex-column mb-auto">
                     <li>
@@ -36,10 +138,29 @@
                 <hr>
             </div>
         </div>
-        <div class="col-10 col-10 col-sm-10 col-md-10 col-lg-10 col-xl-10 col-xxl-10" ">
+        <div class="content-wrapper">
             {% block manage_content %}
             {% endblock %}
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleBtn = document.getElementById('toggleSidebarBtn');
+        const sidebarWrapper = document.querySelector('.sidebar-wrapper');
+
+        if (!toggleBtn || !sidebarWrapper) return;
+
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            sidebarWrapper.classList.toggle('collapsed');
+
+            if (sidebarWrapper.classList.contains('collapsed')) {
+                this.innerHTML = '<i class="bi bi-chevron-right"></i>';
+            } else {
+                this.innerHTML = '<i class="bi bi-chevron-left"></i>';
+            }
+        });
+    });
+</script>
 {% endblock %}
