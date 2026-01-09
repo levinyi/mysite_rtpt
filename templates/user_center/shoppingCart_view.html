@@ -138,51 +138,184 @@
         color: #dc3545;
     }
 
-    /* Fragment Details Styling */
-    .fragment-details-row {
-        background-color: #f8f9fa;
+    /* Restriction Sites Column Styles */
+    .restriction-sites-cell {
+        min-width: 100px;
     }
 
-    .fragment-details-row td {
-        padding: 0 !important;
-    }
-
-    .fragment-toggle {
-        font-size: 0.85rem;
-        padding: 0.25rem 0.5rem;
-        border: none;
-    }
-
-    .fragment-toggle:hover {
-        background-color: #ffc720;
-    }
-
-    .fragment-toggle .toggle-icon {
+    .restriction-sites-cell .badge {
         font-size: 0.7rem;
-        transition: transform 0.3s ease;
+        padding: 0.2em 0.4em;
+        font-weight: 500;
     }
 
-    .fragment-toggle[aria-expanded="true"] .toggle-icon {
-        transform: rotate(180deg);
+    .restriction-sites-cell small {
+        font-size: 0.75rem;
     }
 
-    .fragment-details-row .table {
-        margin-bottom: 0;
-        font-size: 0.85rem;
+    /* Decision Column Styles */
+    .decision-cell {
+        min-width: 120px;
     }
 
-    .fragment-details-row code {
-        font-size: 0.9em;
-        padding: 0.1rem 0.3rem;
+    .decision-cell .badge {
+        font-size: 0.75rem;
+        padding: 0.3em 0.6em;
+        font-weight: 500;
+        white-space: nowrap;
     }
 
-    /* Fragmented gene row styling */
-    #shopping-cart-table tbody tr.fragmented {
-        border-left-color: #fd7e14 !important;
+    .decision-cell small {
+        font-size: 0.75rem;
     }
+
+    .fragmented-badge {
+        background-color: #cfe2ff;
+        color: #084298;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .fragmented-badge:hover {
+        background-color: #9ec5fe;
+        color: #052c65;
+    }
+
+    .fragment-detail-table {
+        font-size: 0.875rem;
+    }
+
+    .fragment-detail-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+
+    .vector-change-alert {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
 </style>
 {% endblock %}
 {% block content %}
+
+<!-- Modal for Fragment Details -->
+<div class="modal fade" id="fragmentDetailsModal" tabindex="-1" aria-labelledby="fragmentDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="fragmentDetailsModalLabel">
+                    <i class="bi bi-scissors me-2"></i>Fragment Details: <span id="fragmentGeneName"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading Spinner -->
+                <div id="fragmentDetailsLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading fragment details...</p>
+                </div>
+
+                <!-- Content Container -->
+                <div id="fragmentDetailsContent" class="d-none">
+                    <!-- Vector Change Warning (if needed) -->
+                    <div id="vectorChangeAlert" class="vector-change-alert d-none">
+                        <strong><i class="bi bi-exclamation-triangle me-2"></i>Vector Recommendation:</strong>
+                        <p id="vectorChangeReason" class="mb-0 mt-2"></p>
+                    </div>
+
+                    <!-- Summary Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-muted">Total Fragments</h6>
+                                    <h3 class="mb-0" id="totalFragments">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-muted">Cloning Method</h6>
+                                    <h5 class="mb-0" id="cloningMethod">-</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-muted">Total Penalty</h6>
+                                    <h3 class="mb-0" id="totalPenalty">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-danger">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-muted">Long Repeats</h6>
+                                    <h3 class="mb-0" id="longRepeatsPenalty">-</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MustCut Positions -->
+                    <div class="alert alert-info" role="alert">
+                        <strong><i class="bi bi-scissors me-2"></i>MustCut Positions:</strong>
+                        <code id="mustcutPositions" class="ms-2">-</code>
+                    </div>
+
+                    <!-- Adapter Adjustments (if any) -->
+                    <div id="adapterAdjustmentsSection" class="d-none mb-3">
+                        <div class="alert alert-warning" role="alert">
+                            <strong><i class="bi bi-wrench me-2"></i>Adapter Conflict Adjustments:</strong>
+                            <div id="adapterAdjustmentsList" class="mt-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- Fragment Table -->
+                    <h6 class="mb-3"><i class="bi bi-table me-2"></i>Fragment Details</h6>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover fragment-detail-table">
+                            <thead>
+                                <tr>
+                                    <th>Index</th>
+                                    <th>Position</th>
+                                    <th>Length (bp)</th>
+                                    <th>Penalty Score</th>
+                                    <th>Adapter Left</th>
+                                    <th>Adapter Right</th>
+                                    <th>Sequence Preview</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fragmentTableBody">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="fragmentDetailsError" class="alert alert-danger d-none" role="alert">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    <span id="fragmentDetailsErrorMessage"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal for bulk optimization settings -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="bulkOptimizationModal" tabindex="-1" aria-labelledby="bulkOptimizationModalLabel" aria-hidden="true">
@@ -350,30 +483,9 @@
             <div class="col-6 text-end">
                 <a href="{% url 'user_center:order_create' %}" class="btn btn-outline-primary">
                     <i class="bi bi-clipboard-plus me-2"></i> Add More</a>
-            </div>
-        </div>
-
-        <!-- Fragmentation Progress Alert -->
-        <div id="fragmentationProgressAlert" class="alert alert-info alert-dismissible fade show" role="alert" style="display: none;">
-            <div class="d-flex align-items-center">
-                <div class="spinner-border spinner-border-sm me-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <div class="flex-grow-1">
-                    <strong>Sequence Fragmentation in Progress</strong>
-                    <div class="mt-2">
-                        <div class="progress" style="height: 20px;">
-                            <div id="fragmentationProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
-                                 role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                                <span id="fragmentationProgressText">0%</span>
-                            </div>
-                        </div>
-                        <small id="fragmentationProgressDetail" class="text-muted mt-1 d-block">
-                            Processing 0 of 0 genes...
-                        </small>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button class="btn btn-warning ms-2" id="fragmentSequencesButton" type="button" onclick="fragmentCartGenes()">
+                    <i class="bi bi-scissors"></i> Fragment Sequences
+                </button>
             </div>
         </div>
 
@@ -413,13 +525,19 @@
                     <option value="low">Low (≤10)</option>
                 </select>
             </div>
-            <div class="col-md-3 mb-2">
-                <label for="fragmentationFilter" class="form-label small mb-1">Fragmentation:</label>
-                <select class="form-control" id="fragmentationFilter">
-                    <option value="all">All Genes</option>
-                    <option value="fragmented">Fragmented Only</option>
-                    <option value="not-fragmented">Not Fragmented</option>
-                </select>
+        </div>
+        <div id="fragmentationStatusContainer" class="alert alert-info d-none" role="alert">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <strong id="fragmentationStatusTitle">Fragmentation status</strong>
+                    <span id="fragmentationStatusText" class="ms-2"></span>
+                </div>
+                <button class="btn btn-sm btn-outline-primary d-none" id="fragmentationReloadButton" type="button">
+                    Reload
+                </button>
+            </div>
+            <div class="progress mt-2 d-none" id="fragmentationProgress">
+                <div class="progress-bar" id="fragmentationProgressBar" role="progressbar" style="width: 0%">0%</div>
             </div>
         </div>
         <!-- Table -->
@@ -436,9 +554,11 @@
                     <th scope="col">Sequence Status</th>
                     <th scope="col">Length(AA/NT)</th>
                     <th scope="col">GC%</th>
+                    <th scope="col">Restriction Sites</th>
+                    <th scope="col">Decision</th>
                     <th scope="col">Optimization Status</th>
                     <th scope="col">Penalty Score</th>
-                    <th scope="col">Fragmentation</th>
+                    <th scope="col">Fragment</th>
                     <th scope="col">Success Rate</th>
                     <th scope="col">Action</th>
                 </tr>
@@ -449,20 +569,20 @@
                     <td class="table-info" >
                         <input type="checkbox" class="date-select-checkbox" data-date="{{ group.date }}">
                     </td>
-                    <td colspan="13" class="table-info text-start"> {{ group.date }}</td>
+                    <td colspan="15" class="table-info text-start"> {{ group.date }}</td>
                 </tr>
                 {% for gene in group.genes %}
                 <tr data-status="{{ gene.status }}"
                     data-optimization-status="{{ gene.optimization_status }}"
                     data-penalty-score="{{ gene.penalty_score|default:'0' }}"
-                    data-is-fragmented="{% if gene.fragments_data and gene.fragments_data.need_fragmentation %}true{% else %}false{% endif %}"
-                    class="{% if gene.penalty_score == 0 or gene.penalty_score == None %}severity-ok{% elif gene.penalty_score <= 28 %}severity-warn{% else %}severity-high{% endif %}{% if gene.fragments_data and gene.fragments_data.need_fragmentation %} fragmented{% endif %}">
+                    class="{% if gene.penalty_score == 0 or gene.penalty_score == None %}severity-ok{% elif gene.penalty_score <= 28 %}severity-warn{% else %}severity-high{% endif %}">
                     <td>
                         <!-- 复选框 -->
-                        <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}" 
-                            data-length="{% if gene.seq_type == 'NT' %}{{ gene.saved_seq|safe|base_length }}{% else %}{{ gene.saved_seq|safe|base_length|multiply:3 }}{% endif %}" 
-                            data-date="{{ group.date }}" 
-                            data-vector="{{ gene.vector }}">
+                        <input type="checkbox" class="gene-checkbox" name="gene_id" value="{{ gene.id }}"
+                            data-length="{% if gene.seq_type == 'NT' %}{{ gene.saved_seq|safe|base_length }}{% else %}{{ gene.saved_seq|safe|base_length|multiply:3 }}{% endif %}"
+                            data-date="{{ group.date }}"
+                            data-vector="{{ gene.vector }}"
+                            data-gene-name="{{ gene.gene_name }}">
                     </td>
                     
                     <td>{{ forloop.counter }}</td>
@@ -513,6 +633,33 @@
                             {{ gene.modified_gc_content }}%
                         {% endif %}
                     </td>
+                    <td class="restriction-sites-cell">
+                        <!-- 限制性酶切位点信息 -->
+                        {% with bsai_count=gene|count_enzyme_sites:"BsaI" bsmbi_count=gene|count_enzyme_sites:"BsmBI" %}
+                            {% if bsai_count == 0 and bsmbi_count == 0 %}
+                                <small class="text-muted">None</small>
+                            {% else %}
+                                {% if bsai_count > 0 %}<span class="badge bg-primary" data-bs-toggle="tooltip" title="BsaI recognition sites">BsaI:{{ bsai_count }}</span>{% endif %}
+                                {% if bsmbi_count > 0 %}<span class="badge bg-info" data-bs-toggle="tooltip" title="BsmBI recognition sites">BsmBI:{{ bsmbi_count }}</span>{% endif %}
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="decision-cell">
+                        <!-- 决策结果 -->
+                        {% if gene.restriction_decision %}
+                            {% if gene.restriction_decision == 'accept' %}
+                                <span class="badge bg-success" data-bs-toggle="tooltip" title="{{ gene.restriction_message }}">
+                                    ✓ {{ gene.restriction_process_route }} route
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger" data-bs-toggle="tooltip" title="{{ gene.restriction_message }}">
+                                    ✗ Reject{% if gene.restriction_requires_manual_review %} ⚠{% endif %}
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if gene.optimization_status == 'Pending' %}
                             <span class="status-text"><i class="bi bi-hourglass-split status-icon text-secondary"></i>Pending</span>
@@ -542,16 +689,13 @@
                         {{ gene.penalty_score|default:"0" }}
                     </td>
                     <td>
-                        <!-- Fragmentation Info -->
                         {% if gene.fragments_data and gene.fragments_data.need_fragmentation %}
-                            <button class="btn btn-sm btn-warning fragment-toggle"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#fragments-{{ gene.id }}"
-                                    data-bs-toggle-tooltip="tooltip"
-                                    title="Click to view fragment details">
+                            <span class="fragmented-badge"
+                                  onclick="showFragmentDetails({{ gene.id }}, '{{ gene.gene_name|escapejs }}')"
+                                  data-bs-toggle="tooltip"
+                                  title="Click to view fragment details">
                                 <i class="bi bi-scissors"></i> {{ gene.fragments_data.total_fragments }} pieces
-                                <i class="bi bi-chevron-down toggle-icon"></i>
-                            </button>
+                            </span>
                         {% else %}
                             <span class="text-muted">-</span>
                         {% endif %}
@@ -582,100 +726,6 @@
                     </td>
                 </tr>
 
-                <!-- Expandable Fragment Details Row -->
-                {% if gene.fragments_data and gene.fragments_data.need_fragmentation %}
-                <tr id="fragments-{{ gene.id }}" class="collapse fragment-details-row">
-                    <td colspan="14" class="bg-light p-0">
-                        <div class="p-3">
-                            <div class="row mb-3">
-                                <div class="col-md-3">
-                                    <strong>Gene:</strong> <span class="text-primary">{{ gene.gene_name }}</span>
-                                </div>
-                                <div class="col-md-3">
-                                    <strong>Cloning Method:</strong>
-                                    <span class="badge {% if gene.fragments_data.cloning_method == 'Gibson' %}bg-info{% elif gene.fragments_data.cloning_method == 'GoldenGate' %}bg-success{% else %}bg-secondary{% endif %}">
-                                        {{ gene.fragments_data.cloning_method }}
-                                    </span>
-                                </div>
-                                <div class="col-md-3">
-                                    <strong>Total Penalty:</strong>
-                                    <span class="badge bg-danger">{{ gene.fragments_data.total_penalty_score }}</span>
-                                </div>
-                                <div class="col-md-3">
-                                    <strong>Long Repeats:</strong>
-                                    <span class="badge {% if gene.fragments_data.long_repeats_penalty > 28 %}bg-danger{% else %}bg-success{% endif %}">
-                                        {{ gene.fragments_data.long_repeats_penalty }}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-12">
-                                    <strong>MustCut Positions:</strong>
-                                    <code class="bg-white p-2 rounded">{{ gene.fragments_data.mustcut_positions }}</code>
-                                </div>
-                            </div>
-
-                            {% if gene.fragments_data.warning %}
-                            <div class="alert alert-warning mb-3">
-                                <i class="bi bi-exclamation-triangle"></i> {{ gene.fragments_data.warning }}
-                            </div>
-                            {% endif %}
-
-                            <h6 class="mb-2"><i class="bi bi-list-ul"></i> Fragment Details:</h6>
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered table-hover">
-                                    <thead class="table-secondary">
-                                        <tr>
-                                            <th style="width: 8%;">Fragment #</th>
-                                            <th style="width: 15%;">Position</th>
-                                            <th style="width: 10%;">Length</th>
-                                            <th style="width: 12%;">Penalty Score</th>
-                                            <th style="width: 12%;">Left Adapter</th>
-                                            <th style="width: 12%;">Right Adapter</th>
-                                            <th style="width: 31%;">Sequence Preview</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for frag in gene.fragments_data.fragments %}
-                                        <tr>
-                                            <td class="text-center"><strong>Frag {{ frag.index }}</strong></td>
-                                            <td class="text-center">{{ frag.start }} - {{ frag.end }}</td>
-                                            <td class="text-center">{{ frag.length }} bp</td>
-                                            <td class="text-center">
-                                                <span class="badge {% if frag.penalty_score <= 28 %}bg-success{% else %}bg-danger{% endif %}">
-                                                    {{ frag.penalty_score }}
-                                                </span>
-                                            </td>
-                                            <td class="text-center">
-                                                {% if frag.adapter_left %}
-                                                    <code class="text-primary">{{ frag.adapter_left }}</code>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center">
-                                                {% if frag.adapter_right %}
-                                                    <code class="text-success">{{ frag.adapter_right }}</code>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <small class="font-monospace">
-                                                    {{ frag.seq|slice:":40" }}{% if frag.seq|length > 40 %}...{% endif %}
-                                                </small>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-                {% endif %}
-
                 {% endfor %}
                 {% endfor %}
             </tbody>
@@ -694,12 +744,8 @@
                 <input type="checkbox" id="selectAllBottom" name="gene_id" value="all">
                 <label class="form-check-label ms-2 me-3" for="selectAllBottom">Select All</label>
                 
-                <button class="btn btn-success me-2" id="codonOptimizeButton" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
+                <button class="btn btn-success me-3" id="codonOptimizeButton" data-bs-toggle="modal" data-bs-target="#bulkOptimizationModal">
                     <i class="bi bi-sliders"></i> Codon Optimization
-                </button>
-
-                <button class="btn btn-warning me-3" id="fragmentSequencesButton" onclick="fragmentSelectedGenes()">
-                    <i class="bi bi-scissors"></i> Fragment Sequences
                 </button>
 
                 <!-- Card with three buttons -->
@@ -1248,23 +1294,16 @@
             applyFilters();
         });
 
-        // 监听切割筛选器的变化
-        $('#fragmentationFilter').on('change', function() {
-            applyFilters();
-        });
-
         // 应用筛选器函数
         function applyFilters() {
             const selectedStatus = $('#statusFilter').val();
             const selectedOptStatus = $('#optimizationStatusFilter').val();
             const selectedPenalty = $('#penaltyScoreFilter').val();
-            const selectedFragmentation = $('#fragmentationFilter').val();
 
             $('tbody tr[data-status]').each(function() {
                 const rowStatus = $(this).data('status');
                 const rowOptStatus = $(this).data('optimization-status');
                 const penaltyScore = parseFloat($(this).data('penalty-score')) || 0;
-                const isFragmented = $(this).data('is-fragmented') === true || $(this).data('is-fragmented') === 'true';
 
                 // 状态匹配
                 const statusMatch = selectedStatus === 'all' || rowStatus === selectedStatus;
@@ -1280,23 +1319,9 @@
                     penaltyMatch = penaltyScore <= 10;
                 }
 
-                // 切割状态匹配
-                let fragmentationMatch = true;
-                if (selectedFragmentation === 'fragmented') {
-                    fragmentationMatch = isFragmented;
-                } else if (selectedFragmentation === 'not-fragmented') {
-                    fragmentationMatch = !isFragmented;
-                }
-
                 // 显示/隐藏行
-                const shouldShow = statusMatch && optStatusMatch && penaltyMatch && fragmentationMatch;
+                const shouldShow = statusMatch && optStatusMatch && penaltyMatch;
                 $(this).toggle(shouldShow);
-
-                // 同时处理该基因的片段详情行
-                const geneId = $(this).find('.gene-checkbox').val();
-                if (geneId) {
-                    $('#fragments-' + geneId).toggle(shouldShow);
-                }
             });
 
             updateTotalPrice();
@@ -1315,63 +1340,18 @@
             }
 
             // 遍历选中基因的状态
-            let hasForbidden = false;
-            let hasNeedsOptimization = false;
-            let hasOptimizing = false;
-            let hasOptimizeFailed = false;
             let hasError = false;
-            let hasPending = false;
 
             $('input.gene-checkbox:checked').each(function () {
                 const row = $(this).closest('tr');
                 const sequenceStatus = row.data('status'); // 序列状态
-                const optimizationStatus = row.data('optimization-status'); // 优化状态
-
-                if (sequenceStatus === 'forbidden' && optimizationStatus !== 'Optimized') {
-                    hasForbidden = true;
-                }
-                if (optimizationStatus === 'NeedsOptimization') {
-                    hasNeedsOptimization = true;
-                }
-                if (optimizationStatus === 'Optimizing') {
-                    hasOptimizing = true;
-                }
-                if (optimizationStatus === 'OptimizeFailed') {
-                    hasOptimizeFailed = true;
-                }
-                if (optimizationStatus === 'Pending') {
-                    hasPending = true;
-                }
+                // 优化状态不再作为提交拦截条件
                 if (sequenceStatus === 'error') {
                     hasError = true;
                 }
             });
 
-            // 判断逻辑
-            if (hasForbidden) {
-                alert('Forbidden items must be optimized before submission.');
-                return;
-            }
-
-            if (hasNeedsOptimization) {
-                alert('Some items are marked for optimization. Please wait for optimization to complete.');
-                return;
-            }
-
-            if (hasOptimizing) {
-                alert('Some items are still optimizing. Please wait for the optimization to finish.');
-                return;
-            }
-
-            if (hasPending) {
-                alert('Some items have pending optimization status. Please wait for the optimization to start or complete.');
-                return;
-            }
-
-            if (hasOptimizeFailed) {
-                alert('Some items failed to optimize. Please retry optimization before submission.');
-                return;
-            }
+            // 判断逻辑（仅拦截错误状态）
 
             if (hasError) {
                 alert('Some items have errors and cannot be submitted. Please fix the issues.');
@@ -1496,6 +1476,249 @@
             selectedValues.push($(this).val());
         });
         return selectedValues;
+    }
+
+    let fragmentationTaskIds = [];
+    let fragmentationPoller = null;
+
+    function setFragmentationAlert(type, title, message, showProgress) {
+        const container = document.getElementById('fragmentationStatusContainer');
+        const titleEl = document.getElementById('fragmentationStatusTitle');
+        const textEl = document.getElementById('fragmentationStatusText');
+        const progressWrap = document.getElementById('fragmentationProgress');
+        const progressBar = document.getElementById('fragmentationProgressBar');
+        const reloadButton = document.getElementById('fragmentationReloadButton');
+
+        container.classList.remove('d-none', 'alert-info', 'alert-success', 'alert-warning', 'alert-danger');
+        container.classList.add(`alert-${type}`);
+        titleEl.textContent = title;
+        textEl.textContent = message || '';
+
+        if (showProgress) {
+            progressWrap.classList.remove('d-none');
+        } else {
+            progressWrap.classList.add('d-none');
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+        }
+
+        reloadButton.classList.add('d-none');
+    }
+
+    function updateFragmentationProgress(completed, total) {
+        const progressBar = document.getElementById('fragmentationProgressBar');
+        if (!total || total <= 0) {
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            return;
+        }
+        const percentage = Math.min(100, Math.round((completed / total) * 100));
+        progressBar.style.width = `${percentage}%`;
+        progressBar.textContent = `${percentage}%`;
+    }
+
+    function summarizeFragmentationTasks(tasks) {
+        const summary = {
+            total: 0,
+            completed: 0,
+            success: 0,
+            failed: 0,
+            skipped: 0,
+            processing: false,
+            unknown: 0
+        };
+
+        Object.values(tasks).forEach((task) => {
+            if (task.status === 'unknown') {
+                summary.unknown += 1;
+                return;
+            }
+            if (task.status === 'processing') {
+                summary.processing = true;
+            }
+            summary.total += task.total || 0;
+            summary.completed += task.completed || 0;
+            summary.success += task.success || 0;
+            summary.failed += task.failed || 0;
+            summary.skipped += task.skipped || 0;
+        });
+
+        return summary;
+    }
+
+    function renderFragmentationStatus(tasks) {
+        const summary = summarizeFragmentationTasks(tasks);
+
+        if (summary.processing) {
+            setFragmentationAlert(
+                'info',
+                'Fragmentation in progress',
+                `Completed ${summary.completed}/${summary.total}. Success: ${summary.success}, Failed: ${summary.failed}, Skipped: ${summary.skipped}.`,
+                true
+            );
+            updateFragmentationProgress(summary.completed, summary.total);
+            return;
+        }
+
+        if (summary.total > 0) {
+            setFragmentationAlert(
+                'success',
+                'Fragmentation completed',
+                `Success: ${summary.success}, Failed: ${summary.failed}, Skipped: ${summary.skipped}.`,
+                false
+            );
+            updateFragmentationProgress(summary.total, summary.total);
+            const reloadButton = document.getElementById('fragmentationReloadButton');
+            reloadButton.classList.remove('d-none');
+            reloadButton.onclick = function () {
+                window.location.reload();
+            };
+            return;
+        }
+
+        if (summary.unknown > 0) {
+            setFragmentationAlert(
+                'warning',
+                'Fragmentation status unavailable',
+                'Some task data expired. Please reload if you need updated results.',
+                false
+            );
+            return;
+        }
+
+        document.getElementById('fragmentationStatusContainer').classList.add('d-none');
+    }
+
+    function pollFragmentationStatus() {
+        if (!fragmentationTaskIds.length) {
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "user_center:get_fragmentation_status" %}',
+            type: 'GET',
+            data: {
+                'task_ids': fragmentationTaskIds.join(',')
+            },
+            success: function(response) {
+                if (response.status !== 'success') {
+                    setFragmentationAlert('warning', 'Fragmentation status error', response.message || 'Unable to load status.', false);
+                    return;
+                }
+                renderFragmentationStatus(response.tasks || {});
+
+                const stillProcessing = Object.values(response.tasks || {}).some((task) => task.status === 'processing');
+                if (!stillProcessing && fragmentationPoller) {
+                    clearInterval(fragmentationPoller);
+                    fragmentationPoller = null;
+                }
+            },
+            error: function() {
+                setFragmentationAlert('warning', 'Fragmentation status error', 'Unable to load status.', false);
+            }
+        });
+    }
+
+    function startFragmentationPolling(taskIds, replace) {
+        if (!taskIds.length) {
+            return;
+        }
+
+        if (replace) {
+            fragmentationTaskIds = taskIds.slice();
+            if (fragmentationPoller) {
+                clearInterval(fragmentationPoller);
+                fragmentationPoller = null;
+            }
+        } else {
+            fragmentationTaskIds = Array.from(new Set(fragmentationTaskIds.concat(taskIds)));
+        }
+
+        if (!fragmentationPoller) {
+            pollFragmentationStatus();
+            fragmentationPoller = setInterval(pollFragmentationStatus, 4000);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const initialTasks = {{ fragmentation_tasks|safe }};
+        if (Array.isArray(initialTasks) && initialTasks.length) {
+            const latestTask = initialTasks[initialTasks.length - 1];
+            if (latestTask && latestTask.task_id) {
+                startFragmentationPolling([latestTask.task_id], true);
+            }
+        }
+    });
+
+    // Fragment selected genes (or all if none selected)
+    function fragmentCartGenes() {
+        const selectedValues = getSelectedValues();
+        let targetValues = selectedValues;
+        let confirmMessage = '';
+
+        if (targetValues.length === 0) {
+            targetValues = $('.gene-checkbox').map(function () {
+                return $(this).val();
+            }).get();
+
+            if (targetValues.length === 0) {
+                setFragmentationAlert('warning', 'No genes to fragment', 'Your cart is empty.', false);
+                return;
+            }
+
+            confirmMessage = 'No genes selected. This will fragment all genes in your cart with penalty score > 28.\n\nDo you want to continue?';
+        } else {
+            confirmMessage = `This will fragment ${targetValues.length} selected gene(s) with penalty score > 28.\n\nDo you want to continue?`;
+        }
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        const fragmentButton = document.getElementById('fragmentSequencesButton');
+        const originalHTML = fragmentButton.innerHTML;
+        fragmentButton.disabled = true;
+        fragmentButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+
+        $.ajax({
+            url: '{% url "user_center:trigger_gene_fragmentation" %}',
+            type: 'POST',
+            data: {
+                'csrfmiddlewaretoken': '{{ csrf_token }}',
+                'gene_ids[]': targetValues
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    setFragmentationAlert(
+                        'info',
+                        'Fragmentation started',
+                        `Total selected: ${response.total_selected}. Need fragmentation: ${response.need_fragmentation}. Skipped: ${response.skipped || 0}.`,
+                        true
+                    );
+                    updateFragmentationProgress(0, response.need_fragmentation || response.total_selected || 0);
+                    if (response.task_id) {
+                        startFragmentationPolling([response.task_id], true);
+                    }
+                } else if (response.status === 'info') {
+                    setFragmentationAlert('warning', 'No fragmentation needed', response.message, false);
+                } else {
+                    setFragmentationAlert('danger', 'Fragmentation failed', response.message, false);
+                }
+
+                fragmentButton.disabled = false;
+                fragmentButton.innerHTML = originalHTML;
+            },
+            error: function(xhr) {
+                let errorMessage = 'Failed to trigger fragmentation.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                setFragmentationAlert('danger', 'Fragmentation failed', errorMessage, false);
+
+                fragmentButton.disabled = false;
+                fragmentButton.innerHTML = originalHTML;
+            }
+        });
     }
 
     // 下载GenBank格式文件
@@ -1758,168 +1981,135 @@ document.addEventListener('DOMContentLoaded', () => {
         this.submit();
     });
 
-    // ========== 片段切割进度监控 ==========
-    const fragmentationTasks = {{ fragmentation_tasks|safe }};
-
-    if (fragmentationTasks && fragmentationTasks.length > 0) {
-        // 过滤出仍在进行中的任务（最近10分钟内的）
-        const now = new Date();
-        const activeTasks = fragmentationTasks.filter(task => {
-            const taskTime = new Date(task.started_at);
-            const diffMinutes = (now - taskTime) / 1000 / 60;
-            return diffMinutes < 10; // 只监控最近10分钟内的任务
-        });
-
-        if (activeTasks.length > 0) {
-            let pollInterval;
-            const taskIds = activeTasks.map(t => t.task_id).join(',');
-
-            // 显示进度条
-            $('#fragmentationProgressAlert').show();
-
-            // 轮询函数
-            function checkFragmentationStatus() {
-                $.ajax({
-                    url: '{% url "user_center:get_fragmentation_status" %}',
-                    method: 'GET',
-                    data: { task_ids: taskIds },
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            let allCompleted = true;
-                            let totalGenes = 0;
-                            let completedGenes = 0;
-                            let successCount = 0;
-                            let failedCount = 0;
-
-                            // 汇总所有任务的进度
-                            for (const taskId in response.tasks) {
-                                const taskData = response.tasks[taskId];
-
-                                if (taskData.status === 'processing') {
-                                    allCompleted = false;
-                                    totalGenes += taskData.total || 0;
-                                    completedGenes += taskData.completed || 0;
-                                    successCount += taskData.success || 0;
-                                    failedCount += taskData.failed || 0;
-                                } else if (taskData.status === 'completed') {
-                                    totalGenes += taskData.total || 0;
-                                    completedGenes += taskData.total || 0;
-                                    successCount += taskData.success || 0;
-                                    failedCount += taskData.failed || 0;
-                                } else if (taskData.status === 'failed') {
-                                    allCompleted = true; // 失败也算完成
-                                }
-                            }
-
-                            // 更新进度条
-                            const percentage = totalGenes > 0 ? Math.round((completedGenes / totalGenes) * 100) : 0;
-                            $('#fragmentationProgressBar')
-                                .css('width', percentage + '%')
-                                .attr('aria-valuenow', percentage);
-                            $('#fragmentationProgressText').text(percentage + '%');
-                            $('#fragmentationProgressDetail').text(
-                                `Processing ${completedGenes} of ${totalGenes} genes (Success: ${successCount}, Failed: ${failedCount})`
-                            );
-
-                            // 如果所有任务都完成了
-                            if (allCompleted || completedGenes >= totalGenes) {
-                                clearInterval(pollInterval);
-
-                                // 显示完成消息
-                                $('#fragmentationProgressBar')
-                                    .removeClass('progress-bar-animated progress-bar-striped')
-                                    .addClass('bg-success');
-                                $('#fragmentationProgressDetail').html(
-                                    `<strong>Fragmentation completed!</strong> Success: ${successCount}, Failed: ${failedCount}`
-                                );
-
-                                // 3秒后刷新页面以显示最新的片段数据
-                                setTimeout(function() {
-                                    location.reload();
-                                }, 3000);
-                            }
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Error checking fragmentation status:', error);
-                    }
-                });
-            }
-
-            // 立即执行一次
-            checkFragmentationStatus();
-
-            // 每3秒轮询一次
-            pollInterval = setInterval(checkFragmentationStatus, 3000);
-        }
-    }
 });
 
-// ========== 手动触发片段切割功能 ==========
-function fragmentSelectedGenes() {
-    // 获取所有选中的基因ID
-    const selectedCheckboxes = document.querySelectorAll('input[name="gene_id"]:checked:not([value="all"])');
-    const selectedGeneIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+</script>
+<script>
+/**
+ * Show fragment details in modal
+ * @param {number} geneId - Gene ID
+ * @param {string} geneName - Gene name
+ */
+function showFragmentDetails(geneId, geneName) {
+    // Set gene name in modal title
+    document.getElementById('fragmentGeneName').textContent = geneName;
 
-    if (selectedGeneIds.length === 0) {
-        alert('Please select at least one gene to fragment.');
-        return;
-    }
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('fragmentDetailsModal'));
+    modal.show();
 
-    // 显示确认对话框
-    const confirmMessage = `You have selected ${selectedGeneIds.length} gene(s).\n\nOnly genes with penalty score > 28 will be fragmented.\n\nDo you want to continue?`;
-    if (!confirm(confirmMessage)) {
-        return;
-    }
+    // Reset modal state
+    document.getElementById('fragmentDetailsLoading').classList.remove('d-none');
+    document.getElementById('fragmentDetailsContent').classList.add('d-none');
+    document.getElementById('fragmentDetailsError').classList.add('d-none');
+    document.getElementById('vectorChangeAlert').classList.add('d-none');
+    document.getElementById('adapterAdjustmentsSection').classList.add('d-none');
 
-    // 禁用按钮，防止重复点击
-    const fragmentButton = document.getElementById('fragmentSequencesButton');
-    fragmentButton.disabled = true;
-    fragmentButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
-
-    // 发送AJAX请求
-    $.ajax({
-        url: '{% url "user_center:trigger_gene_fragmentation" %}',
-        type: 'POST',
-        data: {
-            'gene_ids[]': selectedGeneIds,
-            'csrfmiddlewaretoken': '{{ csrf_token }}'
-        },
-        success: function(response) {
-            if (response.status === 'success') {
-                // 显示成功消息
-                alert(`Fragmentation started successfully!\n\nTotal selected: ${response.total_selected}\nNeed fragmentation: ${response.need_fragmentation}\nSkipped (penalty ≤ 28): ${response.skipped}\n\nYou can monitor the progress in the notification area above.`);
-
-                // 显示进度条
-                $('#fragmentationProgressAlert').show();
-
-                // 3秒后刷新页面以启动轮询
-                setTimeout(() => {
-                    location.reload();
-                }, 1000);
-            } else if (response.status === 'info') {
-                alert(response.message);
-                fragmentButton.disabled = false;
-                fragmentButton.innerHTML = '<i class="bi bi-scissors"></i> Fragment Sequences';
-            } else {
-                alert('Error: ' + response.message);
-                fragmentButton.disabled = false;
-                fragmentButton.innerHTML = '<i class="bi bi-scissors"></i> Fragment Sequences';
-            }
-        },
-        error: function(xhr, status, error) {
-            let errorMessage = 'Failed to trigger fragmentation.';
-            if (xhr.responseJSON && xhr.responseJSON.message) {
-                errorMessage = xhr.responseJSON.message;
-            }
-            alert('Error: ' + errorMessage);
-
-            // 恢复按钮
-            fragmentButton.disabled = false;
-            fragmentButton.innerHTML = '<i class="bi bi-scissors"></i> Fragment Sequences';
+    // Fetch fragment details from server
+    fetch(`/user_center/get_fragment_details/${geneId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
         }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to load fragment details');
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Hide loading, show content
+        document.getElementById('fragmentDetailsLoading').classList.add('d-none');
+
+        if (data.status !== 'success' || !data.fragments_data) {
+            throw new Error(data.message || 'No fragment data available');
+        }
+
+        const fragmentsData = data.fragments_data;
+
+        // Populate summary cards
+        document.getElementById('totalFragments').textContent = fragmentsData.total_fragments || '-';
+        document.getElementById('cloningMethod').textContent = fragmentsData.cloning_method || '-';
+        document.getElementById('totalPenalty').textContent = (fragmentsData.total_penalty_score || 0).toFixed(2);
+        document.getElementById('longRepeatsPenalty').textContent = (fragmentsData.long_repeats_penalty || 0).toFixed(2);
+
+        // MustCut positions
+        document.getElementById('mustcutPositions').textContent = fragmentsData.mustcut_positions || '-';
+
+        // Vector change recommendation
+        if (fragmentsData.vector_recommendation) {
+            document.getElementById('vectorChangeAlert').classList.remove('d-none');
+            document.getElementById('vectorChangeReason').innerHTML =
+                `<strong>Recommended Vector:</strong> ${fragmentsData.vector_recommendation}<br>` +
+                `<strong>Reason:</strong> ${fragmentsData.vector_change_reason || 'N/A'}`;
+        }
+
+        // Adapter adjustments
+        if (fragmentsData.adapter_adjustments && fragmentsData.adapter_adjustments.length > 0) {
+            document.getElementById('adapterAdjustmentsSection').classList.remove('d-none');
+            const adjustmentsList = document.getElementById('adapterAdjustmentsList');
+            adjustmentsList.innerHTML = fragmentsData.adapter_adjustments.map(adj =>
+                `<div class="mb-1">
+                    <strong>Fragment ${adj.fragment_index}:</strong>
+                    Position ${adj.original_position} → ${adj.adjusted_position}
+                    (offset: ${adj.offset >= 0 ? '+' : ''}${adj.offset}bp)
+                </div>`
+            ).join('');
+        }
+
+        // Populate fragment table
+        const tableBody = document.getElementById('fragmentTableBody');
+        tableBody.innerHTML = '';
+
+        if (fragmentsData.fragments && fragmentsData.fragments.length > 0) {
+            fragmentsData.fragments.forEach(fragment => {
+                const row = document.createElement('tr');
+
+                // Format sequence preview (first 30 and last 30 bp)
+                const seq = fragment.seq || '';
+                let seqPreview = '-';
+                if (seq.length > 0) {
+                    if (seq.length <= 60) {
+                        seqPreview = seq;
+                    } else {
+                        seqPreview = seq.substring(0, 30) + '...' + seq.substring(seq.length - 30);
+                    }
+                }
+
+                // Penalty score color
+                let penaltyClass = '';
+                if (fragment.penalty_score <= 10) {
+                    penaltyClass = 'text-success fw-bold';
+                } else if (fragment.penalty_score <= 28) {
+                    penaltyClass = 'text-warning fw-bold';
+                } else {
+                    penaltyClass = 'text-danger fw-bold';
+                }
+
+                row.innerHTML = `
+                    <td class="text-center">${fragment.index}</td>
+                    <td>${fragment.start}-${fragment.end}</td>
+                    <td class="text-end">${fragment.length}</td>
+                    <td class="text-end ${penaltyClass}">${(fragment.penalty_score || 0).toFixed(2)}</td>
+                    <td><code class="small">${fragment.adapter_left || '-'}</code></td>
+                    <td><code class="small">${fragment.adapter_right || '-'}</code></td>
+                    <td><code class="small text-muted">${seqPreview}</code></td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No fragments available</td></tr>';
+        }
+
+        document.getElementById('fragmentDetailsContent').classList.remove('d-none');
+    })
+    .catch(error => {
+        console.error('Error loading fragment details:', error);
+        document.getElementById('fragmentDetailsLoading').classList.add('d-none');
+        document.getElementById('fragmentDetailsError').classList.remove('d-none');
+        document.getElementById('fragmentDetailsErrorMessage').textContent = error.message || 'Failed to load fragment details';
     });
 }
-
 </script>
 {% endblock %}

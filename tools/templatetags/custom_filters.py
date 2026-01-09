@@ -210,3 +210,66 @@ def synthesis_rate_color(gene):
         return get_success_rate_color_class(rate)
     except Exception as e:
         return "text-secondary"
+
+@register.filter
+def count_enzyme_sites(gene, enzyme_name):
+    """
+    统计基因序列中特定酶切位点的数量
+
+    参数:
+        gene: GeneInfo 对象
+        enzyme_name: 酶的名称 ('BsaI' 或 'BsmBI')
+
+    返回:
+        位点数量 (整数)
+    """
+    try:
+        from user_center.utils.sequence_processing import get_enzyme_sites
+
+        sequence = gene.saved_seq if gene.saved_seq else gene.original_seq
+        if not sequence:
+            return 0
+
+        result = get_enzyme_sites(sequence, enzyme_name)
+        return result['count']
+    except Exception as e:
+        return 0
+
+@register.filter
+def restriction_decision_badge(gene):
+    """
+    返回限制性酶切位点决策结果的HTML徽章（紧凑版）
+
+    参数:
+        gene: GeneInfo 对象
+
+    返回:
+        HTML标记的徽章字符串
+    """
+    try:
+        if not gene.restriction_decision:
+            return mark_safe('')
+
+        decision = gene.restriction_decision
+        route = gene.restriction_process_route
+        message = gene.restriction_message or ''
+        requires_review = gene.restriction_requires_manual_review
+
+        if decision == 'accept':
+            badge_color = 'success'
+            # 只显示路线，不显示图标，更紧凑
+            badge_text = route if route else 'OK'
+        else:
+            badge_color = 'danger'
+            badge_text = 'Reject'
+            # 如果需要人工评估，在拒绝后添加警告图标
+            if requires_review:
+                badge_text += ' ⚠'
+
+        tooltip = f'data-bs-toggle="tooltip" title="{message}"' if message else ''
+
+        html = f'<span class="badge bg-{badge_color}" {tooltip}>{badge_text}</span>'
+
+        return mark_safe(html)
+    except Exception as e:
+        return mark_safe('')

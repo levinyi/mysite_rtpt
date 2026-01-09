@@ -52,6 +52,8 @@ urlpatterns = [
     path('api/get_task_status/', views.get_task_status, name='get_task_status'),
     path('api/get_fragmentation_status/', views.get_fragmentation_status, name='get_fragmentation_status'),
     path('api/trigger_gene_fragmentation/', views.trigger_gene_fragmentation, name='trigger_gene_fragmentation'),
+    path('api/trigger_order_fragmentation/<int:order_id>/', views.trigger_order_fragmentation, name='trigger_order_fragmentation'),
+    path('get_fragment_details/<int:gene_id>/', views.get_fragment_details, name='get_fragment_details'),
     path('test/', views.test, name='test'),
     path('test_django_send/', views.test_django_send, name='test_django_send'),
 ]

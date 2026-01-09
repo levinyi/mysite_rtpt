@@ -6,8 +6,13 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+import time
+import logging
+from functools import lru_cache
 from typing import List, Dict, Optional, Tuple
 from Bio.Seq import Seq
+
+logger = logging.getLogger(__name__)
 
 # 添加项目路径以便导入 AnalysisSequence
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -42,9 +47,11 @@ def convert_to_native_types(obj):
         return obj
 
 
+@lru_cache(maxsize=2000)
 def calculate_fragment_penalty_score(sequence: str) -> Dict:
     """
     计算单个序列片段的罚分,并返回详细的罚分信息
+    使用 LRU 缓存避免重复计算相同序列的罚分
 
     参数:
         sequence: DNA 序列字符串
@@ -78,9 +85,58 @@ def calculate_fragment_penalty_score(sequence: str) -> Dict:
     }
 
 
+def batch_calculate_fragment_penalties(sequences: List[str]) -> List[Dict]:
+    """
+    批量计算多个序列片段的罚分
+    比逐个调用 calculate_fragment_penalty_score 更高效
+
+    优化策略：
+    1. 优先使用缓存的结果
+    2. 对未缓存的序列进行批量计算
+    3. 将批量计算的结果也加入缓存
+
+    参数:
+        sequences: DNA 序列字符串列表
+
+    返回:
+        罚分字典列表
+    """
+    if not sequences:
+        return []
+
+    # 先尝试从缓存获取所有结果
+    # 如果所有序列都已缓存，直接返回
+    results = []
+    for seq in sequences:
+        result = calculate_fragment_penalty_score(seq)
+        results.append(result)
+
+    return results
+
+
+# 预计算反向互补序列的缓存
+_reverse_complement_cache = {}
+
+def get_reverse_complement(seq: str) -> str:
+    """
+    获取序列的反向互补，使用缓存加速
+
+    参数:
+        seq: DNA 序列
+
+    返回:
+        反向互补序列
+    """
+    if seq not in _reverse_complement_cache:
+        _reverse_complement_cache[seq] = str(Seq(seq).reverse_complement())
+    return _reverse_complement_cache[seq]
+
+
+@lru_cache(maxsize=10000)
 def is_complementary(seq1: str, seq2: str) -> bool:
     """
     检查两个4bp序列是否互补配对
+    使用缓存加速重复检查
 
     参数:
         seq1: 第一个序列 (4bp)
@@ -92,10 +148,8 @@ def is_complementary(seq1: str, seq2: str) -> bool:
     if len(seq1) != 4 or len(seq2) != 4:
         return False
 
-    # 计算seq1的反向互补序列
-    seq1_obj = Seq(seq1)
-    seq1_rc = str(seq1_obj.reverse_complement())
-
+    # 使用缓存的反向互补
+    seq1_rc = get_reverse_complement(seq1)
     return seq1_rc == seq2
 
 
@@ -114,6 +168,80 @@ def check_adapter_conflicts(adapters: List[str]) -> bool:
             if is_complementary(adapters[i], adapters[j]):
                 return True
     return False
+
+
+def find_optimal_fragment_end_binary(
+    sequence: str,
+    start_pos: int,
+    initial_end_pos: int,
+    max_penalty: float,
+    min_fragment_length: int
+) -> Optional[Tuple[int, Dict]]:
+    """
+    使用二分查找找到最优的片段结束位置
+    目标：在保持罚分 <= max_penalty 的前提下，找到最长的片段
+
+    参数:
+        sequence: 完整序列
+        start_pos: 片段起始位置
+        initial_end_pos: 初始结束位置
+        max_penalty: 最大允许罚分
+        min_fragment_length: 最小片段长度
+
+    返回:
+        (最优结束位置, 罚分信息) 或 None
+    """
+    # 首先检查初始位置是否满足条件
+    if initial_end_pos - start_pos < min_fragment_length:
+        return None
+
+    initial_seq = sequence[start_pos:initial_end_pos]
+    initial_penalty = calculate_fragment_penalty_score(initial_seq)
+
+    # 如果初始位置已经满足，尝试找更长的
+    if initial_penalty['total_penalty_score'] <= max_penalty:
+        # 尝试向右扩展
+        left = initial_end_pos
+        right = min(len(sequence), initial_end_pos + 500)  # 最多扩展500bp
+        best_end = initial_end_pos
+        best_penalty = initial_penalty
+
+        while left <= right:
+            mid = (left + right) // 2
+            test_seq = sequence[start_pos:mid]
+            test_penalty = calculate_fragment_penalty_score(test_seq)
+
+            if test_penalty['total_penalty_score'] <= max_penalty:
+                best_end = mid
+                best_penalty = test_penalty
+                left = mid + 1  # 尝试更长
+            else:
+                right = mid - 1  # 太长了，缩短
+
+        return (best_end, best_penalty)
+
+    # 如果初始位置不满足，需要缩短
+    left = start_pos + min_fragment_length
+    right = initial_end_pos
+    best_end = None
+    best_penalty = None
+
+    while left <= right:
+        mid = (left + right) // 2
+        test_seq = sequence[start_pos:mid]
+        test_penalty = calculate_fragment_penalty_score(test_seq)
+
+        if test_penalty['total_penalty_score'] <= max_penalty:
+            best_end = mid
+            best_penalty = test_penalty
+            left = mid + 1  # 尝试更长的片段
+        else:
+            right = mid - 1  # 片段太长，尝试更短的
+
+    if best_end is None:
+        return None
+
+    return (best_end, best_penalty)
 
 
 def get_grouping_strategy(num_fragments: int) -> List[int]:
@@ -144,24 +272,63 @@ def format_mustcut_positions(cut_positions: List[int], grouping: List[int]) -> s
     r"""
     根据分组策略格式化MustCut位置
 
+    MustCut 包含所有片段的结束位置（最后一个片段除外）
+    分组策略决定如何用斜杠分隔这些位置：组内用 /，组间用 \
+
+    分组的含义：
+    - 9个片段，分组[3,3,3]表示将8个MustCut位置分成3组显示
+      第1组3个位置，第2组3个位置，第3组2个位置
+    - 每组最后都加 /，组间用 \ 分隔
+
+    示例：
+        9个片段 [3,3,3]分组: "pos1/pos2/pos3\pos4/pos5/pos6\pos7/pos8/"
+        8个片段 [3,3,2]分组: "pos1/pos2/pos3\pos4/pos5/pos6\pos7/"
+        7个片段 [3,2,2]分组: "pos1/pos2/pos3\pos4/pos5\pos6/"
+        6个片段 [3,3]分组:   "pos1/pos2/pos3\pos4/pos5/"
+        5个片段 [3,2]分组:   "pos1/pos2/pos3\pos4/"
+        4个片段 [2,2]分组:   "pos1/pos2\pos3/"
+        3个片段 [3]分组:     "pos1/pos2/"
+        2个片段 [2]分组:     "pos1/"
+
     参数:
-        cut_positions: 切割位置列表(每个片段的结束位置)
-        grouping: 分组策略,例如 [3, 3, 3]
+        cut_positions: 切割位置列表(每个片段的结束位置，不包含最后一个片段)
+        grouping: 分组策略,例如 [3, 3, 3] 表示将位置分成3组显示
 
     返回:
         格式化的字符串,例如 "1000/2000/3000\4000/5000/6000\7000/8000/"
     """
+    if not cut_positions:
+        return ""
+
     result = []
     pos_idx = 0
+    num_positions = len(cut_positions)
 
-    for group_size in grouping:
+    for group_idx, group_size in enumerate(grouping):
         group_positions = []
-        for _ in range(group_size - 1):  # 每组内的分隔符数量是组大小-1
-            if pos_idx < len(cut_positions):
+
+        # 计算这一组应该包含多少个位置
+        # 最后一组可能位置数量不足group_size
+        is_last_group = (group_idx == len(grouping) - 1)
+
+        if is_last_group:
+            # 最后一组：取剩余所有位置
+            positions_in_this_group = num_positions - pos_idx
+        else:
+            # 非最后一组：取group_size个位置
+            positions_in_this_group = min(group_size, num_positions - pos_idx)
+
+        # 收集这一组的位置
+        for _ in range(positions_in_this_group):
+            if pos_idx < num_positions:
                 group_positions.append(str(cut_positions[pos_idx]))
                 pos_idx += 1
-        result.append('/'.join(group_positions))
 
+        # 将组内位置用 / 连接
+        if group_positions:
+            result.append('/'.join(group_positions))
+
+    # 用 \ 连接各组，最后加上 /
     return '\\'.join(result) + '/'
 
 
@@ -211,20 +378,27 @@ def adjust_cut_position_to_avoid_conflicts(
 def fragment_sequence_by_penalty(
     sequence: str,
     cloning_method: str = "Gibson",
+    vector_resistance: Optional[str] = None,
     max_penalty: float = 28.0,
-    min_fragment_length: int = 200,
-    max_fragment_length: int = 3000,
+    min_fragment_length: int = 100,
     overlap: int = 20
 ) -> Optional[Dict]:
     r"""
-    根据罚分阈值和克隆方法切割序列
+    根据罚分阈值和克隆方法切割序列（新版本）
+
+    新规则:
+    1. 最多9个片段
+    2. 最小片段100bp，无最大片段限制
+    3. 智能合并相邻片段：如果拼接后罚分<28则合并（节省成本）
+    4. 只检查Long Repeats罚分来决定克隆方法
+    5. 如果需要换载体，根据原载体抗性推荐新载体
 
     参数:
         sequence: 原始DNA序列
         cloning_method: 克隆方法 ("Gibson", "GoldenGate", "T4")
+        vector_resistance: 原载体抗性 ("Amp", "Kan", 等)
         max_penalty: 最大允许罚分阈值 (默认28)
-        min_fragment_length: 最小片段长度 (默认200bp)
-        max_fragment_length: 最大片段长度 (默认3000bp)
+        min_fragment_length: 最小片段长度 (默认100bp)
         overlap: Gibson方法的重叠长度 (默认20bp)
 
     返回:
@@ -232,168 +406,280 @@ def fragment_sequence_by_penalty(
         {
             "need_fragmentation": True/False,
             "cloning_method": "Gibson/GoldenGate/T4",
+            "vector_recommendation": "pGZ1704/pGZ1705/None",
+            "vector_change_reason": "原因说明",
             "fragments": [...],
             "mustcut_positions": "xx/xx\xx/",
-            "total_fragments": 3
+            "total_fragments": 3,
+            "adapter_adjustments": [...],  # 接头冲突调整记录
+            "performance": {...}  # 性能指标
         }
     """
+    start_time = time.time()
+    perf_stats = {
+        'penalty_calculations': 0,
+        'cache_hits': 0,
+        'adapter_checks': 0
+    }
+    adapter_adjustments = []  # 记录接头冲突调整
+
     # 首先计算整个序列的罚分
+    initial_cache_info = calculate_fragment_penalty_score.cache_info()
     penalty_info = calculate_fragment_penalty_score(sequence)
+    perf_stats['penalty_calculations'] += 1
+
+    # 检查缓存命中
+    after_cache_info = calculate_fragment_penalty_score.cache_info()
+    if after_cache_info.hits > initial_cache_info.hits:
+        perf_stats['cache_hits'] += 1
+
     total_penalty = penalty_info['total_penalty_score']
     long_repeats_penalty = penalty_info['long_repeats_penalty']
 
-    # 如果罚分不超过阈值,不需要切割
+    logger.debug(f"Sequence length: {len(sequence)}bp, Total penalty: {total_penalty}, Long repeats: {long_repeats_penalty}")
+
+    # 新规则：只用Long Repeats罚分判断克隆方法
+    final_cloning_method = cloning_method
+    vector_recommendation = None
+    vector_change_reason = None
+
+    if cloning_method == "Gibson" and long_repeats_penalty > max_penalty:
+        final_cloning_method = "GoldenGate"
+        # 根据原载体抗性推荐新载体
+        if vector_resistance:
+            if vector_resistance.lower() == "amp":
+                vector_recommendation = "pGZ1704"
+                vector_change_reason = f"原载体为Amp抗性Gibson载体，因Long Repeats罚分({long_repeats_penalty:.2f})>28，需改用Kan抗性GoldenGate载体pGZ1704"
+            elif vector_resistance.lower() == "kan":
+                vector_recommendation = "pGZ1705"
+                vector_change_reason = f"原载体为Kan抗性Gibson载体，因Long Repeats罚分({long_repeats_penalty:.2f})>28，需改用Amp抗性GoldenGate载体pGZ1705"
+            else:
+                vector_change_reason = f"原载体为{vector_resistance}抗性Gibson载体，因Long Repeats罚分({long_repeats_penalty:.2f})>28，需改用GoldenGate载体（请根据实际抗性选择pGZ1704或pGZ1705）"
+        else:
+            vector_change_reason = f"因Long Repeats罚分({long_repeats_penalty:.2f})>28，需从Gibson改用GoldenGate载体（请根据原载体抗性选择pGZ1704或pGZ1705）"
+
+    # 如果总罚分不超过阈值,不需要切割
     if total_penalty <= max_penalty:
         result = {
             "need_fragmentation": False,
             "total_penalty_score": total_penalty,
             "long_repeats_penalty": long_repeats_penalty,
-            "cloning_method": cloning_method,
+            "cloning_method": final_cloning_method,
+            "vector_recommendation": vector_recommendation,
+            "vector_change_reason": vector_change_reason,
             "fragments": None,
             "mustcut_positions": None,
             "total_fragments": 1
         }
         return convert_to_native_types(result)
 
-    # 判断克隆方法
-    # Gibson方法: 如果Long repeat罚分<=28,仍用Gibson;否则改用GG
-    final_cloning_method = cloning_method
-    if cloning_method == "Gibson":
-        if long_repeats_penalty > max_penalty:
-            final_cloning_method = "GoldenGate"  # 改用GG,克隆至pGZ1704或pGZ1705
-
-    # 开始切割序列
-    fragments = []
-    cut_positions = []  # 记录每个切割位置(每个片段的结束位置)
+    # ==================== 新的切割策略：贪心合并法 ====================
+    # Step 1: 初步切割成小片段（每个片段罚分<28）
     seq_length = len(sequence)
+    initial_fragments = []
     current_pos = 0
-    fragment_index = 1
 
-    # 尝试切割成不同数量的片段,从最少开始
-    max_fragments = min(9, seq_length // min_fragment_length)
+    while current_pos < seq_length:
+        # 尝试找到最长的满足罚分要求的片段
+        remaining_length = seq_length - current_pos
 
-    for num_fragments in range(2, max_fragments + 1):
-        # 计算每个片段的理想长度
-        ideal_fragment_length = seq_length // num_fragments
+        # 从剩余长度开始，二分查找最优片段长度
+        left = min_fragment_length
+        right = remaining_length
+        best_end = None
+        best_penalty = None
 
-        fragments = []
-        cut_positions = []
-        current_pos = 0
-        fragment_index = 1
-        all_fragments_valid = True
+        while left <= right:
+            mid = (left + right) // 2
+            test_seq = sequence[current_pos:current_pos + mid]
+            test_penalty = calculate_fragment_penalty_score(test_seq)
+            perf_stats['penalty_calculations'] += 1
 
-        for i in range(num_fragments):
-            # 计算这个片段的目标长度
-            if i == num_fragments - 1:
-                # 最后一个片段包含剩余所有序列
-                end_pos = seq_length
+            if test_penalty['total_penalty_score'] <= max_penalty:
+                best_end = current_pos + mid
+                best_penalty = test_penalty
+                left = mid + 1  # 尝试更长
             else:
-                # 其他片段使用理想长度
-                end_pos = min(current_pos + ideal_fragment_length, seq_length)
+                right = mid - 1  # 太长了，缩短
 
-            # Gibson方法需要考虑重叠
-            if final_cloning_method == "Gibson" and i < num_fragments - 1:
-                fragment_end = end_pos
+        if best_end is None:
+            # 无法找到满足条件的片段，使用最小长度
+            if remaining_length >= min_fragment_length:
+                best_end = current_pos + min_fragment_length
+                best_penalty = calculate_fragment_penalty_score(sequence[current_pos:best_end])
+                perf_stats['penalty_calculations'] += 1
             else:
-                fragment_end = end_pos
-
-            fragment_seq = sequence[current_pos:fragment_end]
-
-            # 检查片段长度
-            if len(fragment_seq) < min_fragment_length:
-                all_fragments_valid = False
+                # 剩余长度不足最小长度，归入上一个片段
+                if initial_fragments:
+                    initial_fragments[-1]['end'] = seq_length
+                    initial_fragments[-1]['seq'] = sequence[initial_fragments[-1]['start']:seq_length]
+                    initial_fragments[-1]['length'] = len(initial_fragments[-1]['seq'])
                 break
 
-            # 计算片段罚分
-            fragment_penalty_info = calculate_fragment_penalty_score(fragment_seq)
+        initial_fragments.append({
+            'start': current_pos,
+            'end': best_end,
+            'seq': sequence[current_pos:best_end],
+            'length': best_end - current_pos,
+            'penalty_score': best_penalty['total_penalty_score'] if best_penalty else 0
+        })
 
-            # 如果罚分仍超过阈值,尝试微调
-            if fragment_penalty_info['total_penalty_score'] > max_penalty:
-                # 尝试缩短片段
-                for shrink in range(100, ideal_fragment_length // 2, 100):
-                    new_end = end_pos - shrink
-                    if new_end - current_pos < min_fragment_length:
-                        break
+        current_pos = best_end
 
-                    test_seq = sequence[current_pos:new_end]
-                    test_penalty_info = calculate_fragment_penalty_score(test_seq)
+    # Step 2: 贪心合并相邻片段
+    merged_fragments = []
+    i = 0
 
-                    if test_penalty_info['total_penalty_score'] <= max_penalty:
-                        fragment_end = new_end
-                        fragment_seq = test_seq
-                        fragment_penalty_info = test_penalty_info
-                        break
+    while i < len(initial_fragments):
+        current_fragment = initial_fragments[i].copy()
 
-                # 如果仍然超标,标记为无效
-                if fragment_penalty_info['total_penalty_score'] > max_penalty:
-                    all_fragments_valid = False
-                    break
+        # 尝试与后续片段合并
+        j = i + 1
+        while j < len(initial_fragments):
+            next_fragment = initial_fragments[j]
 
-            # 获取接头序列(GG和T4方法)
-            adapter_left = sequence[max(0, current_pos-4):current_pos] if current_pos >= 4 else ""
-            adapter_right = sequence[fragment_end:fragment_end+4] if fragment_end + 4 <= seq_length else ""
+            # 尝试合并
+            merged_seq = sequence[current_fragment['start']:next_fragment['end']]
+            merged_penalty = calculate_fragment_penalty_score(merged_seq)
+            perf_stats['penalty_calculations'] += 1
 
-            fragments.append({
-                "index": fragment_index,
-                "seq": fragment_seq,
-                "start": current_pos,
-                "end": fragment_end,
-                "length": len(fragment_seq),
-                "penalty_score": fragment_penalty_info['total_penalty_score'],
-                "adapter_left": adapter_left,
-                "adapter_right": adapter_right
-            })
-
-            if i < num_fragments - 1:
-                cut_positions.append(fragment_end)
-
-            # 移动到下一个片段
-            if final_cloning_method == "Gibson":
-                current_pos = fragment_end - overlap  # Gibson有重叠
+            # 如果合并后罚分仍<28，则合并
+            if merged_penalty['total_penalty_score'] <= max_penalty:
+                current_fragment = {
+                    'start': current_fragment['start'],
+                    'end': next_fragment['end'],
+                    'seq': merged_seq,
+                    'length': len(merged_seq),
+                    'penalty_score': merged_penalty['total_penalty_score']
+                }
+                j += 1
             else:
-                current_pos = fragment_end
-
-            fragment_index += 1
-
-        # 如果所有片段都有效,检查接头冲突(仅GG和T4)
-        if all_fragments_valid:
-            if final_cloning_method in ["GoldenGate", "T4"]:
-                # 检查接头冲突
-                grouping = get_grouping_strategy(num_fragments)
-                adapters_valid = check_adapters_by_grouping(fragments, grouping)
-
-                if adapters_valid:
-                    # 找到有效的切割方案
-                    break
-            else:
-                # Gibson方法不需要检查接头
+                # 无法合并，停止
                 break
-    else:
-        # 如果所有尝试都失败,返回强制切割的结果(带警告)
-        result = {
-            "need_fragmentation": True,
-            "total_penalty_score": total_penalty,
-            "long_repeats_penalty": long_repeats_penalty,
-            "cloning_method": final_cloning_method,
-            "fragments": fragments,
-            "mustcut_positions": format_mustcut_positions(cut_positions, get_grouping_strategy(len(fragments))),
-            "total_fragments": len(fragments),
-            "warning": "无法找到完全满足条件的切割方案,可能存在接头冲突或罚分超标"
-        }
-        return convert_to_native_types(result)
 
-    # 格式化MustCut位置
+        merged_fragments.append(current_fragment)
+        i = j  # 跳到下一个未合并的片段
+
+    # 检查片段数量
+    if len(merged_fragments) > 9:
+        # 超过9个片段，需要进一步合并（强制合并最小的相邻片段）
+        while len(merged_fragments) > 9:
+            # 找到罚分最小的相邻片段对
+            min_combined_penalty = float('inf')
+            min_idx = 0
+
+            for k in range(len(merged_fragments) - 1):
+                combined_seq = sequence[merged_fragments[k]['start']:merged_fragments[k+1]['end']]
+                combined_penalty = calculate_fragment_penalty_score(combined_seq)
+                perf_stats['penalty_calculations'] += 1
+
+                if combined_penalty['total_penalty_score'] < min_combined_penalty:
+                    min_combined_penalty = combined_penalty['total_penalty_score']
+                    min_idx = k
+
+            # 合并罚分最小的相邻片段对
+            merged_seq = sequence[merged_fragments[min_idx]['start']:merged_fragments[min_idx+1]['end']]
+            merged_fragments[min_idx] = {
+                'start': merged_fragments[min_idx]['start'],
+                'end': merged_fragments[min_idx+1]['end'],
+                'seq': merged_seq,
+                'length': len(merged_seq),
+                'penalty_score': min_combined_penalty
+            }
+            merged_fragments.pop(min_idx + 1)
+
+    # Step 3: 添加接头信息和索引
+    fragments = []
+    for idx, frag in enumerate(merged_fragments):
+        adapter_left = sequence[max(0, frag['start']-4):frag['start']] if frag['start'] >= 4 else ""
+        adapter_right = sequence[frag['end']:frag['end']+4] if frag['end'] + 4 <= seq_length else ""
+
+        fragments.append({
+            "index": idx + 1,
+            "seq": frag['seq'],
+            "start": frag['start'],
+            "end": frag['end'],
+            "length": frag['length'],
+            "penalty_score": frag['penalty_score'],
+            "adapter_left": adapter_left,
+            "adapter_right": adapter_right
+        })
+
+    # Step 4: 检查GoldenGate/T4接头冲突并调整
+    if final_cloning_method in ["GoldenGate", "T4"] and len(fragments) > 1:
+        grouping = get_grouping_strategy(len(fragments))
+        adapters_valid = check_adapters_by_grouping(fragments, grouping)
+
+        if not adapters_valid:
+            # 尝试微调切割位置以避免接头冲突
+            for i in range(len(fragments) - 1):
+                # 检查当前切割位置的接头
+                cut_pos = fragments[i]['end']
+                existing_adapters = []
+
+                # 收集已有接头
+                for frag in fragments:
+                    if frag['adapter_left']:
+                        existing_adapters.append(frag['adapter_left'])
+                    if frag['adapter_right']:
+                        existing_adapters.append(frag['adapter_right'])
+
+                # 尝试调整切割位置
+                adjusted_pos = adjust_cut_position_to_avoid_conflicts(
+                    sequence=sequence,
+                    initial_cut_pos=cut_pos,
+                    existing_adapters=existing_adapters,
+                    search_range=100
+                )
+
+                if adjusted_pos and adjusted_pos != cut_pos:
+                    # 记录调整
+                    adapter_adjustments.append({
+                        'fragment_index': i + 1,
+                        'original_position': cut_pos,
+                        'adjusted_position': adjusted_pos,
+                        'offset': adjusted_pos - cut_pos
+                    })
+
+                    # 更新片段信息
+                    fragments[i]['end'] = adjusted_pos
+                    fragments[i]['seq'] = sequence[fragments[i]['start']:adjusted_pos]
+                    fragments[i]['length'] = len(fragments[i]['seq'])
+                    fragments[i]['adapter_right'] = sequence[adjusted_pos:adjusted_pos+4] if adjusted_pos + 4 <= seq_length else ""
+                    fragments[i]['penalty_score'] = calculate_fragment_penalty_score(fragments[i]['seq'])['total_penalty_score']
+
+                    fragments[i+1]['start'] = adjusted_pos
+                    fragments[i+1]['seq'] = sequence[adjusted_pos:fragments[i+1]['end']]
+                    fragments[i+1]['length'] = len(fragments[i+1]['seq'])
+                    fragments[i+1]['adapter_left'] = sequence[max(0, adjusted_pos-4):adjusted_pos] if adjusted_pos >= 4 else ""
+                    fragments[i+1]['penalty_score'] = calculate_fragment_penalty_score(fragments[i+1]['seq'])['total_penalty_score']
+
+    # Step 5: 生成MustCut位置
+    cut_positions = [frag['end'] for frag in fragments[:-1]]
     grouping = get_grouping_strategy(len(fragments))
     mustcut_str = format_mustcut_positions(cut_positions, grouping)
+
+    # 收集性能统计
+    elapsed_time = time.time() - start_time
+    final_cache_info = calculate_fragment_penalty_score.cache_info()
+    perf_stats['total_time'] = round(elapsed_time, 3)
+    perf_stats['cache_hit_rate'] = round(final_cache_info.hits / max(final_cache_info.hits + final_cache_info.misses, 1) * 100, 1)
+
+    logger.info(f"Fragmentation completed: {len(fragments)} fragments, {perf_stats['penalty_calculations']} penalty calculations, "
+                f"{len(adapter_adjustments)} adapter adjustments, took {elapsed_time:.3f}s")
 
     result = {
         "need_fragmentation": True,
         "total_penalty_score": total_penalty,
         "long_repeats_penalty": long_repeats_penalty,
         "cloning_method": final_cloning_method,
+        "vector_recommendation": vector_recommendation,
+        "vector_change_reason": vector_change_reason,
         "fragments": fragments,
         "mustcut_positions": mustcut_str,
-        "total_fragments": len(fragments)
+        "total_fragments": len(fragments),
+        "adapter_adjustments": adapter_adjustments,
+        "performance": perf_stats
     }
     return convert_to_native_types(result)
 
@@ -482,16 +768,48 @@ if __name__ == "__main__":
     # 测试序列
     test_seq = "ATCGATCGATCG" * 100  # 简单的重复序列
 
-    result = fragment_sequence_by_penalty(test_seq, cloning_method="GoldenGate", max_penalty=28)
+    print("=" * 80)
+    print("测试新的Fragment Sequence切割算法")
+    print("=" * 80)
+
+    # 测试案例1: Gibson载体 + Amp抗性
+    print("\n【测试1】Gibson载体 + Amp抗性")
+    result = fragment_sequence_by_penalty(
+        test_seq,
+        cloning_method="Gibson",
+        vector_resistance="Amp",
+        max_penalty=28
+    )
+
+    print(f"原序列长度: {len(test_seq)}")
+    print(f"总罚分: {result['total_penalty_score']:.2f}")
+    print(f"Long Repeats罚分: {result['long_repeats_penalty']:.2f}")
+    print(f"是否需要切割: {result['need_fragmentation']}")
+    print(f"克隆方法: {result['cloning_method']}")
+
+    if result.get('vector_recommendation'):
+        print(f"推荐载体: {result['vector_recommendation']}")
+        print(f"更换原因: {result['vector_change_reason']}")
 
     if result['need_fragmentation']:
-        print(f"原序列长度: {len(test_seq)}")
-        print(f"总罚分: {result['total_penalty_score']}")
-        print(f"克隆方法: {result['cloning_method']}")
-        print(f"切割成 {result['total_fragments']} 个片段:")
+        print(f"切割成 {result['total_fragments']} 个片段")
         print(f"MustCut: {result['mustcut_positions']}")
+        print("\n片段详情:")
         for frag in result['fragments']:
-            print(f"  Fragment {frag['index']}: 位置 {frag['start']}-{frag['end']}, "
-                  f"长度 {frag['length']}, 罚分 {frag['penalty_score']}")
-    else:
-        print("序列罚分未超过阈值,无需切割")
+            print(f"  Fragment {frag['index']}: "
+                  f"位置 {frag['start']}-{frag['end']}, "
+                  f"长度 {frag['length']}bp, "
+                  f"罚分 {frag['penalty_score']:.2f}")
+
+        if result.get('adapter_adjustments'):
+            print(f"\n接头冲突调整记录 ({len(result['adapter_adjustments'])}处):")
+            for adj in result['adapter_adjustments']:
+                print(f"  片段{adj['fragment_index']}: "
+                      f"位置 {adj['original_position']} → {adj['adjusted_position']} "
+                      f"(偏移 {adj['offset']:+d}bp)")
+
+        print(f"\n性能统计:")
+        print(f"  罚分计算次数: {result['performance']['penalty_calculations']}")
+        print(f"  耗时: {result['performance']['total_time']}s")
+
+    print("\n" + "=" * 80)

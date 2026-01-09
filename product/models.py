@@ -31,6 +31,7 @@ class Vector(models.Model):
 
     # 载体改造自动化设计相关字段
     cloning_method = models.CharField(verbose_name="克隆方法", max_length=50, null=True, blank=True, help_text="Gibson/GoldenGate/T4")
+    antibiotic_resistance = models.CharField(verbose_name="抗性", max_length=50, null=True, blank=True, help_text="Amp/Kan/Chlor/etc")
     design_status = models.CharField(verbose_name="设计状态", max_length=50, null=True, blank=True, default='Pending', help_text="Pending/Processing/Completed/Failed")
     design_error = models.TextField(verbose_name="设计错误信息", null=True, blank=True)
     primer_forward = models.TextField(verbose_name="正向引物序列", null=True, blank=True)

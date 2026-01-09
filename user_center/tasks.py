@@ -186,10 +186,80 @@ def async_vector_automation_design(vector_id):
         return {'status': 'error', 'errors': [f'系统错误: {str(e)}']}
 
 
+def _fragment_single_gene(gene_data):
+    """
+    处理单个基因的切割任务（用于并行处理）
+
+    Args:
+        gene_data: 包含基因信息的字典
+
+    Returns:
+        dict: 处理结果
+    """
+    import time
+    from user_center.models import GeneInfo
+    from user_center.utils.sequence_fragmenter import fragment_sequence_by_penalty
+
+    gene_id = gene_data['gene_id']
+    start_time = time.time()
+
+    try:
+        gene = GeneInfo.objects.get(id=gene_id)
+
+        if not gene.penalty_score or gene.penalty_score <= 28:
+            return {
+                'gene_id': gene_id,
+                'gene_name': gene.gene_name,
+                'status': 'skipped',
+                'reason': 'penalty_score <= 28',
+                'time': time.time() - start_time
+            }
+
+        # 执行片段切割
+        vector_resistance = gene_data.get('vector_resistance') or (gene.vector.antibiotic_resistance if gene.vector and hasattr(gene.vector, 'antibiotic_resistance') else None)
+        fragmentation_result = fragment_sequence_by_penalty(
+            sequence=gene.combined_seq,
+            cloning_method=gene_data['cloning_method'],
+            vector_resistance=vector_resistance,
+            max_penalty=28.0
+        )
+
+        if fragmentation_result and fragmentation_result.get('need_fragmentation'):
+            # 更新基因的 fragments_data
+            gene.fragments_data = fragmentation_result
+            gene.save(update_fields=['fragments_data'])
+
+            return {
+                'gene_id': gene_id,
+                'gene_name': gene.gene_name,
+                'status': 'success',
+                'fragments': fragmentation_result.get('total_fragments', 0),
+                'method': fragmentation_result.get('cloning_method'),
+                'time': time.time() - start_time
+            }
+        else:
+            return {
+                'gene_id': gene_id,
+                'gene_name': gene.gene_name,
+                'status': 'no_fragmentation_needed',
+                'time': time.time() - start_time
+            }
+
+    except Exception as e:
+        return {
+            'gene_id': gene_id,
+            'gene_name': gene_data.get('gene_name', 'Unknown'),
+            'status': 'error',
+            'error': str(e),
+            'time': time.time() - start_time
+        }
+
+
 @shared_task(bind=True)
 def async_fragment_genes(self, gene_ids):
     """
     异步执行基因序列片段切割任务
+    使用多进程并行处理提高性能
 
     Args:
         self: Celery task instance (bind=True)
@@ -198,9 +268,12 @@ def async_fragment_genes(self, gene_ids):
     Returns:
         dict: 处理结果
     """
+    import time
     from django.core.cache import cache
+    from user_center.models import GeneInfo
 
     task_id = self.request.id
+    start_time = time.time()
     logger.info(f"Starting async fragmentation for {len(gene_ids)} genes (task_id: {task_id})")
 
     # 在缓存中存储任务状态
@@ -213,73 +286,71 @@ def async_fragment_genes(self, gene_ids):
     }, timeout=3600)  # 1小时过期
 
     try:
-        from user_center.models import GeneInfo
-
         # 获取需要切割的基因
         genes = GeneInfo.objects.filter(id__in=gene_ids).select_related('vector')
 
+        # 准备基因数据
+        gene_data_list = []
+        for gene in genes:
+            cloning_method = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else "Gibson"
+            gene_data_list.append({
+                'gene_id': gene.id,
+                'gene_name': gene.gene_name,
+                'cloning_method': cloning_method
+            })
+
         success_count = 0
         fail_count = 0
+        skip_count = 0
+        completed_count = 0
 
-        for idx, gene in enumerate(genes):
-            try:
-                if not gene.penalty_score or gene.penalty_score <= 28:
-                    logger.info(f"Gene {gene.gene_name} (ID: {gene.id}) penalty score {gene.penalty_score} <= 28, skipping")
-                    continue
+        # 顺序执行，避免并发开销
+        for gene_data in gene_data_list:
+            result = _fragment_single_gene(gene_data)
+            completed_count += 1
 
-                # 获取载体的克隆方法
-                cloning_method = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else "Gibson"
-
-                # 执行片段切割
-                fragmentation_result = fragment_sequence_by_penalty(
-                    sequence=gene.combined_seq,
-                    cloning_method=cloning_method,
-                    max_penalty=28.0
-                )
-
-                if fragmentation_result and fragmentation_result.get('need_fragmentation'):
-                    # 更新基因的 fragments_data
-                    gene.fragments_data = fragmentation_result
-                    gene.save(update_fields=['fragments_data'])
-                    success_count += 1
-                    logger.info(
-                        f"Gene {gene.gene_name} (ID: {gene.id}, penalty: {gene.penalty_score}) "
-                        f"fragmented into {fragmentation_result.get('total_fragments', 0)} pieces using {fragmentation_result.get('cloning_method')}"
-                    )
-                else:
-                    logger.info(f"Gene {gene.gene_name} (ID: {gene.id}) penalty recalculated, no fragmentation needed")
-
-            except Exception as e:
+            if result['status'] == 'success':
+                success_count += 1
+                logger.info(f"Gene {result['gene_name']} (ID: {result['gene_id']}) fragmented into {result['fragments']} pieces using {result['method']} (took {result['time']:.2f}s)")
+            elif result['status'] == 'skipped':
+                skip_count += 1
+            elif result['status'] == 'error':
                 fail_count += 1
-                logger.error(f"Failed to fragment gene {gene.gene_name} (ID: {gene.id}): {str(e)}", exc_info=True)
+                logger.error(f"Failed to fragment gene {result['gene_name']} (ID: {result['gene_id']}): {result['error']}")
 
             # 更新缓存中的进度
             cache.set(cache_key, {
                 'status': 'processing',
-                'total': len(genes),
-                'completed': idx + 1,
+                'total': len(gene_data_list),
+                'completed': completed_count,
                 'gene_ids': gene_ids,
                 'success': success_count,
-                'failed': fail_count
+                'failed': fail_count,
+                'skipped': skip_count
             }, timeout=3600)
 
-        logger.info(f"Fragmentation completed: {success_count} success, {fail_count} failed out of {len(genes)} genes")
+        total_time = time.time() - start_time
+        logger.info(f"Fragmentation completed: {success_count} success, {fail_count} failed, {skip_count} skipped out of {len(gene_data_list)} genes (took {total_time:.2f}s)")
 
         # 更新缓存为完成状态
         cache.set(cache_key, {
             'status': 'completed',
-            'total': len(genes),
-            'completed': len(genes),
+            'total': len(gene_data_list),
+            'completed': len(gene_data_list),
             'gene_ids': gene_ids,
             'success': success_count,
-            'failed': fail_count
+            'failed': fail_count,
+            'skipped': skip_count,
+            'time': total_time
         }, timeout=3600)
 
         return {
             'status': 'success',
-            'total': len(genes),
+            'total': len(gene_data_list),
             'success': success_count,
-            'failed': fail_count
+            'failed': fail_count,
+            'skipped': skip_count,
+            'time': total_time
         }
 
     except Exception as e:
@@ -449,9 +520,11 @@ def async_process_gene_sequences(self, process_task_id, user_id, vector_id, spec
             if total_penalty and total_penalty > 28:
                 try:
                     cloning_method = vector.cloning_method if vector.cloning_method else "Gibson"
+                    vector_resistance = vector.antibiotic_resistance if hasattr(vector, 'antibiotic_resistance') else None
                     fragmentation_result = fragment_sequence_by_penalty(
                         sequence=row['CombinedSeq'],
                         cloning_method=cloning_method,
+                        vector_resistance=vector_resistance,
                         max_penalty=28.0
                     )
 

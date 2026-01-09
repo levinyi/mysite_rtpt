@@ -1,0 +1,211 @@
+<mxfile host="app.diagrams.net" modified="2026-01-08T00:00:00.000Z" agent="Claude Code" version="24.0.0">
+  <diagram name="Fragment Sequence Algorithm" id="fragment-sequence">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Start -->
+        <mxCell id="start" value="开始&#xa;fragment_sequence_by_penalty()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="485" y="40" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Calculate Total Penalty -->
+        <mxCell id="calc_penalty" value="计算整个序列的罚分&#xa;total_penalty&#xa;long_repeats_penalty" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="485" y="130" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="start" target="calc_penalty">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Check Long Repeats for Cloning Method -->
+        <mxCell id="check_long_repeats" value="Long Repeats &gt; 28&#xa;&amp;&amp; Gibson?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="490" y="220" width="190" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="calc_penalty" target="check_long_repeats">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Change to GoldenGate -->
+        <mxCell id="change_method" value="改用GoldenGate&#xa;根据抗性推荐载体:&#xa;Amp → pGZ1704(Kan)&#xa;Kan → pGZ1705(Amp)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="730" y="225" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge3" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_long_repeats" target="change_method">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Check Total Penalty -->
+        <mxCell id="check_total_penalty" value="Total Penalty ≤ 28?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="495" y="330" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge4" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_long_repeats" target="check_total_penalty">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;" edge="1" parent="1" source="change_method" target="check_total_penalty">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="820" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- No Fragmentation Needed -->
+        <mxCell id="no_fragment" value="不需要切割&#xa;返回结果" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="280" y="340" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge6" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_total_penalty" target="no_fragment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Step 1: Initial Fragmentation -->
+        <mxCell id="step1" value="Step 1: 初步切割&#xa;从左到右扫描序列&#xa;二分查找最长满足罚分≤28的片段&#xa;最小片段: 100bp" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="470" y="450" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge7" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_total_penalty" target="step1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Step 2: Greedy Merge -->
+        <mxCell id="step2" value="Step 2: 贪心合并&#xa;从左到右遍历初始片段&#xa;如果相邻片段合并后罚分≤28&#xa;则合并(节省成本)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="470" y="570" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="step1" target="step2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Check Fragment Count -->
+        <mxCell id="check_count" value="片段数 &gt; 9?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="510" y="690" width="150" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="step2" target="check_count">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Force Merge -->
+        <mxCell id="force_merge" value="强制合并&#xa;找到合并后罚分最小的&#xa;相邻片段对，强制合并&#xa;重复直到片段数≤9" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="770" y="685" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge10" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_count" target="force_merge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;" edge="1" parent="1" source="force_merge" target="check_count">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="790" />
+              <mxPoint x="720" y="790" />
+              <mxPoint x="720" y="725" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Add Adapter Info -->
+        <mxCell id="add_adapters" value="Step 3: 添加接头信息&#xa;为每个片段添加:&#xa;- adapter_left (前4bp)&#xa;- adapter_right (后4bp)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="470" y="800" width="230" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge12" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_count" target="add_adapters">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Check if GoldenGate or T4 -->
+        <mxCell id="check_gg_t4" value="GoldenGate/T4?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="510" y="920" width="150" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="add_adapters" target="check_gg_t4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Check Adapter Conflicts -->
+        <mxCell id="check_conflicts" value="Step 4: 检查接头冲突&#xa;按分组策略检查&#xa;组内和组间接头" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="475" y="1030" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge14" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_gg_t4" target="check_conflicts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Has Conflicts? -->
+        <mxCell id="has_conflicts" value="有冲突?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="510" y="1140" width="150" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_conflicts" target="has_conflicts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Adjust Cut Positions -->
+        <mxCell id="adjust_positions" value="微调切割位置&#xa;在±100bp范围内搜索&#xa;避免接头互补配对&#xa;记录到adapter_adjustments" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="755" y="1135" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge16" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="has_conflicts" target="adjust_positions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Generate MustCut -->
+        <mxCell id="generate_mustcut" value="Step 5: 生成MustCut位置&#xa;根据分组策略格式化&#xa;例: '1000/2000/3000\4000/5000/'" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="465" y="1260" width="240" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge17" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="has_conflicts" target="generate_mustcut">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;" edge="1" parent="1" source="adjust_positions" target="generate_mustcut">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="855" y="1295" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Skip to MustCut for Gibson -->
+        <mxCell id="edge19" value="否(Gibson)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="check_gg_t4" target="generate_mustcut">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="360" y="955" />
+              <mxPoint x="360" y="1295" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Return Result -->
+        <mxCell id="return_result" value="返回切割结果&#xa;- fragments[]&#xa;- mustcut_positions&#xa;- cloning_method&#xa;- vector_recommendation&#xa;- adapter_adjustments[]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="460" y="1370" width="250" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="generate_mustcut" target="return_result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Grouping Strategy Box -->
+        <mxCell id="grouping_info" value="分组策略&#xa;9片段: [3,3,3]&#xa;8片段: [3,3,2]&#xa;7片段: [3,2,2]&#xa;6片段: [3,3]&#xa;5片段: [3,2]&#xa;4片段: [2,2]&#xa;3片段: [3]&#xa;2片段: [2]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;verticalAlign=top;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1030" width="130" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- Key Features Box -->
+        <mxCell id="features" value="核心特性&#xa;✓ 最多9个片段&#xa;✓ 最小100bp&#xa;✓ 无最大长度限制&#xa;✓ 贪心合并节省成本&#xa;✓ 仅Long Repeats&#xa;  决定克隆方法&#xa;✓ 自动推荐载体&#xa;✓ 接头冲突微调" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;align=left;verticalAlign=top;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="450" width="160" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- Title -->
+        <mxCell id="title" value="Fragment Sequence 切割算法流程图 (新版本)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#0066CC;" vertex="1" parent="1">
+          <mxGeometry x="320" y="10" width="530" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -40,8 +40,7 @@ def get_group_emails(group_name):
         users = group.user_set.filter(is_active=True)
         user_emails = []
         for user in users:
-            profile = user.userprofile
-            user_emails.append(profile.email)
+            user_emails.append(user.email)
         return user_emails
     except Group.DoesNotExist:
         return []

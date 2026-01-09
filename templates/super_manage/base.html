@@ -148,18 +148,29 @@
     document.addEventListener('DOMContentLoaded', function() {
         const toggleBtn = document.getElementById('toggleSidebarBtn');
         const sidebarWrapper = document.querySelector('.sidebar-wrapper');
+        const storageKey = 'super_manage_sidebar_collapsed';
 
         if (!toggleBtn || !sidebarWrapper) return;
+
+        const setToggleIcon = function(isCollapsed) {
+            toggleBtn.innerHTML = isCollapsed
+                ? '<i class="bi bi-chevron-right"></i>'
+                : '<i class="bi bi-chevron-left"></i>';
+        };
+
+        const isCollapsed = localStorage.getItem(storageKey) === '1';
+        if (isCollapsed) {
+            sidebarWrapper.classList.add('collapsed');
+        }
+        setToggleIcon(isCollapsed);
 
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
             sidebarWrapper.classList.toggle('collapsed');
 
-            if (sidebarWrapper.classList.contains('collapsed')) {
-                this.innerHTML = '<i class="bi bi-chevron-right"></i>';
-            } else {
-                this.innerHTML = '<i class="bi bi-chevron-left"></i>';
-            }
+            const collapsedNow = sidebarWrapper.classList.contains('collapsed');
+            localStorage.setItem(storageKey, collapsedNow ? '1' : '0');
+            setToggleIcon(collapsedNow);
         });
     });
 </script>

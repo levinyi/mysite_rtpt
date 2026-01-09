@@ -50,6 +50,16 @@ class GeneInfo(models.Model):
     #   {"index": 2, "seq": "GCTA...", "start": 1000, "end": 2000, "penalty_score": 27.8}
     # ]
 
+    # 限制性酶切位点自动决策相关字段
+    restriction_decision = models.CharField(max_length=50, null=True, blank=True, help_text="accept/reject")
+    restriction_process_route = models.CharField(max_length=50, null=True, blank=True, help_text="BsaI/BsmBI")
+    restriction_message = models.TextField(null=True, blank=True, help_text="决策提示信息")
+    restriction_requires_manual_review = models.BooleanField(default=False, help_text="是否需要人工评估")
+    bsai_count = models.IntegerField(null=True, blank=True, help_text="BsaI位点数量")
+    bsmbi_count = models.IntegerField(null=True, blank=True, help_text="BsmBI位点数量")
+    bsai_positions = models.JSONField(null=True, blank=True, help_text="BsaI位点位置列表")
+    bsmbi_positions = models.JSONField(null=True, blank=True, help_text="BsmBI位点位置列表")
+
     def __str__(self):
         return self.gene_name
 

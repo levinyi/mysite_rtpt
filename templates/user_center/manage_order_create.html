@@ -5,48 +5,62 @@
 {% block extra_head %}
 <!-- Custom CSS -->
 <style>
+    .custom-workflow-shell {
+        display: flex;
+        justify-content: center;
+        padding: 0 1.25rem 1rem;
+    }
+
     .custom-workflow-container {
         display: flex;
         gap: 1rem;
         justify-content: space-between;
         align-items: center;
         position: relative;
-        padding: 1rem 1.25rem;
+        padding: .6rem 1rem;
+        max-width: 760px;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid rgba(13,110,253,.12);
+        border-radius: 999px;
+        box-shadow: 0 12px 28px rgba(13,110,253,.08);
     }
 
     .custom-workflow-step {
         text-align: center;
-        flex: 1;
+        flex: 0 1 170px;
         position: relative;
         z-index: 1;
     }
 
     .custom-workflow-icon {
-        width: 44px;
-        height: 44px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.25rem;
+        font-size: 1rem;
         color: #0d6efd;
-        background: linear-gradient(145deg, #eff6ff, #f7fbff);
+        background: linear-gradient(145deg, #eff6ff, #ffffff);
         border: 1px solid rgba(13,110,253,.12);
     }
 
     .custom-step-label {
-        font-weight: bold;
+        font-weight: 600;
         color: #495057;
-        margin-top: .5rem;
+        margin-top: .35rem;
+        font-size: .85rem;
+        letter-spacing: .02em;
     }
 
     /* connectors between steps */
     .custom-workflow-step:before {
         content: '';
         position: absolute;
-        top: 22px;
-        left: -50%;
-        width: 100%;
+        top: 18px;
+        left: -36px;
+        width: 72px;
         height: 2px;
         background: linear-gradient(90deg, rgba(13,110,253,.12), rgba(13,110,253,.12));
         z-index: 0;
@@ -55,6 +69,37 @@
 
     .hero-card { background: linear-gradient(135deg, #f8fbff 0%, #f4f9ff 60%, #f8fff9 100%); }
     .section-hint { color: #6c757d; font-size: .9rem; }
+
+    @media (max-width: 992px) {
+        .custom-workflow-container {
+            border-radius: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: .75rem 1rem;
+        }
+
+        .custom-workflow-step {
+            flex: 1 1 40%;
+        }
+
+        .custom-workflow-step:before {
+            display: none;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .custom-workflow-shell {
+            padding: 0 1rem 1rem;
+        }
+
+        .custom-workflow-container {
+            padding: .75rem;
+        }
+
+        .custom-workflow-step {
+            flex: 1 1 100%;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -80,22 +125,24 @@
                 </div>
             </div>
         </div>
-        <div class="custom-workflow-container mb-3">
-            <div class="custom-workflow-step">
-                <div class="custom-workflow-icon"><i class="bi bi-journal-text"></i></div>
-                <div class="custom-step-label">Choose Vector</div>
-            </div>
-            <div class="custom-workflow-step">
-                <div class="custom-workflow-icon"><i class="bi bi-folder-check"></i></div>
-                <div class="custom-step-label">Submit Sequence</div>
-            </div>
-            <div class="custom-workflow-step">
-                <div class="custom-workflow-icon"><i class="bi bi-person-check"></i></div>
-                <div class="custom-step-label">Sequence Validation</div>
-            </div>
-            <div class="custom-workflow-step">
-                <div class="custom-workflow-icon"><i class="bi bi-check-lg"></i></div>
-                <div class="custom-step-label">Order Complete</div>
+        <div class="custom-workflow-shell">
+            <div class="custom-workflow-container">
+                <div class="custom-workflow-step">
+                    <div class="custom-workflow-icon"><i class="bi bi-journal-text"></i></div>
+                    <div class="custom-step-label">Choose Vector</div>
+                </div>
+                <div class="custom-workflow-step">
+                    <div class="custom-workflow-icon"><i class="bi bi-folder-check"></i></div>
+                    <div class="custom-step-label">Submit Sequence</div>
+                </div>
+                <div class="custom-workflow-step">
+                    <div class="custom-workflow-icon"><i class="bi bi-person-check"></i></div>
+                    <div class="custom-step-label">Sequence Validation</div>
+                </div>
+                <div class="custom-workflow-step">
+                    <div class="custom-workflow-icon"><i class="bi bi-check-lg"></i></div>
+                    <div class="custom-step-label">Order Complete</div>
+                </div>
             </div>
         </div>
     </div>

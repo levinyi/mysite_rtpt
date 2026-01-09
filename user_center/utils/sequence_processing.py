@@ -150,6 +150,26 @@ def process_highlights_positions(row):
                 'content': error['content']
             })
 
+    # 处理 BsaI 位点
+    if 'bsai_positions' in row and row['bsai_positions']:
+        for pos in row['bsai_positions']:
+            highlights_positions.append({
+                'start': pos['start'],
+                'end': pos['end'],
+                'type': 'BsaI',
+                'content': pos['seq']
+            })
+
+    # 处理 BsmBI 位点
+    if 'bsmbi_positions' in row and row['bsmbi_positions']:
+        for pos in row['bsmbi_positions']:
+            highlights_positions.append({
+                'start': pos['start'],
+                'end': pos['end'],
+                'type': 'BsmBI',
+                'content': pos['seq']
+            })
+
     return highlights_positions
 
 
@@ -220,3 +240,157 @@ def process_status(row):
         return 'warning'
     else:
         return 'validated'
+
+
+def get_enzyme_sites(seq, enzyme_name):
+    """
+    统计序列中特定酶切位点的数量和位置
+
+    参数:
+        seq: DNA序列字符串
+        enzyme_name: 酶的名称 ('BsaI' 或 'BsmBI')
+
+    返回:
+        dict: {'count': int, 'positions': [{'start': int, 'end': int, 'seq': str}, ...]}
+    """
+    if not seq:
+        return {'count': 0, 'positions': []}
+
+    # 定义酶切位点序列（包括正向和反向互补）
+    enzyme_sites = {
+        'BsaI': ['GGTCTC', 'GAGACC'],
+        'BsmBI': ['CGTCTC', 'GAGACG']
+    }
+
+    if enzyme_name not in enzyme_sites:
+        return {'count': 0, 'positions': []}
+
+    sites = enzyme_sites[enzyme_name]
+    positions = []
+
+    # 搜索所有匹配的位点
+    seq_upper = seq.upper()
+    for site in sites:
+        for match in re.finditer(site, seq_upper):
+            positions.append({
+                'start': match.start(),
+                'end': match.end(),
+                'seq': site
+            })
+
+    # 按位置排序
+    positions.sort(key=lambda x: x['start'])
+
+    return {
+        'count': len(positions),
+        'positions': positions
+    }
+
+
+def make_restriction_site_decision(seq, cloning_method):
+    """
+    基于限制性酶切位点数量、克隆方法和序列长度做出自动决策
+
+    参数:
+        seq: DNA序列字符串
+        cloning_method: 克隆方法 ('Gibson', 'GG', 或 'T4')
+
+    返回:
+        dict: {
+            'decision': 'accept' 或 'reject',
+            'process_route': 'BsaI' 或 'BsmBI' 或 None,
+            'message': 决策提示信息,
+            'bsai_count': BsaI位点数量,
+            'bsmbi_count': BsmBI位点数量,
+            'bsai_positions': BsaI位点位置列表,
+            'bsmbi_positions': BsmBI位点位置列表,
+            'seq_length': 序列长度,
+            'requires_manual_review': 是否需要人工评估
+        }
+    """
+    # 获取BsaI和BsmBI位点信息
+    bsai_info = get_enzyme_sites(seq, 'BsaI')
+    bsmbi_info = get_enzyme_sites(seq, 'BsmBI')
+
+    bsai_count = bsai_info['count']
+    bsmbi_count = bsmbi_info['count']
+    seq_length = len(seq)
+
+    # 初始化结果
+    result = {
+        'decision': 'accept',
+        'process_route': None,
+        'message': '',
+        'bsai_count': bsai_count,
+        'bsmbi_count': bsmbi_count,
+        'bsai_positions': bsai_info['positions'],
+        'bsmbi_positions': bsmbi_info['positions'],
+        'seq_length': seq_length,
+        'requires_manual_review': False
+    }
+
+    # 情况5: ≥2个BsaI + ≥2个BsmBI - 无条件拒绝
+    if bsai_count >= 2 and bsmbi_count >= 2:
+        result['decision'] = 'reject'
+        result['message'] = f'Sequence contains {bsai_count} BsaI sites and {bsmbi_count} BsmBI sites. Manual review required.'
+        result['requires_manual_review'] = True
+        return result
+
+    # 情况1: 无BsaI位点
+    if bsai_count == 0:
+        result['decision'] = 'accept'
+        result['process_route'] = 'BsaI'
+        result['message'] = 'No BsaI sites found. Synthesis accepted via BsaI route.'
+        return result
+
+    # 情况2: 有BsaI但无BsmBI
+    if bsai_count >= 1 and bsmbi_count == 0:
+        result['decision'] = 'accept'
+        result['process_route'] = 'BsmBI'
+        result['message'] = f'Sequence contains {bsai_count} BsaI site(s) but no BsmBI sites. Synthesis accepted via BsmBI route.'
+        return result
+
+    # 情况3: 1个BsaI + ≥1个BsmBI
+    if bsai_count == 1 and bsmbi_count >= 1:
+        # 检查克隆方法
+        if cloning_method == 'Gibson':
+            result['decision'] = 'reject'
+            result['message'] = f'Genes with internal BsaI cannot be cloned into vectors by Gibson. BsaI sites: {bsai_count}, BsmBI sites: {bsmbi_count}.'
+            return result
+
+        # 检查序列长度
+        if seq_length <= 1500:
+            result['decision'] = 'accept'
+            result['process_route'] = 'BsaI'
+            result['message'] = f'Sequence contains {bsai_count} BsaI site and {bsmbi_count} BsmBI site(s). Length ≤1500bp. Synthesis accepted via BsaI route (auto-processed).'
+        else:
+            result['decision'] = 'reject'
+            result['message'] = f'Sequence contains {bsai_count} BsaI site and {bsmbi_count} BsmBI site(s). Length >1500bp. Manual review required.'
+            result['requires_manual_review'] = True
+
+        return result
+
+    # 情况4: ≥2个BsaI + 1个BsmBI
+    if bsai_count >= 2 and bsmbi_count == 1:
+        # 检查克隆方法
+        if cloning_method == 'Gibson':
+            result['decision'] = 'reject'
+            result['message'] = f'Genes with internal BsmBI cannot be cloned into vectors by Gibson. BsaI sites: {bsai_count}, BsmBI sites: {bsmbi_count}.'
+            return result
+
+        # 检查序列长度
+        if seq_length <= 1500:
+            result['decision'] = 'accept'
+            result['process_route'] = 'BsmBI'
+            result['message'] = f'Sequence contains {bsai_count} BsaI sites and {bsmbi_count} BsmBI site. Length ≤1500bp. Synthesis accepted via BsmBI route (auto-processed).'
+        else:
+            result['decision'] = 'reject'
+            result['message'] = f'Sequence contains {bsai_count} BsaI sites and {bsmbi_count} BsmBI site. Length >1500bp. Manual review required.'
+            result['requires_manual_review'] = True
+
+        return result
+
+    # 默认情况（理论上不应该到这里）
+    result['decision'] = 'accept'
+    result['message'] = 'Sequence validated.'
+    return result

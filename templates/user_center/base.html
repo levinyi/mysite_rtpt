@@ -196,26 +196,34 @@
         })
     </script>
     <script>
-        // Toggle sidebar functionality
+        // Toggle sidebar functionality (persist state)
         document.addEventListener('DOMContentLoaded', function() {
             const toggleBtn = document.getElementById('toggleSidebarBtn');
             const sidebarWrapper = document.querySelector('.sidebar-wrapper');
+            const storageKey = 'user_center_sidebar_collapsed';
 
             if (!toggleBtn || !sidebarWrapper) return;
 
-            // 默认展开，不从 localStorage 读取状态
+            const setToggleIcon = function(isCollapsed) {
+                toggleBtn.innerHTML = isCollapsed
+                    ? '<i class="bi bi-chevron-right"></i>'
+                    : '<i class="bi bi-chevron-left"></i>';
+            };
+
+            const isCollapsed = localStorage.getItem(storageKey) === '1';
+            if (isCollapsed) {
+                sidebarWrapper.classList.add('collapsed');
+            }
+            setToggleIcon(isCollapsed);
 
             // Toggle button click handler
             toggleBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 sidebarWrapper.classList.toggle('collapsed');
 
-                // Toggle icon (不保存到 localStorage)
-                if (sidebarWrapper.classList.contains('collapsed')) {
-                    this.innerHTML = '<i class="bi bi-chevron-right"></i>';
-                } else {
-                    this.innerHTML = '<i class="bi bi-chevron-left"></i>';
-                }
+                const collapsedNow = sidebarWrapper.classList.contains('collapsed');
+                localStorage.setItem(storageKey, collapsedNow ? '1' : '0');
+                setToggleIcon(collapsedNow);
             });
         });
     </script>

@@ -1,18 +1,83 @@
+# Python 缓存和编译文件
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.pyc
 *.pyo
-*.log
-*.sqlite3
-db.sqlite3-journal
 *.egg-info/
+
+# Django 相关
+*.log
+*.pot
+*.sqlite3
+db.sqlite3
+db.sqlite3-journal
+mysite.backup.sql
+*.sql
+
+# 静态文件和媒体文件（开发时的临时文件）
+staticfiles/
+staticfiles
+media/
+downloads/
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv
+
+# IDE 配置文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
-.env
+
+# Git 相关
 .git/
 .gitignore
-mysite.backup.sql
-*.yml
-media/
+.gitattributes
+
+# Docker 相关文件（不需要打包进镜像）
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.yml.backup
 *.tar
-*.sql
-staticfiles
+setup.docker.sh
+
+# 文档和说明
+*.md
+README*
+docs/
+*.drawio
+
+# 测试文件
 test_*.py
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 备份文件
+*.backup
+*.bak
+*.old
+
+# 临时文件
+*.tmp
+temp/
+tmp/
+
+# 其他
+node_modules/
+npm-debug.log

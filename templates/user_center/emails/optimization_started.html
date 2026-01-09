@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Optimization Started</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #0d6efd;
+            color: #ffffff;
+        }
+        .content {
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #0d6efd;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .gene-list {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .gene-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .gene-item:last-child {
+            border-bottom: none;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666666;
+            border-top: 1px solid #dee2e6;
+            margin-top: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #0d6efd;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .highlight {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧬 Sequence Optimization Started</h1>
+        </div>
+        <div class="content">
+            <p>Dear {{ user_name }},</p>
+
+            <p>Your sequence optimization task has been successfully submitted and is now being processed.</p>
+
+            <div class="info-box">
+                <strong>📊 Optimization Details:</strong><br>
+                <p style="margin: 10px 0;">
+                    <strong>Total Genes:</strong> <span class="highlight">{{ gene_count }}</span><br>
+                    <strong>Species:</strong> <span class="highlight">{{ species }}</span><br>
+                    <strong>Optimization Method:</strong> <span class="highlight">{{ optimization_method }}</span><br>
+                    <strong>Submitted Time:</strong> {{ submitted_time }}
+                </p>
+            </div>
+
+            {% if gene_names %}
+            <div class="gene-list">
+                <strong>Gene List:</strong>
+                {% for gene_name in gene_names %}
+                <div class="gene-item">{{ forloop.counter }}. {{ gene_name }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <p><strong>⏱️ Estimated Time:</strong> Depending on the sequence complexity and length, the optimization process may take several minutes to hours. You will receive another email once the optimization is complete.</p>
+
+            <p>You can check the status of your optimization at any time by visiting your shopping cart.</p>
+
+            <a href="{{ shopping_cart_url }}" class="button">View Shopping Cart</a>
+
+            <p style="margin-top: 30px;">
+                Best regards,<br>
+                <strong>RootPath Gene Synthesis Team</strong>
+            </p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message from RootPath Gene Synthesis Platform.</p>
+            <p>If you have any questions, please contact us at <a href="mailto:order@rootpathgx.com">order@rootpathgx.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

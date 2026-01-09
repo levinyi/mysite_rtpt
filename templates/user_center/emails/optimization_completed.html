@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Optimization Completed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #198754;
+            color: #ffffff;
+        }
+        .header.failed {
+            background-color: #dc3545;
+        }
+        .content {
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .success-box {
+            background-color: #d1e7dd;
+            border-left: 4px solid #198754;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .failed-box {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .info-table td {
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .info-table td:first-child {
+            font-weight: bold;
+            width: 40%;
+            color: #495057;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-success {
+            background-color: #198754;
+            color: white;
+        }
+        .status-failed {
+            background-color: #dc3545;
+            color: white;
+        }
+        .status-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666666;
+            border-top: 1px solid #dee2e6;
+            margin-top: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #0d6efd;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .highlight {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .improvement {
+            color: #198754;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header {% if optimization_status == 'failed' %}failed{% endif %}">
+            <h1>{% if optimization_status == 'Optimized' %}✅ Optimization Completed{% else %}❌ Optimization Failed{% endif %}</h1>
+        </div>
+        <div class="content">
+            <p>Dear {{ user_name }},</p>
+
+            {% if optimization_status == 'Optimized' %}
+            <p>Great news! Your sequence optimization has been completed successfully.</p>
+
+            <div class="success-box">
+                <strong>🎉 Optimization Summary:</strong>
+                <table class="info-table">
+                    <tr>
+                        <td>Gene Name:</td>
+                        <td><strong>{{ gene_name }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td>
+                        <td><span class="status-badge status-success">Optimized</span></td>
+                    </tr>
+                    <tr>
+                        <td>Sequence Status:</td>
+                        <td>
+                            {% if sequence_status == 'validated' %}
+                            <span class="status-badge status-success">Validated</span>
+                            {% elif sequence_status == 'warning' %}
+                            <span class="status-badge status-warning">Warning</span>
+                            {% else %}
+                            <span class="status-badge">{{ sequence_status|title }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if penalty_score is not None %}
+                    <tr>
+                        <td>Penalty Score:</td>
+                        <td>
+                            {% if old_penalty_score %}
+                            <span style="text-decoration: line-through; color: #dc3545;">{{ old_penalty_score }}</span> →
+                            {% endif %}
+                            <span class="improvement">{{ penalty_score }}</span>
+                            {% if old_penalty_score and penalty_score < old_penalty_score %}
+                            <span style="color: #198754; font-size: 12px;">
+                                (↓ {{ old_penalty_score|floatformat:2|add:"-"|add:penalty_score|floatformat:2 }} improvement)
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% if gc_content is not None %}
+                    <tr>
+                        <td>GC Content:</td>
+                        <td>{{ gc_content }}%</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Completed Time:</td>
+                        <td>{{ completed_time }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <p><strong>📋 Next Steps:</strong></p>
+            <ul>
+                <li>Review the optimized sequence in your shopping cart</li>
+                <li>Check the updated Sequence Status and Penalty Score</li>
+                <li>Proceed to checkout when ready to submit your order</li>
+            </ul>
+
+            {% else %}
+            <p>Unfortunately, the optimization for your gene sequence has failed.</p>
+
+            <div class="failed-box">
+                <strong>❌ Failure Details:</strong>
+                <table class="info-table">
+                    <tr>
+                        <td>Gene Name:</td>
+                        <td><strong>{{ gene_name }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td>
+                        <td><span class="status-badge status-failed">Failed</span></td>
+                    </tr>
+                    {% if error_message %}
+                    <tr>
+                        <td>Error Message:</td>
+                        <td style="color: #dc3545;">{{ error_message }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Failed Time:</td>
+                        <td>{{ completed_time }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <p><strong>💡 Recommended Actions:</strong></p>
+            <ul>
+                <li>Review your sequence for potential issues</li>
+                <li>Try a different optimization method</li>
+                <li>Contact our support team for assistance</li>
+            </ul>
+            {% endif %}
+
+            <a href="{{ shopping_cart_url }}" class="button">View in Shopping Cart</a>
+
+            <p style="margin-top: 30px;">
+                Best regards,<br>
+                <strong>RootPath Gene Synthesis Team</strong>
+            </p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message from RootPath Gene Synthesis Platform.</p>
+            <p>If you have any questions, please contact us at <a href="mailto:order@rootpathgx.com">order@rootpathgx.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

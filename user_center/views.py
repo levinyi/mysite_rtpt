@@ -20,7 +20,7 @@ from django.conf import settings
 
 from product.models import GeneSynEnzymeCutSite, Species, Vector
 from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
-from tools.scripts.ParsingGenBank import addMultipleFeaturesToGeneBank
+from tools.scripts.ParsingGenBank import addMultipleFeaturesToGeneBank, addAnalysisFeaturesAndFragments
 # from tools.scripts.penalty_score_predict import predict_new_data_from_df
 from .models import Cart, GeneInfo, GeneOptimization, OrderInfo
 from .utils.render_to_pdf import render_to_pdf
@@ -36,7 +36,8 @@ from user_center.utils.sequence_processing import (
     process_contained_forbidden_list,
     process_highlights_positions,
     deal_repeats_warnings,
-    process_status
+    process_status,
+    make_restriction_site_decision
 )
 
 logger = logging.getLogger(__name__)
@@ -157,11 +158,33 @@ def order_create(request):
             ]
             result_df['total_penalty_score'] = sum(result_df[col] for col in feature_columns).round(2)
             # 将结果合并到原始数据中
-            df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')            
+            df = df.merge(result_df, left_on='GeneName', right_on='GeneName', how='left')
+            ###############################################################################################################################
+            # 限制性酶切位点自动决策
+            # 获取克隆方法
+            cloning_method = vector.cloning_method if vector.cloning_method else 'T4'
+
+            # 对每个序列进行限制性酶切位点决策
+            def apply_restriction_decision(row):
+                decision_result = make_restriction_site_decision(row['CombinedSeq'], cloning_method)
+                return pd.Series({
+                    'restriction_decision': decision_result['decision'],
+                    'restriction_process_route': decision_result['process_route'],
+                    'restriction_message': decision_result['message'],
+                    'restriction_requires_manual_review': decision_result['requires_manual_review'],
+                    'bsai_count': decision_result['bsai_count'],
+                    'bsmbi_count': decision_result['bsmbi_count'],
+                    'bsai_positions': decision_result['bsai_positions'],
+                    'bsmbi_positions': decision_result['bsmbi_positions']
+                })
+
+            restriction_results = df.apply(apply_restriction_decision, axis=1)
+            df = pd.concat([df, restriction_results], axis=1)
+
             ###############################################################################################################################
             # 整合  把forbidden seq，warnings，stop codons的content加到 FoundForbiddenSequence中，在header中展示。
             df['contained_forbidden_list'] = df.apply(process_contained_forbidden_list, axis=1)
-            
+
             # 整合：把forbidden_seq, warnings, stop codons 的位置信息加到 highlights_positions中，用于前端展示
             df['highlights_positions'] = df.apply(
                 lambda row: process_highlights_positions(row),
@@ -219,7 +242,17 @@ def order_create(request):
                         analysis_results=analysis_results,  # 假设你有一个 JSONField 或 TextField 存储分析结果
 
                         # 存储片段数据（暂时为None）
-                        fragments_data=None
+                        fragments_data=None,
+
+                        # 限制性酶切位点决策结果
+                        restriction_decision=row.get('restriction_decision', None),
+                        restriction_process_route=row.get('restriction_process_route', None),
+                        restriction_message=row.get('restriction_message', None),
+                        restriction_requires_manual_review=row.get('restriction_requires_manual_review', False),
+                        bsai_count=row.get('bsai_count', None),
+                        bsmbi_count=row.get('bsmbi_count', None),
+                        bsai_positions=row.get('bsai_positions', None),
+                        bsmbi_positions=row.get('bsmbi_positions', None)
                     )
                 )
 
@@ -725,6 +758,8 @@ def validation_save(request, id):
 def bulk_optimization_submit(request):
     '''批量优化基因页面'''
     if request.method == 'POST':
+        from user_center.utils.email_notifications import send_optimization_started_email
+
         # 从请求中获取基因ID列表和物种
         gene_ids = request.POST.get('selected_genes')
         species_selected = request.POST.get('species_select_for_optimization')
@@ -744,7 +779,7 @@ def bulk_optimization_submit(request):
 
         if species_selected == None:
             return JsonResponse({'status': 'error', 'message': 'Please select a species for optimization'})
-        
+
         # 检查 species 是否存在
         species_obj = get_object_or_404(Species, species_name=species_selected)
 
@@ -757,6 +792,20 @@ def bulk_optimization_submit(request):
             gene.optimization_method = optimization_method_dict.get(optimization_method)
             gene.optimization_id = uuid.uuid4()  # Generate a unique ID for optimization
             gene.save()
+
+        # 发送优化开始的邮件通知
+        try:
+            send_optimization_started_email(
+                user=request.user,
+                gene_objects=gene_objects,
+                species=species_obj,
+                optimization_method=optimization_method_dict.get(optimization_method)
+            )
+        except Exception as e:
+            # 邮件发送失败不影响主流程，只记录日志
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to send optimization started email: {str(e)}")
 
         return redirect('user_center:bulk_optimization_display')
 
@@ -794,34 +843,138 @@ def condon_optimization_api(request):
             return JsonResponse({'status': 'error', 'message': f'Failed to fetch genes: {str(e)}'}, status=500)
     elif request.method == "POST":
         try:
+            import sys
+            import pandas as pd
+
+            # 添加项目路径以便导入 AnalysisSequence
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(current_dir)
+            tools_scripts_path = os.path.join(project_root, 'tools', 'scripts')
+            sys.path.insert(0, tools_scripts_path)
+
+            from AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
+            from user_center.utils.sequence_processing import (
+                check_forbidden_seq,
+                deal_repeats_warnings,
+                process_status,
+                process_contained_forbidden_list,
+                process_highlights_positions,
+                clean_and_check_dna_sequence
+            )
+
             # Parse form-encoded data (request.POST)
             task_id = request.POST.get("gene_id")
             optimized_seq = request.POST.get("optimized_seq")
             status = request.POST.get("status")
             optimization_message = request.POST.get("optimization_message")
-            
+
             status_mapping = {
                 'completed': 'Optimized',
                 'failed': 'failed',
                 'processing': 'Optimizing',
             }
-                
+
             # Update the gene information
             gene = GeneInfo.objects.get(optimization_id=task_id)  # assuming task_id maps to gene_id
+
+            # 保存优化前的penalty score，用于邮件通知
+            old_penalty_score = gene.penalty_score
+
             if status_mapping.get(status) == 'failed':
                 gene.optimization_status = 'failed'
                 gene.optimization_message = optimization_message
             else:
+                # 更新优化状态和序列
                 gene.optimization_status = status_mapping.get(status, 'Optimizing')
                 gene.saved_seq = optimized_seq
-                gene.modified_gc_content = round((optimized_seq.upper().count('G') + optimized_seq.upper().count('C')) / len(optimized_seq) * 100, 2)
-                # penalty_score = calculate_penalty_score(optimized_seq)
-                # gene.penalty_score = penalty_score
+
+                # 仅在优化完成时重新分析序列
+                if status_mapping.get(status) == 'Optimized':
+                    # 1. 计算GC含量
+                    gene.modified_gc_content = round(
+                        (optimized_seq.upper().count('G') + optimized_seq.upper().count('C')) / len(optimized_seq) * 100, 2
+                    ) if len(optimized_seq) > 0 else 0
+
+                    # 2. 清理序列并检查非法碱基
+                    cleaned_seq, error_info = clean_and_check_dna_sequence(optimized_seq)
+
+                    # 3. 检查禁用序列
+                    built_in_forbidden_list = [
+                        'GAAGAC', 'GGTCTC', 'CGTCTC', 'CACCTGC', 'GCAGGTG',
+                        'CTGCAG', 'CTCGAG', 'AGATCT', 'ACTAGT', 'TCTAGA',
+                        'GGATCC', 'GAATTC', 'GCGGCCGC', 'TTAATTAA'
+                    ]
+                    forbidden_info = check_forbidden_seq(optimized_seq, built_in_forbidden_list)
+
+                    # 4. 计算penalty score
+                    df = pd.DataFrame({
+                        'gene_id': [gene.gene_name],
+                        'sequence': [optimized_seq],
+                        'forbidden_info': [forbidden_info],
+                        'Error': [error_info] if error_info else [None]
+                    })
+
+                    # 使用AnalysisSequence进行分析
+                    data_json = convert_gene_table_to_RepeatsFinder_Format(df)
+                    result_df = process_gene_table_results(data_json)
+
+                    # 计算总penalty score
+                    feature_columns = [
+                        'HighGC_penalty_score', 'LowGC_penalty_score', 'W12S12Motifs_penalty_score',
+                        'LongRepeats_penalty_score', 'Homopolymers_penalty_score', 'DoubleNT_penalty_score',
+                        'TandemRepeats_penalty_score', 'PalindromeRepeats_penalty_score', 'InvertedRepeats_penalty_score'
+                    ]
+                    total_penalty_score = sum(result_df[col].iloc[0] for col in feature_columns)
+                    gene.penalty_score = round(total_penalty_score, 2)
+
+                    # 5. 更新 contained_forbidden_list
+                    forbidden_seqs = [info['forbidden_seq'] for info in forbidden_info] if forbidden_info else []
+                    gene.contained_forbidden_list = forbidden_seqs
+
+                    # 6. 处理 highlights_positions
+                    row_dict = df.iloc[0].to_dict()
+                    for col in result_df.columns:
+                        if col != 'GeneName':
+                            row_dict[col] = result_df.iloc[0][col]
+                    highlights_positions = process_highlights_positions(row_dict)
+                    gene.modified_highlights = highlights_positions
+
+                    # 7. 更新 warnings
+                    gene.warnings = deal_repeats_warnings(row_dict)
+
+                    # 8. 更新 status (Sequence Status)
+                    row_dict['contained_forbidden_list'] = forbidden_seqs
+                    row_dict['warnings'] = gene.warnings
+                    new_status = process_status(row_dict)
+                    gene.status = new_status
+
+                    # 9. 更新 analysis_results
+                    if gene.gene_name in data_json:
+                        gene.analysis_results = data_json[gene.gene_name]
+
             gene.save()
+
+            # 发送优化完成的邮件通知（成功或失败都发送）
+            if status_mapping.get(status) in ['Optimized', 'failed']:
+                try:
+                    from user_center.utils.email_notifications import send_optimization_completed_email
+                    send_optimization_completed_email(
+                        user=gene.user,
+                        gene=gene,
+                        optimization_status=status_mapping.get(status),
+                        old_penalty_score=old_penalty_score
+                    )
+                except Exception as email_error:
+                    # 邮件发送失败不影响主流程，只记录日志
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to send optimization completed email: {str(email_error)}")
 
             return JsonResponse({'status': 'success', 'message': 'Gene status updated successfully'})
         except Exception as e:
-            return JsonResponse({'status': 'error', 'message': f'Failed to update gene status: {str(e)}'}, status=500)
+            import traceback
+            error_details = traceback.format_exc()
+            return JsonResponse({'status': 'error', 'message': f'Failed to update gene status: {str(e)}', 'details': error_details}, status=500)
 
     else:
         return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
@@ -839,8 +992,8 @@ def bulk_optimization_display(request):
 def view_cart(request):
     cart, created = Cart.objects.get_or_create(user=request.user)
 
-    # 获取并按 `create_date` 倒序排序
-    shopping_cart = cart.genes.all().order_by('-create_date')
+    # 获取并按 `create_date` 正序排序（保持提交顺序）
+    shopping_cart = cart.genes.all().order_by('create_date')
 
     # 分组
     grouped_shopping_cart = [
@@ -987,6 +1140,142 @@ def trigger_gene_fragmentation(request):
         }, status=500)
 
 
+@login_required
+def get_fragment_details(request, gene_id):
+    """
+    获取基因的Fragment详细信息
+    用于在购物车页面展示切割详情
+    """
+    try:
+        # 获取基因
+        gene = GeneInfo.objects.get(id=gene_id, user=request.user)
+
+        # 检查是否有fragments_data
+        if not gene.fragments_data or not gene.fragments_data.get('need_fragmentation'):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'This gene has not been fragmented or does not need fragmentation'
+            }, status=404)
+
+        return JsonResponse({
+            'status': 'success',
+            'gene_id': gene.id,
+            'gene_name': gene.gene_name,
+            'fragments_data': gene.fragments_data
+        })
+
+    except GeneInfo.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Gene not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error getting fragment details for gene {gene_id}: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Failed to load fragment details: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_POST
+def trigger_order_fragmentation(request, order_id):
+    """
+    触发订单级别的基因序列片段切割
+    处理订单中所有罚分 > 28 的基因
+    """
+    import time
+    from user_center.utils.sequence_fragmenter import fragment_sequence_by_penalty
+
+    try:
+        # 获取订单
+        order = OrderInfo.objects.get(id=order_id, user=request.user)
+
+        # 获取订单中的所有基因
+        genes = order.gene_infos.select_related('vector').all()
+
+        if not genes:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No genes found in this order'
+            }, status=404)
+
+        # 过滤出罚分 > 28 的基因
+        genes_need_fragmentation = [
+            gene for gene in genes
+            if gene.penalty_score and gene.penalty_score > 28
+        ]
+
+        if not genes_need_fragmentation:
+            return JsonResponse({
+                'status': 'info',
+                'message': 'None of the genes in this order require fragmentation (all penalty scores ≤ 28)',
+                'total': len(genes),
+                'need_fragmentation': 0
+            })
+
+        # 同步处理切割（订单级别，基因数量通常不多）
+        success_count = 0
+        fail_count = 0
+        start_time = time.time()
+
+        for gene in genes_need_fragmentation:
+            try:
+                # 获取载体的克隆方法和抗性
+                cloning_method = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else "Gibson"
+                vector_resistance = gene.vector.antibiotic_resistance if gene.vector and hasattr(gene.vector, 'antibiotic_resistance') else None
+
+                # 执行片段切割
+                fragmentation_result = fragment_sequence_by_penalty(
+                    sequence=gene.combined_seq,
+                    cloning_method=cloning_method,
+                    vector_resistance=vector_resistance,
+                    max_penalty=28.0
+                )
+
+                if fragmentation_result and fragmentation_result.get('need_fragmentation'):
+                    # 更新基因的 fragments_data
+                    gene.fragments_data = fragmentation_result
+                    gene.save(update_fields=['fragments_data'])
+                    success_count += 1
+                    logger.info(
+                        f"Gene {gene.gene_name} (ID: {gene.id}) from Order {order_id} "
+                        f"fragmented into {fragmentation_result.get('total_fragments', 0)} pieces"
+                    )
+
+            except Exception as e:
+                fail_count += 1
+                logger.error(f"Failed to fragment gene {gene.gene_name} (ID: {gene.id}): {str(e)}", exc_info=True)
+
+        elapsed_time = time.time() - start_time
+        logger.info(
+            f"User {request.user.username} fragmented Order {order_id}: "
+            f"{success_count} success, {fail_count} failed out of {len(genes_need_fragmentation)} genes (took {elapsed_time:.2f}s)"
+        )
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Fragmentation completed',
+            'total': len(genes),
+            'success': success_count,
+            'failed': fail_count,
+            'skipped': len(genes) - len(genes_need_fragmentation),
+            'time': round(elapsed_time, 2)
+        })
+
+    except OrderInfo.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Order not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Error triggering order fragmentation: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Failed to trigger fragmentation: {str(e)}'
+        }, status=500)
+
+
 # checked
 @login_required
 def gene_delete(request):
@@ -1034,33 +1323,37 @@ def cart_genbank_download(request, gene_id):
     except GeneInfo.DoesNotExist:
         return HttpResponse("Gene not found", status=404)
 
-    i5nc = gene.i5nc
-    i3nc = gene.i3nc
+    i5nc = gene.i5nc or ''
+    i3nc = gene.i3nc or ''
     sequence = gene.saved_seq
     # 检查sequence是否为AA序列
     if is_dna_or_protein(sequence) != 'DNA':
         return HttpResponse("Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.", status=400)
 
     new_sequences = [i5nc, sequence, i3nc]
-    # print(new_sequences)
     new_feature_names = ['i5NC', gene.gene_name, 'i3NC']
 
     vector = gene.vector
     if vector.vector_gb and os.path.exists(vector.vector_gb.path):
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file: # 确保文件使用后自动删除，减少空间占用
-            # addFeaturesToGeneBank(vector_genbank_file_path, sequence, temp_file.name, 'iU20', 'iD20', new_feature_name=gene)
-            addMultipleFeaturesToGeneBank(
-                genebank_file=vector_genbank_file_path, 
-                output_file=temp_file.name, 
-                new_sequences=new_sequences, 
-                new_feature_names=new_feature_names, 
-                start_feature_label='iU20', 
-                end_feature_label='iD20'
+            # 计算基因序列在插入序列中的起始位置（i5nc之后）
+            gene_start_pos_in_insert = len(i5nc)
+
+            # 使用新的函数，添加序列评估特征和fragments标注
+            addAnalysisFeaturesAndFragments(
+                genebank_file=vector_genbank_file_path,
+                output_file=temp_file.name,
+                new_sequences=new_sequences,
+                new_feature_names=new_feature_names,
+                start_feature_label='iU20',
+                end_feature_label='iD20',
+                analysis_results=gene.analysis_results,
+                fragments_data=gene.fragments_data,
+                gene_start_pos_in_insert=gene_start_pos_in_insert
             )
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
-            # response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}-{gene.status}.gb"'
             response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}.gb"'
             return response
     else:
@@ -1283,30 +1576,37 @@ def bulk_download_genbank(request):
         gene_ids = data.get('gene_ids', [])
         if not gene_ids:
             return JsonResponse({"error": "No genes selected"}, status=400)
-        
+
         temp_zip = tempfile.NamedTemporaryFile(delete=False)
         with zipfile.ZipFile(temp_zip, 'w') as zf:
             for gene_id in gene_ids:
                 try:
                     gene = GeneInfo.objects.get(user=request.user, id=gene_id)
-                    sequence = gene.original_seq
+                    sequence = gene.saved_seq
                     if is_dna_or_protein(sequence) != 'DNA':
                         zf.writestr(f"Error-{gene_id}.{gene.gene_name}.txt", "Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.")
                         continue
-                    i5nc = gene.i5nc
-                    i3nc = gene.i3nc
+                    i5nc = gene.i5nc or ''
+                    i3nc = gene.i3nc or ''
 
                     vector = gene.vector
                     if vector.vector_gb:
                         vector_genbank_file_path = vector.vector_gb.path
                         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
-                            addMultipleFeaturesToGeneBank(
-                                genebank_file=vector_genbank_file_path, 
+                            # 计算基因序列在插入序列中的起始位置（i5nc之后）
+                            gene_start_pos_in_insert = len(i5nc)
+
+                            # 使用新的函数，添加序列评估特征和fragments标注
+                            addAnalysisFeaturesAndFragments(
+                                genebank_file=vector_genbank_file_path,
                                 output_file=temp_file.name,
-                                new_sequences=[i5nc, sequence, i3nc], 
-                                new_feature_names=['i5NC', gene.gene_name, 'i3NC'], 
-                                start_feature_label='iU20', 
-                                end_feature_label='iD20'
+                                new_sequences=[i5nc, sequence, i3nc],
+                                new_feature_names=['i5NC', gene.gene_name, 'i3NC'],
+                                start_feature_label='iU20',
+                                end_feature_label='iD20',
+                                analysis_results=gene.analysis_results,
+                                fragments_data=gene.fragments_data,
+                                gene_start_pos_in_insert=gene_start_pos_in_insert
                             )
                             temp_file.seek(0)
                             genbank_content = temp_file.read()
@@ -1340,9 +1640,25 @@ def bulk_download_geneinfo_excel(request):
         # 获取完整的GeneInfo对象(需要fragments_data字段)
         gene_info_list = GeneInfo.objects.filter(user=request.user, id__in=gene_ids).select_related('species', 'vector')
 
+        # 导入酶切位点检测函数
+        from user_center.utils.sequence_processing import get_enzyme_sites
+
         # 构建数据列表
         data_rows = []
         for gene in gene_info_list:
+            # 获取要分析的序列（优先使用 combined_seq，空时回退 original_seq）
+            modified_seq = gene.combined_seq if gene.combined_seq else gene.original_seq
+            seq_to_analyze = modified_seq
+
+            # 检测 BsaI 和 BsmBI 位点
+            bsai_info = get_enzyme_sites(seq_to_analyze, 'BsaI') if seq_to_analyze else {'count': 0, 'positions': []}
+            bsmbi_info = get_enzyme_sites(seq_to_analyze, 'BsmBI') if seq_to_analyze else {'count': 0, 'positions': []}
+
+            # 格式化位置信息为字符串 (例如: "10-16, 50-56")
+            bsai_positions_str = ', '.join([f"{p['start']}-{p['end']}" for p in bsai_info['positions']]) if bsai_info['positions'] else ''
+            bsmbi_positions_str = ', '.join([f"{p['start']}-{p['end']}" for p in bsmbi_info['positions']]) if bsmbi_info['positions'] else ''
+
+            used_modified_fallback = not bool(gene.combined_seq)
             row = {
                 'GeneName': gene.gene_name,
                 'Species': gene.species.species_name if gene.species else '',
@@ -1354,12 +1670,48 @@ def bulk_download_geneinfo_excel(request):
                 'i3nc': gene.i3nc or '',
                 'ForbiddenSeqs': gene.forbid_seq or '',
                 'OriginalSeq': gene.original_seq or '',
-                'OriginalGCContent': gene.original_gc_content or '',
-                'ModifiedSeq': gene.saved_seq or '',
-                'ModifiedGCContent': gene.modified_gc_content or '',
+                'OriginalGCContent': gene.original_gc_content if gene.original_gc_content is not None else '',
+                'ModifiedSeq': modified_seq or '',
+                'ModifiedGCContent': gene.modified_gc_content if gene.modified_gc_content is not None else '',
                 'Status': gene.status or '',
-                'PenaltyScore': gene.penalty_score or '',
+                'PenaltyScore': gene.penalty_score if gene.penalty_score is not None else '',
+                'BsaI_Count': bsai_info['count'],
+                'BsaI_Positions': bsai_positions_str,
+                'BsmBI_Count': bsmbi_info['count'],
+                'BsmBI_Positions': bsmbi_positions_str,
+                'ModifiedSeqFallback': 'Yes' if used_modified_fallback else 'No',
             }
+
+            # 添加详细的序列评估特征列
+            if gene.analysis_results:
+                analysis = gene.analysis_results
+                # 添加9种评估特征的罚分
+                row['HighGC_penalty'] = analysis.get('HighGC_penalty_score', '')
+                row['LowGC_penalty'] = analysis.get('LowGC_penalty_score', '')
+                row['W12S12Motifs_penalty'] = analysis.get('W12S12Motifs_penalty_score', '')
+                row['LongRepeats_penalty'] = analysis.get('LongRepeats_penalty_score', '')
+                row['Homopolymers_penalty'] = analysis.get('Homopolymers_penalty_score', '')
+                row['DoubleNT_penalty'] = analysis.get('DoubleNT_penalty_score', '')
+                row['TandemRepeats_penalty'] = analysis.get('TandemRepeats_penalty_score', '')
+                row['PalindromeRepeats_penalty'] = analysis.get('PalindromeRepeats_penalty_score', '')
+                row['InvertedRepeats_penalty'] = analysis.get('InvertedRepeats_penalty_score', '')
+
+                # 添加位置信息（原始注释格式）
+                row['HighGC_positions'] = analysis.get('HighGC', '')
+                row['LowGC_positions'] = analysis.get('LowGC', '')
+                row['W12S12Motifs_positions'] = analysis.get('W12S12Motifs', '')
+                row['LongRepeats_positions'] = analysis.get('LongRepeats', '')
+                row['Homopolymers_positions'] = analysis.get('Homopolymers', '')
+                row['DoubleNT_positions'] = analysis.get('DoubleNT', '')
+                row['TandemRepeats_positions'] = analysis.get('TandemRepeats', '')
+                row['PalindromeRepeats_positions'] = analysis.get('PalindromeRepeats', '')
+                row['InvertedRepeats_positions'] = analysis.get('InvertedRepeats', '')
+            else:
+                # 如果没有analysis_results，填充空值
+                for feature in ['HighGC', 'LowGC', 'W12S12Motifs', 'LongRepeats', 'Homopolymers',
+                               'DoubleNT', 'TandemRepeats', 'PalindromeRepeats', 'InvertedRepeats']:
+                    row[f'{feature}_penalty'] = ''
+                    row[f'{feature}_positions'] = ''
 
             # 处理片段信息
             if gene.fragments_data:
@@ -1406,7 +1758,22 @@ def bulk_download_geneinfo_excel(request):
         column_order = [
             'GeneName', 'Species', 'VectorName', 'VectorID', 'v5NC', 'v3NC', 'i5nc', 'i3nc',
             'ForbiddenSeqs', 'OriginalSeq', 'OriginalGCContent', 'ModifiedSeq',
-            'ModifiedGCContent', 'Status', 'PenaltyScore', 'FullSeq',
+            'ModifiedGCContent', 'Status', 'PenaltyScore',
+            # 序列评估特征（罚分和位置）
+            'HighGC_penalty', 'HighGC_positions',
+            'LowGC_penalty', 'LowGC_positions',
+            'W12S12Motifs_penalty', 'W12S12Motifs_positions',
+            'LongRepeats_penalty', 'LongRepeats_positions',
+            'Homopolymers_penalty', 'Homopolymers_positions',
+            'DoubleNT_penalty', 'DoubleNT_positions',
+            'TandemRepeats_penalty', 'TandemRepeats_positions',
+            'PalindromeRepeats_penalty', 'PalindromeRepeats_positions',
+            'InvertedRepeats_penalty', 'InvertedRepeats_positions',
+            # 酶切位点
+            'BsaI_Count', 'BsaI_Positions', 'BsmBI_Count', 'BsmBI_Positions',
+            # 序列信息
+            'FullSeq', 'ModifiedSeqFallback',
+            # 片段信息
             'IsFragmented', 'CloningMethod', 'TotalFragments', 'MustCut', 'FragmentDetails', 'FragmentWarning'
         ]
         df = df[column_order]
@@ -1533,8 +1900,10 @@ def export_order_to_csv(request, order_id):
     order = OrderInfo.objects.get(id=order_id)
 
     # Create a list of dictionaries containing gene information
-    gene_info_list = [
-        {
+    gene_info_list = []
+    for gene_info in order.gene_infos.all():
+        # 基础信息
+        gene_data = {
             'GeneName': gene_info.gene_name,
             'SeqAA': get_seq_aa(gene_info.combined_seq),
             'Species': gene_info.species.species_name if gene_info.species else None,
@@ -1547,8 +1916,34 @@ def export_order_to_csv(request, order_id):
             'i3nc': gene_info.i3nc,
             'InquiryID': order.inquiry_id,
         }
-        for gene_info in order.gene_infos.all()
-    ]
+
+        # 添加切割信息（如果存在）
+        if gene_info.fragments_data and gene_info.fragments_data.get('need_fragmentation'):
+            frag_data = gene_info.fragments_data
+            gene_data.update({
+                'Fragmented': 'Yes',
+                'TotalFragments': frag_data.get('total_fragments', ''),
+                'CloningMethod': frag_data.get('cloning_method', ''),
+                'MustCutPositions': frag_data.get('mustcut_positions', ''),
+                'PenaltyScore': gene_info.penalty_score if gene_info.penalty_score else '',
+            })
+
+            # 添加每个片段的详细信息
+            fragments = frag_data.get('fragments', [])
+            for idx, fragment in enumerate(fragments, 1):
+                gene_data[f'Fragment{idx}_Length'] = fragment.get('length', '')
+                gene_data[f'Fragment{idx}_Penalty'] = fragment.get('penalty_score', '')
+                gene_data[f'Fragment{idx}_Position'] = f"{fragment.get('start', '')}-{fragment.get('end', '')}"
+        else:
+            gene_data.update({
+                'Fragmented': 'No',
+                'TotalFragments': '',
+                'CloningMethod': gene_info.vector.cloning_method if gene_info.vector else '',
+                'MustCutPositions': '',
+                'PenaltyScore': gene_info.penalty_score if gene_info.penalty_score else '',
+            })
+
+        gene_info_list.append(gene_data)
 
     # Create a DataFrame from the list
     df = pd.DataFrame(gene_info_list)
