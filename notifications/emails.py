@@ -4,6 +4,19 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.contrib.auth.models import Group
 
+
+def get_user_email(user):
+    """
+    获取用户邮箱，优先使用 User.email，兼容旧的 UserProfile.email（若存在）。
+    """
+    if not user:
+        return None
+    email = getattr(user, "email", None)
+    if email:
+        return email
+    profile = getattr(user, "userprofile", None)
+    return getattr(profile, "email", None)
+
 def send_templated_email(subject, recipient_list, template_name, context=None):
     """
     通用的邮件发送函数：根据模板渲染出 HTML，再用EmailMultiAlternatives发邮件。
@@ -58,7 +71,9 @@ def send_registration_user_email(user, verify_link):
         'verify_link': verify_link,
     }
 
-    send_templated_email(subject, [user.userprofile.email], template_name, context)
+    email = get_user_email(user)
+    if email:
+        send_templated_email(subject, [email], template_name, context)
 
 def send_registration_staff_notify(user):
     """
@@ -75,7 +90,9 @@ def send_password_reset_user_email(user, reset_link):
     subject = "密码重置链接"
     template_name = 'emails/password_reset_user.html'
     context = {'user': user, 'reset_link': reset_link}
-    send_templated_email(subject, [user.userprofile.email], template_name, context)
+    email = get_user_email(user)
+    if email:
+        send_templated_email(subject, [email], template_name, context)
 
 
 def send_order_created_user_email(order):
@@ -116,7 +133,9 @@ def send_vector_approved_user_email(vector):
     subject = f"文件已审核通过 - {vector.vector_name}"
     template_name = 'emails/vector_approved_user.html'
     context = {'vector': vector}
-    send_templated_email(subject, [vector.user.userprofile.email], template_name, context)
+    email = get_user_email(vector.user)
+    if email:
+        send_templated_email(subject, [email], template_name, context)
 
 def send_vector_approved_staff_notify(vector):
     subject = f"文件审核完成 - {vector.vector_name}"
@@ -125,4 +144,3 @@ def send_vector_approved_staff_notify(vector):
     staff_emails = get_group_emails("TechStaffGroup")
     if staff_emails:
         send_templated_email(subject, staff_emails, template_name, context)
-

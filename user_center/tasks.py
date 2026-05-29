@@ -3,6 +3,7 @@ user_center模块的Celery异步任务
 """
 import os
 import time
+import json
 import logging
 import pandas as pd
 import numpy as np
@@ -20,12 +21,13 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def async_vector_automation_design(vector_id):
+def async_vector_automation_design(vector_id, forced_method=None):
     """
     异步执行载体改造自动化设计任务
 
     Args:
         vector_id: Vector对象的ID
+        forced_method: 指定克隆方法（'Gibson'/'GoldenGate'/'T4'），为None时自动选择
 
     Returns:
         dict: 设计结果
@@ -56,7 +58,7 @@ def async_vector_automation_design(vector_id):
         vector.id20 = parsed_data['id20_seq']
 
         # 2. 选择克隆方法并设计v5NC和v3NC
-        design_result = designer.select_cloning_method(parsed_data)
+        design_result = designer.select_cloning_method(parsed_data, forced_method=forced_method)
         if not design_result:
             vector.design_status = 'Failed'
             vector.design_error = '没有找到可用的克隆方法。' + '; '.join(designer.errors)
@@ -108,30 +110,56 @@ def async_vector_automation_design(vector_id):
         vector.i5NC = design_result.get('i5nc', '')
         vector.i3NC = design_result.get('i3nc', '')
 
+        # 3.5 菌落PCR引物（5对，适用于所有克隆方法）
+        colony_pairs = designer.design_colony_pcr_primers(
+            parsed_data, design_result, vector_code=vector_code
+        )
+        if colony_pairs:
+            vector.colony_pcr_primers = json.dumps(colony_pairs, ensure_ascii=False)
+            if len(colony_pairs) < 5:
+                append_error_message(f'菌落PCR引物：仅找到 {len(colony_pairs)}/5 对')
+        else:
+            vector.colony_pcr_primers = None
+            append_error_message('菌落PCR引物设计失败')
+
         # 4. 生成改造后GenBank文件
         # 构建输出文件名
         if resistance:
-            output_filename = f"{vector_code}M1({resistance})-{filename_suffix}-M1.gb"
+            output_filename = f"{vector_code}M1({resistance})-{filename_suffix}.gb"
         else:
-            output_filename = f"{vector_code}M1-{filename_suffix}-M1.gb"
+            output_filename = f"{vector_code}M1-{filename_suffix}.gb"
             append_error_message('未在文件名中找到抗性信息')
 
-        # 生成临时输出路径
-        output_dir = os.path.dirname(genbank_file_path)
-        output_path = os.path.join(output_dir, output_filename)
+        # 在临时目录生成 GenBank 文件，避免与 Django 存储路径冲突
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.gb', delete=False) as tmp:
+            tmp_path = tmp.name
 
-        # 生成GenBank文件
         designer.generate_modified_genbank(
             design_result,
             parsed_data,
             primer_result,
-            output_path,
-            output_filename.replace('.gb', '')
+            tmp_path,
+            output_filename.replace('.gb', ''),
+            colony_primers=colony_pairs,
         )
 
-        # 保存到vector_gb字段
-        with open(output_path, 'rb') as f:
+        # 保存到 vector_gb 字段（先删除旧文件避免 Django 追加随机后缀）
+        if vector.vector_gb:
+            try:
+                old_path = vector.vector_gb.path
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+            except Exception:
+                pass
+            vector.vector_gb.delete(save=False)
+
+        with open(tmp_path, 'rb') as f:
             vector.vector_gb.save(output_filename, File(f), save=False)
+
+        # 清理临时文件
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
         # 保存载体序列（without v5NC/v3NC之间的序列）
         v5nc_end = design_result['v5nc_location'][1]
@@ -217,8 +245,11 @@ def _fragment_single_gene(gene_data):
 
         # 执行片段切割
         vector_resistance = gene_data.get('vector_resistance') or (gene.vector.antibiotic_resistance if gene.vector and hasattr(gene.vector, 'antibiotic_resistance') else None)
+        fragment_source_seq = (gene.saved_seq or gene.original_seq or gene.combined_seq or '').strip()
+        if not fragment_source_seq:
+            raise ValueError("No valid DNA sequence found for fragmentation")
         fragmentation_result = fragment_sequence_by_penalty(
-            sequence=gene.combined_seq,
+            sequence=fragment_source_seq,
             cloning_method=gene_data['cloning_method'],
             vector_resistance=vector_resistance,
             max_penalty=28.0
@@ -435,9 +466,9 @@ def async_process_gene_sequences(self, process_task_id, user_id, vector_id, spec
         df['original_gc_content'] = df['OriginalSeq'].apply(calc_gc_content)
         df['modified_gc_content'] = df['CombinedSeq'].apply(calc_gc_content)
 
-        # 清理序列并检查是否包含非法碱基
+        # 清理序列并检查是否包含非法碱基（在OriginalSeq上检查，位置相对于insert）
         from user_center.utils.sequence_processing import clean_and_check_dna_sequence
-        df['CombinedSeq'], df['Error'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
+        _, df['Error'] = zip(*df['OriginalSeq'].apply(clean_and_check_dna_sequence))
 
         # 1. Forbidden sequence检查
         built_in_forbidden_list = [
@@ -458,10 +489,11 @@ def async_process_gene_sequences(self, process_task_id, user_id, vector_id, spec
                     results[idx] = future.result()
             return results
 
+        # 在OriginalSeq上检查，位置相对于insert
         if len(df) > 10:
-            df['forbidden_info'] = check_forbidden_parallel(df['CombinedSeq'].tolist(), built_in_forbidden_list)
+            df['forbidden_info'] = check_forbidden_parallel(df['OriginalSeq'].tolist(), built_in_forbidden_list)
         else:
-            df['forbidden_info'] = df['CombinedSeq'].apply(
+            df['forbidden_info'] = df['OriginalSeq'].apply(
                 lambda seq: check_forbidden_seq(seq, built_in_forbidden_list)
             )
 
@@ -469,9 +501,9 @@ def async_process_gene_sequences(self, process_task_id, user_id, vector_id, spec
         process_task.progress = int(total_sequences * 0.2)
         process_task.save()
 
-        # 2. Repeats分析
+        # 2. Repeats分析（在OriginalSeq上分析，位置相对于insert）
         df['gene_id'] = df['GeneName']
-        df['sequence'] = df['CombinedSeq']
+        df['sequence'] = df['OriginalSeq']
         data_json = convert_gene_table_to_RepeatsFinder_Format(df)
         result_df = process_gene_table_results(data_json)
 
@@ -521,8 +553,14 @@ def async_process_gene_sequences(self, process_task_id, user_id, vector_id, spec
                 try:
                     cloning_method = vector.cloning_method if vector.cloning_method else "Gibson"
                     vector_resistance = vector.antibiotic_resistance if hasattr(vector, 'antibiotic_resistance') else None
+                    fragment_source_seq = row.get('OriginalSeq', '')
+                    if pd.isna(fragment_source_seq):
+                        fragment_source_seq = ''
+                    fragment_source_seq = str(fragment_source_seq).strip()
+                    if not fragment_source_seq:
+                        raise ValueError("No valid DNA sequence found for fragmentation")
                     fragmentation_result = fragment_sequence_by_penalty(
-                        sequence=row['CombinedSeq'],
+                        sequence=fragment_source_seq,
                         cloning_method=cloning_method,
                         vector_resistance=vector_resistance,
                         max_penalty=28.0

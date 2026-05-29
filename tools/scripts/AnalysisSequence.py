@@ -9,7 +9,7 @@ import pandas as pd
 
 class DNARepeatsFinder:
     # 优化：预定义碱基互补转换表，避免重复创建字典
-    _COMPLEMENT_TABLE = str.maketrans('ATCG', 'TAGC')
+    _COMPLEMENT_TABLE = str.maketrans('ATCGatcg', 'TAGCtagc')
 
     def __init__(self, data_set=None, sequence=None):
         '''
@@ -22,13 +22,14 @@ class DNARepeatsFinder:
 
             # 为每个序列构建后缀数组和LCP数组,预先计算每条序列的后缀数组和LCP数组
             for index, row in data_set.iterrows():
-                seq = row['sequence']
+                seq = row['sequence'].upper()
+                self.data_set.at[index, 'sequence'] = seq
                 self.suffix_arrays[index] = self.build_suffix_array(seq)
                 self.lcps_arrays[index] = self.find_lcp(seq, self.suffix_arrays[index])
         elif sequence is not None:
-            self.s = sequence
-            self.sa = self.build_suffix_array(sequence)
-            self.lcp = self.find_lcp(sequence, self.sa)
+            self.s = sequence.upper()
+            self.sa = self.build_suffix_array(self.s)
+            self.lcp = self.find_lcp(self.s, self.sa)
 
     @staticmethod
     def build_suffix_array(s):
@@ -254,21 +255,32 @@ class DNARepeatsFinder:
 
     def find_dispersed_repeats(self, index=None, min_len=16):
         s, sa, lcp = self._get_sequence_data(index)
-        
+
         repeats = []
         n = len(s)
         potential_repeats = {}
 
         # 收集所有潜在的重复序列
+        # 对LCP值进行截断：当两个后缀的距离小于LCP值时，说明匹配区域有重叠，
+        # 实际不重叠的重复单元长度应以两个后缀的距离为上限
         for i in range(1, n):
             length = lcp[i]
             if length >= min_len:
-                start_index = sa[i]
-                seq = s[start_index:start_index + length]
+                p1, p2 = sa[i - 1], sa[i]
+                dist = abs(p2 - p1)
+                # 截断：当LCP超过距离时，用距离作为有效重复长度
+                effective_len = min(length, dist) if dist >= min_len else length
+                if effective_len < min_len:
+                    continue
+                start_index = min(p1, p2)
+                seq = s[start_index:start_index + effective_len]
                 if seq not in potential_repeats:
-                    potential_repeats[seq] = []
-                potential_repeats[seq].append(start_index)
-        
+                    potential_repeats[seq] = set()
+                potential_repeats[seq].add(p1)
+                potential_repeats[seq].add(p2)
+
+        # 转换set为sorted list供merge使用
+        potential_repeats = {seq: sorted(pos) for seq, pos in potential_repeats.items()}
         merged_repeats = self.merge_potential_repeats(potential_repeats)
         # 转换为最终输出格式
         for seq, positions in merged_repeats.items():
@@ -285,7 +297,61 @@ class DNARepeatsFinder:
                         'length': len(seq),
                         'penalty_score': self.calculate_dispersed_repeats_penalty_score(len(seq), len(matches))
                     })
-        return repeats
+            elif len(seq) > min_len:
+                # 回退处理：合并后的序列可能因重叠而过长，导致re.finditer只找到1个匹配
+                # 用二分搜索找到最长的、有>=2个不重叠匹配的前缀
+                lo, hi = min_len, len(seq) - 1
+                best_len = 0
+                best_matches = []
+                while lo <= hi:
+                    mid = (lo + hi) // 2
+                    sub = seq[:mid]
+                    sub_matches = [m.start() for m in re.finditer(re.escape(sub), s)]
+                    if len(sub_matches) >= 2:
+                        dists = [sub_matches[j] - sub_matches[j - 1] for j in range(1, len(sub_matches))]
+                        if all(d >= min_len for d in dists):
+                            best_len = mid
+                            best_matches = sub_matches
+                            lo = mid + 1
+                        else:
+                            hi = mid - 1
+                    else:
+                        hi = mid - 1
+                if best_len >= min_len:
+                    best_seq = seq[:best_len]
+                    repeats.append({
+                        'sequence': best_seq,
+                        'start': best_matches,
+                        'end': [m + best_len - 1 for m in best_matches],
+                        'gc_content': self.gc_percent(best_seq),
+                        'length': best_len,
+                        'penalty_score': self.calculate_dispersed_repeats_penalty_score(best_len, len(best_matches))
+                    })
+
+        # 去重：按penalty_score降序排序，移除与更高罚分结果显著重叠的重复
+        repeats.sort(key=lambda x: x['penalty_score'], reverse=True)
+        filtered_repeats = []
+        covered_ranges = []  # 已覆盖的区间列表 [(start, end), ...]
+        for r in repeats:
+            # 检查该重复的所有出现位置是否与已覆盖区间有显著重叠（>80%）
+            r_ranges = list(zip(r['start'], r['end']))
+            all_overlapped = True
+            for rs, re_ in r_ranges:
+                r_len = re_ - rs + 1
+                best_overlap = 0
+                for cs, ce in covered_ranges:
+                    overlap_start = max(rs, cs)
+                    overlap_end = min(re_, ce)
+                    if overlap_start <= overlap_end:
+                        best_overlap = max(best_overlap, overlap_end - overlap_start + 1)
+                if best_overlap < r_len * 0.8:
+                    all_overlapped = False
+                    break
+            if not all_overlapped:
+                filtered_repeats.append(r)
+                covered_ranges.extend(r_ranges)
+
+        return filtered_repeats
 
     # 3) Palindrome Repeats
     def find_palindrome_repeats(self, index=None, min_len=15):
@@ -861,6 +927,9 @@ def convert_gene_table_to_RepeatsFinder_Format(gene_table, long_repeats_min_len=
 
 # 格式化函数：将特征信息合并为字符串
 def format_feature_data(feature_data, keys):
+    # 需要从 0-based 转换为 1-based 的位置字段
+    _POSITION_KEYS = {'start', 'end', 'stem1_start', 'stem1_end', 'stem2_start', 'stem2_end'}
+
     if not feature_data:
         return ""
     values = []
@@ -868,14 +937,21 @@ def format_feature_data(feature_data, keys):
         for item in feature_data:
             parts = []
             for key in keys:
-                parts.append(f"{key}: {item.get(key, '')}")
+                val = item.get(key, '')
+                if key in _POSITION_KEYS and isinstance(val, (int, float)):
+                    val = int(val) + 1
+                parts.append(f"{key}: {val}")
             values.append(" | ".join(parts))
     else:
         for key in keys:
-            if isinstance(feature_data[key], list):
-                values.append(f"{key}: {', '.join(map(str, feature_data[key]))}")
+            val = feature_data[key]
+            if key in _POSITION_KEYS and isinstance(val, (int, float)):
+                val = int(val) + 1
+                values.append(f"{key}: {val}")
+            elif isinstance(val, list):
+                values.append(f"{key}: {', '.join(map(str, val))}")
             else:
-                values.append(f"{key}: {feature_data[key]}")
+                values.append(f"{key}: {val}")
     return "; ".join(values)
 
 

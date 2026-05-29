@@ -282,6 +282,10 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
             return numbers
 
         def iter_ranges(item):
+            """
+            返回 (start, end_exclusive) 元组列表，用于 FeatureLocation（0-based exclusive end）
+            原始数据中 end 是 0-based inclusive，需要 +1 转换为 exclusive
+            """
             if not isinstance(item, dict):
                 return []
             starts = item.get('start')
@@ -291,9 +295,9 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
             if isinstance(starts, list):
                 if isinstance(ends, list) and ends:
                     count = min(len(starts), len(ends))
-                    return [(int(starts[i]), int(ends[i])) for i in range(count)]
+                    return [(int(starts[i]), int(ends[i]) + 1) for i in range(count)]
                 if length is not None:
-                    return [(int(s), int(s) + int(length) - 1) for s in starts]
+                    return [(int(s), int(s) + int(length)) for s in starts]
                 return []
 
             if starts is None:
@@ -307,12 +311,12 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
             end_val = None
             if ends is not None:
                 try:
-                    end_val = int(ends)
+                    end_val = int(ends) + 1  # inclusive -> exclusive
                 except (TypeError, ValueError):
                     end_val = None
             if end_val is None and length is not None:
                 try:
-                    end_val = start_val + int(length) - 1
+                    end_val = start_val + int(length)  # start + length = exclusive end
                 except (TypeError, ValueError):
                     end_val = None
             if end_val is None:
@@ -333,6 +337,7 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
             if analysis_type == 'InvertedRepeats':
                 items = annotation_data if isinstance(annotation_data, list) else [annotation_data]
                 if isinstance(annotation_data, str):
+                    # 格式化字符串中的位置是 1-based，需要转回 0-based
                     stem1_starts = extract_numbers(annotation_data, 'stem1_start')
                     stem1_ends = extract_numbers(annotation_data, 'stem1_end')
                     stem2_starts = extract_numbers(annotation_data, 'stem2_start')
@@ -340,10 +345,10 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
                     items = []
                     for s1_start, s1_end, s2_start, s2_end in zip(stem1_starts, stem1_ends, stem2_starts, stem2_ends):
                         items.append({
-                            'stem1_start': s1_start,
-                            'stem1_end': s1_end,
-                            'stem2_start': s2_start,
-                            'stem2_end': s2_end,
+                            'stem1_start': s1_start - 1,
+                            'stem1_end': s1_end - 1,
+                            'stem2_start': s2_start - 1,
+                            'stem2_end': s2_end - 1,
                         })
 
                 for item in items:
@@ -357,10 +362,11 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
                     except (TypeError, ValueError):
                         continue
 
+                    # 原始数据 end 是 0-based inclusive，FeatureLocation 需要 exclusive，所以 +1
                     stem1_start_abs = gene_start_in_vector + s1_start
-                    stem1_end_abs = gene_start_in_vector + s1_end
+                    stem1_end_abs = gene_start_in_vector + s1_end + 1
                     stem2_start_abs = gene_start_in_vector + s2_start
-                    stem2_end_abs = gene_start_in_vector + s2_end
+                    stem2_end_abs = gene_start_in_vector + s2_end + 1
 
                     penalty_str = format_penalty(item.get('penalty_score'))
                     repeat_type = item.get('type')
@@ -372,7 +378,7 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
                         type=feature_type,
                         qualifiers={
                             "label": f"{analysis_type}_stem1",
-                            "note": f"Inverted repeat stem1 at {s1_start}-{s1_end}{note_suffix}{penalty_suffix}"
+                            "note": f"Inverted repeat stem1 at {s1_start + 1}-{s1_end + 1}{note_suffix}{penalty_suffix}"
                         }
                     )
                     record.features.append(stem1_feature)
@@ -382,23 +388,25 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
                         type=feature_type,
                         qualifiers={
                             "label": f"{analysis_type}_stem2",
-                            "note": f"Inverted repeat stem2 at {s2_start}-{s2_end}{note_suffix}{penalty_suffix}"
+                            "note": f"Inverted repeat stem2 at {s2_start + 1}-{s2_end + 1}{note_suffix}{penalty_suffix}"
                         }
                     )
                     record.features.append(stem2_feature)
                 continue
 
             if isinstance(annotation_data, str):
+                # 格式化字符串中的位置是 1-based，需要转回 0-based 以便 iter_ranges 统一处理
                 starts = extract_numbers(annotation_data, 'start')
                 ends = extract_numbers(annotation_data, 'end')
-                items = [{'start': s, 'end': e} for s, e in zip(starts, ends)]
+                items = [{'start': s - 1, 'end': e - 1} for s, e in zip(starts, ends)]
             else:
                 items = annotation_data if isinstance(annotation_data, list) else [annotation_data]
 
             for item in items:
-                for start_rel, end_rel in iter_ranges(item):
-                    start_abs = gene_start_in_vector + int(start_rel)
-                    end_abs = gene_start_in_vector + int(end_rel)
+                for start_rel, end_rel_exclusive in iter_ranges(item):
+                    # iter_ranges 返回的是 (0-based start, 0-based exclusive end)
+                    start_abs = gene_start_in_vector + start_rel
+                    end_abs = gene_start_in_vector + end_rel_exclusive
 
                     penalty_score = None
                     if isinstance(item, dict):
@@ -408,12 +416,16 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
                     penalty_str = format_penalty(penalty_score)
                     penalty_suffix = f" (penalty: {penalty_str})" if penalty_str else ""
 
+                    # note 中显示 1-based 位置（与表格输出一致）
+                    display_start = start_rel + 1
+                    display_end = end_rel_exclusive  # exclusive end 的值刚好等于 1-based inclusive end
+
                     feature = SeqFeature(
                         FeatureLocation(start_abs, end_abs),
                         type=feature_type,
                         qualifiers={
                             "label": analysis_type,
-                            "note": f"{analysis_type} at {start_rel}-{end_rel}{penalty_suffix}"
+                            "note": f"{analysis_type} at {display_start}-{display_end}{penalty_suffix}"
                         }
                     )
                     record.features.append(feature)
@@ -421,15 +433,26 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
     # 添加Fragment特征标注
     if fragments_data and fragments_data.get('need_fragmentation'):
         gene_start_in_vector = start_pos + gene_start_pos_in_insert
+        gene_seq_len = len(new_sequences[1]) if len(new_sequences) > 1 and new_sequences[1] else 0
         fragments = fragments_data.get('fragments', [])
 
         for frag in fragments:
-            frag_start_rel = frag.get('start', 0)
-            frag_end_rel = frag.get('end', 0)
+            try:
+                frag_start_rel = int(frag.get('start', 0))
+                frag_end_rel = int(frag.get('end', 0))
+            except (TypeError, ValueError):
+                continue
             frag_index = frag.get('index', 0)
             frag_penalty = frag.get('penalty_score', 0)
             adapter_left = frag.get('adapter_left', '')
             adapter_right = frag.get('adapter_right', '')
+
+            # 保护性裁剪：避免片段坐标超出真实基因区间
+            if gene_seq_len > 0:
+                frag_start_rel = max(0, min(frag_start_rel, gene_seq_len))
+                frag_end_rel = max(0, min(frag_end_rel, gene_seq_len))
+            if frag_end_rel <= frag_start_rel:
+                continue
 
             # 计算在载体中的绝对位置
             frag_start_abs = gene_start_in_vector + frag_start_rel

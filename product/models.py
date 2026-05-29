@@ -1,6 +1,28 @@
+import re
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.files.storage import FileSystemStorage
 from django.utils import timezone
+
+
+class VectorFileStorage(FileSystemStorage):
+    """
+    自定义存储类，保留文件名中的括号。
+    Django 默认的 get_valid_name 会去掉括号等特殊字符，
+    但载体文件名中的括号包含抗性信息（如 pCVa999(Kan)-xxx.gb），必须保留。
+    """
+    def get_valid_name(self, name):
+        # 只去掉真正危险的字符（路径分隔符、空字节等），保留括号
+        name = name.replace('\x00', '')
+        # 去掉路径中的目录遍历
+        name = re.sub(r'[/\\]', '', name)
+        # 去掉首尾空格
+        name = name.strip()
+        return name
+
+
+vector_storage = VectorFileStorage()
+
 
 # Create your models here.
 def user_directory_path(instance, filename):
@@ -24,10 +46,10 @@ class Vector(models.Model):
     id20 = models.TextField(verbose_name="id20", null=True, blank=True)
     i5NC = models.TextField(verbose_name="i5NC", null=True, blank=True, help_text="v5NC移位碱基")
     i3NC = models.TextField(verbose_name="i3NC", null=True, blank=True, help_text="v3NC移位碱基")
-    vector_file = models.FileField(verbose_name="用户上传的vector文件", upload_to=user_directory_path, null=True, blank=True)
+    vector_file = models.FileField(verbose_name="用户上传的vector文件", upload_to=user_directory_path, storage=vector_storage, null=True, blank=True)
     vector_png = models.ImageField(verbose_name="改造后的Vector_png", upload_to=user_directory_path, null=True, blank=True)
 
-    vector_gb = models.FileField(verbose_name="genebank file", upload_to=user_directory_path, null=True, blank=True)
+    vector_gb = models.FileField(verbose_name="genebank file", upload_to=user_directory_path, storage=vector_storage, null=True, blank=True)
 
     # 载体改造自动化设计相关字段
     cloning_method = models.CharField(verbose_name="克隆方法", max_length=50, null=True, blank=True, help_text="Gibson/GoldenGate/T4")
@@ -38,6 +60,7 @@ class Vector(models.Model):
     primer_reverse = models.TextField(verbose_name="反向引物序列", null=True, blank=True)
     primer_forward_tm = models.FloatField(verbose_name="正向引物Tm", null=True, blank=True)
     primer_reverse_tm = models.FloatField(verbose_name="反向引物Tm", null=True, blank=True)
+    colony_pcr_primers = models.TextField(verbose_name="菌落PCR引物(5对, JSON)", null=True, blank=True)
 
     create_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=255, default='Received')

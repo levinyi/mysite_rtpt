@@ -1,5 +1,6 @@
 import itertools
 import json, re, os
+import copy
 import tempfile
 import zipfile
 import uuid
@@ -109,8 +110,8 @@ def order_create(request):
             df['original_gc_content'] = df['OriginalSeq'].apply(calc_gc_content)
             df['modified_gc_content'] = df['CombinedSeq'].apply(calc_gc_content)
 
-            # 清理序列并检查是否包含非法碱基
-            df['CombinedSeq'], df['Error'] = zip(*df['CombinedSeq'].apply(clean_and_check_dna_sequence))
+            # 清理序列并检查是否包含非法碱基（在OriginalSeq上检查，位置相对于insert）
+            _, df['Error'] = zip(*df['OriginalSeq'].apply(clean_and_check_dna_sequence))
 
             ##########################################################################################################################
             # Forbidden Check List - 优化：提前查询并缓存，只查询一次
@@ -130,19 +131,20 @@ def order_create(request):
                         results[idx] = future.result()
                 return results
 
-            # 根据数据量决定是否使用并行处理
+            # 根据数据量决定是否使用并行处理（在OriginalSeq上检查，位置相对于insert）
             if len(df) > 10:  # 超过10条序列时使用并行处理
-                df['forbidden_info'] = check_forbidden_parallel(df['CombinedSeq'].tolist(), built_in_forbidden_list)
+                df['forbidden_info'] = check_forbidden_parallel(df['OriginalSeq'].tolist(), built_in_forbidden_list)
             else:
-                df['forbidden_info'] = df['CombinedSeq'].apply(
+                df['forbidden_info'] = df['OriginalSeq'].apply(
                     lambda seq: check_forbidden_seq(seq, built_in_forbidden_list)
                 )
 
             ###############################################################################################################################
             # Repeats Finder. sequence 和 gene_id 是查找repeats时必须的字段, 给这两列重新赋值，不需要重命名。
+            # 在OriginalSeq上分析，使所有位置相对于insert，避免iU20/iD20导致的~20bp偏移
             repeats_start = time.time()
             df['gene_id'] = df['GeneName']
-            df['sequence'] = df['CombinedSeq']
+            df['sequence'] = df['OriginalSeq']
             data_json = convert_gene_table_to_RepeatsFinder_Format(df)
             result_df = process_gene_table_results(data_json)
             logger.info(f"Repeats analysis took {time.time() - repeats_start:.2f}s")
@@ -166,7 +168,13 @@ def order_create(request):
 
             # 对每个序列进行限制性酶切位点决策
             def apply_restriction_decision(row):
-                decision_result = make_restriction_site_decision(row['CombinedSeq'], cloning_method)
+                decision_seq = build_restriction_scan_sequence(
+                    vector,
+                    i5nc=row.get('i5nc', ''),
+                    insert_seq=row.get('OriginalSeq', ''),
+                    i3nc=row.get('i3nc', '')
+                )
+                decision_result = make_restriction_site_decision(decision_seq, cloning_method)
                 return pd.Series({
                     'restriction_decision': decision_result['decision'],
                     'restriction_process_route': decision_result['process_route'],
@@ -550,6 +558,168 @@ def has_value(value):
         return bool(value.strip())
     return True  # 其他情况默认视为有值
 
+
+def normalize_sequence_text(value):
+    """将序列相关字段标准化为字符串，避免None/NaN/'nan'参与拼接。"""
+    if value is None:
+        return ''
+
+    try:
+        if pd.isna(value):
+            return ''
+    except Exception:
+        pass
+
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned.lower() in {'nan', 'none', 'null'}:
+            return ''
+        return cleaned
+
+    return str(value)
+
+
+def build_restriction_scan_sequence(vector, i5nc='', insert_seq='', i3nc=''):
+    """
+    统一Decision/BsaI/BsmBI统计序列：
+    v5NC + i5nc + insert + i3nc + v3NC
+    其中 iU20/iD20 仅作为标记，不参与任何计算。
+    """
+    i5nc = normalize_sequence_text(i5nc)
+    insert_seq = normalize_sequence_text(insert_seq)
+    i3nc = normalize_sequence_text(i3nc)
+    core_seq = f'{i5nc}{insert_seq}{i3nc}' or insert_seq
+
+    if not vector:
+        return core_seq
+
+    v5nc = normalize_sequence_text(getattr(vector, 'NC5', ''))
+    v3nc = normalize_sequence_text(getattr(vector, 'NC3', ''))
+
+    return f'{v5nc}{core_seq}{v3nc}'
+
+
+def get_restriction_scan_sequence(gene, default_seq=''):
+    """
+    基于Gene对象构建统一Decision/BsaI/BsmBI统计序列。
+    """
+    insert_seq = normalize_sequence_text(default_seq or gene.original_seq)
+    return build_restriction_scan_sequence(
+        getattr(gene, 'vector', None),
+        i5nc=getattr(gene, 'i5nc', ''),
+        insert_seq=insert_seq,
+        i3nc=getattr(gene, 'i3nc', '')
+    )
+
+
+def calculate_restriction_for_gene(gene, insert_seq_override=None):
+    """
+    按统一规则计算单条基因的Decision与BsaI/BsmBI位点信息。
+    返回值与make_restriction_site_decision一致。
+    """
+    insert_seq = normalize_sequence_text(
+        insert_seq_override if insert_seq_override is not None else (
+            getattr(gene, 'saved_seq', '') or getattr(gene, 'original_seq', '')
+        )
+    )
+    seq_to_analyze = build_restriction_scan_sequence(
+        getattr(gene, 'vector', None),
+        i5nc=getattr(gene, 'i5nc', ''),
+        insert_seq=insert_seq,
+        i3nc=getattr(gene, 'i3nc', '')
+    )
+    cloning_method = gene.vector.cloning_method if getattr(gene, 'vector', None) and gene.vector.cloning_method else 'T4'
+
+    if not seq_to_analyze:
+        return {
+            'decision': '',
+            'process_route': None,
+            'message': '',
+            'requires_manual_review': False,
+            'bsai_count': 0,
+            'bsmbi_count': 0,
+            'bsai_positions': [],
+            'bsmbi_positions': []
+        }
+
+    return make_restriction_site_decision(seq_to_analyze, cloning_method)
+
+
+def apply_restriction_result_to_gene(gene, decision_result):
+    """
+    将Decision结果写回Gene对象（仅赋值，不save）。
+    """
+    gene.restriction_decision = decision_result.get('decision') or ''
+    gene.restriction_process_route = decision_result.get('process_route')
+    gene.restriction_message = decision_result.get('message') or ''
+    gene.restriction_requires_manual_review = bool(decision_result.get('requires_manual_review', False))
+    gene.bsai_count = int(decision_result.get('bsai_count') or 0)
+    gene.bsmbi_count = int(decision_result.get('bsmbi_count') or 0)
+    gene.bsai_positions = decision_result.get('bsai_positions') or []
+    gene.bsmbi_positions = decision_result.get('bsmbi_positions') or []
+
+
+def normalize_fragments_data_for_gene(gene, fragments_data):
+    """
+    将片段坐标标准化到基因区间（0-based, end-exclusive）。
+    用于导出与图谱标注，避免片段位置超出真实基因长度。
+    """
+    if not isinstance(fragments_data, dict):
+        return fragments_data
+
+    fragments = fragments_data.get('fragments')
+    if not isinstance(fragments, list):
+        return fragments_data
+
+    gene_seq = normalize_sequence_text(
+        getattr(gene, 'saved_seq', '') or getattr(gene, 'original_seq', '')
+    )
+    gene_len = len(gene_seq)
+    if gene_len <= 0:
+        return fragments_data
+
+    normalized = copy.deepcopy(fragments_data)
+    normalized_fragments = []
+
+    for frag in fragments:
+        if not isinstance(frag, dict):
+            continue
+
+        try:
+            start = int(frag.get('start', 0))
+            end = int(frag.get('end', 0))
+        except (TypeError, ValueError):
+            continue
+
+        start = max(0, min(start, gene_len))
+        end = max(0, min(end, gene_len))
+        if end <= start:
+            continue
+
+        frag_copy = copy.deepcopy(frag)
+        frag_copy['start'] = start
+        frag_copy['end'] = end
+        frag_copy['length'] = end - start
+        frag_copy['seq'] = gene_seq[start:end]
+        normalized_fragments.append(frag_copy)
+
+    normalized['fragments'] = normalized_fragments
+    normalized['total_fragments'] = len(normalized_fragments)
+
+    cut_positions = [frag['end'] for frag in normalized_fragments[:-1]]
+    if cut_positions:
+        try:
+            from user_center.utils.sequence_fragmenter import get_grouping_strategy, format_mustcut_positions
+            grouping = get_grouping_strategy(len(normalized_fragments))
+            normalized['mustcut_positions'] = format_mustcut_positions(cut_positions, grouping)
+        except Exception:
+            normalized['mustcut_positions'] = '/'.join(str(pos) for pos in cut_positions) + '/'
+    else:
+        normalized['mustcut_positions'] = ''
+
+    return normalized
+
+
 # 定义状态处理函数
 def process_status(row):
     forbidden = has_value(row.get('contained_forbidden_list'))
@@ -678,6 +848,8 @@ def handle_gene_saving(gene_object, edited_seq):
     gene_object.combined_seq = edited_seq
     gene_object.modified_highlights = modified_highlights
     gene_object.modified_gc_content = modified_gc_content
+    decision_result = calculate_restriction_for_gene(gene_object)
+    apply_restriction_result_to_gene(gene_object, decision_result)
 
     if seq_status == 'validated':
         gene_object.status = 'saved'
@@ -728,6 +900,8 @@ def gene_validation(request):
         gene_object.modified_highlights = modified_highlights
         gene_object.modified_gc_content = modified_gc_content
         gene_object.optimization_status = optimization_status
+        decision_result = calculate_restriction_for_gene(gene_object)
+        apply_restriction_result_to_gene(gene_object, decision_result)
         gene_object.save()
         return JsonResponse({'status': 'success', 'message': 'Validation process finished', 'new_seq': tagged_seq, 'seq_status': seq_status})
     except Vector.DoesNotExist:
@@ -993,7 +1167,43 @@ def view_cart(request):
     cart, created = Cart.objects.get_or_create(user=request.user)
 
     # 获取并按 `create_date` 正序排序（保持提交顺序）
-    shopping_cart = cart.genes.all().order_by('create_date')
+    shopping_cart = list(cart.genes.all().select_related('vector').order_by('create_date'))
+
+    # 统一按最新规则重算Decision与位点，修复历史数据导致的页面/导出不一致
+    changed_genes = []
+    restriction_fields = [
+        'restriction_decision', 'restriction_process_route', 'restriction_message',
+        'restriction_requires_manual_review', 'bsai_count', 'bsmbi_count',
+        'bsai_positions', 'bsmbi_positions'
+    ]
+    for gene in shopping_cart:
+        previous = (
+            gene.restriction_decision,
+            gene.restriction_process_route,
+            gene.restriction_message,
+            gene.restriction_requires_manual_review,
+            gene.bsai_count,
+            gene.bsmbi_count,
+            gene.bsai_positions,
+            gene.bsmbi_positions,
+        )
+        decision_result = calculate_restriction_for_gene(gene)
+        apply_restriction_result_to_gene(gene, decision_result)
+        current = (
+            gene.restriction_decision,
+            gene.restriction_process_route,
+            gene.restriction_message,
+            gene.restriction_requires_manual_review,
+            gene.bsai_count,
+            gene.bsmbi_count,
+            gene.bsai_positions,
+            gene.bsmbi_positions,
+        )
+        if current != previous:
+            changed_genes.append(gene)
+
+    if changed_genes:
+        GeneInfo.objects.bulk_update(changed_genes, restriction_fields)
 
     # 分组
     grouped_shopping_cart = [
@@ -1157,11 +1367,13 @@ def get_fragment_details(request, gene_id):
                 'message': 'This gene has not been fragmented or does not need fragmentation'
             }, status=404)
 
+        normalized_fragments_data = normalize_fragments_data_for_gene(gene, gene.fragments_data)
+
         return JsonResponse({
             'status': 'success',
             'gene_id': gene.id,
             'gene_name': gene.gene_name,
-            'fragments_data': gene.fragments_data
+            'fragments_data': normalized_fragments_data
         })
 
     except GeneInfo.DoesNotExist:
@@ -1224,10 +1436,13 @@ def trigger_order_fragmentation(request, order_id):
                 # 获取载体的克隆方法和抗性
                 cloning_method = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else "Gibson"
                 vector_resistance = gene.vector.antibiotic_resistance if gene.vector and hasattr(gene.vector, 'antibiotic_resistance') else None
+                fragment_source_seq = normalize_sequence_text(gene.saved_seq or gene.original_seq or gene.combined_seq)
+                if not fragment_source_seq:
+                    raise ValueError("No valid DNA sequence found for fragmentation")
 
                 # 执行片段切割
                 fragmentation_result = fragment_sequence_by_penalty(
-                    sequence=gene.combined_seq,
+                    sequence=fragment_source_seq,
                     cloning_method=cloning_method,
                     vector_resistance=vector_resistance,
                     max_penalty=28.0
@@ -1330,6 +1545,15 @@ def cart_genbank_download(request, gene_id):
     if is_dna_or_protein(sequence) != 'DNA':
         return HttpResponse("Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.", status=400)
 
+    # 与GenBank插入序列保持一致，先按统一规则重算并回写Restriction结果
+    decision_result = calculate_restriction_for_gene(gene, insert_seq_override=sequence)
+    apply_restriction_result_to_gene(gene, decision_result)
+    gene.save(update_fields=[
+        'restriction_decision', 'restriction_process_route', 'restriction_message',
+        'restriction_requires_manual_review', 'bsai_count', 'bsmbi_count',
+        'bsai_positions', 'bsmbi_positions'
+    ])
+
     new_sequences = [i5nc, sequence, i3nc]
     new_feature_names = ['i5NC', gene.gene_name, 'i3NC']
 
@@ -1341,6 +1565,7 @@ def cart_genbank_download(request, gene_id):
             gene_start_pos_in_insert = len(i5nc)
 
             # 使用新的函数，添加序列评估特征和fragments标注
+            normalized_fragments_data = normalize_fragments_data_for_gene(gene, gene.fragments_data)
             addAnalysisFeaturesAndFragments(
                 genebank_file=vector_genbank_file_path,
                 output_file=temp_file.name,
@@ -1349,7 +1574,7 @@ def cart_genbank_download(request, gene_id):
                 start_feature_label='iU20',
                 end_feature_label='iD20',
                 analysis_results=gene.analysis_results,
-                fragments_data=gene.fragments_data,
+                fragments_data=normalized_fragments_data,
                 gene_start_pos_in_insert=gene_start_pos_in_insert
             )
             temp_file.seek(0)
@@ -1579,6 +1804,12 @@ def bulk_download_genbank(request):
 
         temp_zip = tempfile.NamedTemporaryFile(delete=False)
         with zipfile.ZipFile(temp_zip, 'w') as zf:
+            changed_genes = []
+            restriction_fields = [
+                'restriction_decision', 'restriction_process_route', 'restriction_message',
+                'restriction_requires_manual_review', 'bsai_count', 'bsmbi_count',
+                'bsai_positions', 'bsmbi_positions'
+            ]
             for gene_id in gene_ids:
                 try:
                     gene = GeneInfo.objects.get(user=request.user, id=gene_id)
@@ -1586,6 +1817,32 @@ def bulk_download_genbank(request):
                     if is_dna_or_protein(sequence) != 'DNA':
                         zf.writestr(f"Error-{gene_id}.{gene.gene_name}.txt", "Your sequence is not a DNA sequence, or your amino acid sequence is not optimized. Please check.")
                         continue
+                    # 与GenBank插入序列保持一致，先按统一规则重算并回写Restriction结果
+                    previous = (
+                        gene.restriction_decision,
+                        gene.restriction_process_route,
+                        gene.restriction_message,
+                        gene.restriction_requires_manual_review,
+                        gene.bsai_count,
+                        gene.bsmbi_count,
+                        gene.bsai_positions,
+                        gene.bsmbi_positions,
+                    )
+                    decision_result = calculate_restriction_for_gene(gene, insert_seq_override=sequence)
+                    apply_restriction_result_to_gene(gene, decision_result)
+                    current = (
+                        gene.restriction_decision,
+                        gene.restriction_process_route,
+                        gene.restriction_message,
+                        gene.restriction_requires_manual_review,
+                        gene.bsai_count,
+                        gene.bsmbi_count,
+                        gene.bsai_positions,
+                        gene.bsmbi_positions,
+                    )
+                    if current != previous:
+                        changed_genes.append(gene)
+
                     i5nc = gene.i5nc or ''
                     i3nc = gene.i3nc or ''
 
@@ -1597,6 +1854,7 @@ def bulk_download_genbank(request):
                             gene_start_pos_in_insert = len(i5nc)
 
                             # 使用新的函数，添加序列评估特征和fragments标注
+                            normalized_fragments_data = normalize_fragments_data_for_gene(gene, gene.fragments_data)
                             addAnalysisFeaturesAndFragments(
                                 genebank_file=vector_genbank_file_path,
                                 output_file=temp_file.name,
@@ -1605,7 +1863,7 @@ def bulk_download_genbank(request):
                                 start_feature_label='iU20',
                                 end_feature_label='iD20',
                                 analysis_results=gene.analysis_results,
-                                fragments_data=gene.fragments_data,
+                                fragments_data=normalized_fragments_data,
                                 gene_start_pos_in_insert=gene_start_pos_in_insert
                             )
                             temp_file.seek(0)
@@ -1618,6 +1876,9 @@ def bulk_download_genbank(request):
                         zf.writestr(f"Error-{gene_id}.txt", "No vector GenBank file found")
                 except GeneInfo.DoesNotExist:
                     zf.writestr(f"Error-{gene_id}.txt", "Gene not found")
+
+            if changed_genes:
+                GeneInfo.objects.bulk_update(changed_genes, restriction_fields)
 
         temp_zip.seek(0)
         response = HttpResponse(temp_zip.read(), content_type='application/zip')
@@ -1640,19 +1901,57 @@ def bulk_download_geneinfo_excel(request):
         # 获取完整的GeneInfo对象(需要fragments_data字段)
         gene_info_list = GeneInfo.objects.filter(user=request.user, id__in=gene_ids).select_related('species', 'vector')
 
-        # 导入酶切位点检测函数
-        from user_center.utils.sequence_processing import get_enzyme_sites
-
         # 构建数据列表
         data_rows = []
+        changed_genes = []
+        restriction_fields = [
+            'restriction_decision', 'restriction_process_route', 'restriction_message',
+            'restriction_requires_manual_review', 'bsai_count', 'bsmbi_count',
+            'bsai_positions', 'bsmbi_positions'
+        ]
         for gene in gene_info_list:
-            # 获取要分析的序列（优先使用 combined_seq，空时回退 original_seq）
-            modified_seq = gene.combined_seq if gene.combined_seq else gene.original_seq
-            seq_to_analyze = modified_seq
+            modified_seq = normalize_sequence_text(gene.combined_seq if gene.combined_seq else gene.original_seq)
 
-            # 检测 BsaI 和 BsmBI 位点
-            bsai_info = get_enzyme_sites(seq_to_analyze, 'BsaI') if seq_to_analyze else {'count': 0, 'positions': []}
-            bsmbi_info = get_enzyme_sites(seq_to_analyze, 'BsmBI') if seq_to_analyze else {'count': 0, 'positions': []}
+            decision_info = calculate_restriction_for_gene(gene)
+            previous = (
+                gene.restriction_decision,
+                gene.restriction_process_route,
+                gene.restriction_message,
+                gene.restriction_requires_manual_review,
+                gene.bsai_count,
+                gene.bsmbi_count,
+                gene.bsai_positions,
+                gene.bsmbi_positions,
+            )
+            apply_restriction_result_to_gene(gene, decision_info)
+            current = (
+                gene.restriction_decision,
+                gene.restriction_process_route,
+                gene.restriction_message,
+                gene.restriction_requires_manual_review,
+                gene.bsai_count,
+                gene.bsmbi_count,
+                gene.bsai_positions,
+                gene.bsmbi_positions,
+            )
+            if current != previous:
+                changed_genes.append(gene)
+
+            bsai_info = {
+                'count': int(decision_info.get('bsai_count') or 0),
+                'positions': decision_info.get('bsai_positions') or []
+            }
+            bsmbi_info = {
+                'count': int(decision_info.get('bsmbi_count') or 0),
+                'positions': decision_info.get('bsmbi_positions') or []
+            }
+
+            if decision_info.get('decision') == 'accept' and decision_info.get('process_route'):
+                decision_text = f"{decision_info['process_route']} route"
+            elif decision_info.get('decision') == 'reject':
+                decision_text = 'Reject'
+            else:
+                decision_text = ''
 
             # 格式化位置信息为字符串 (例如: "10-16, 50-56")
             bsai_positions_str = ', '.join([f"{p['start']}-{p['end']}" for p in bsai_info['positions']]) if bsai_info['positions'] else ''
@@ -1664,14 +1963,14 @@ def bulk_download_geneinfo_excel(request):
                 'Species': gene.species.species_name if gene.species else '',
                 'VectorName': gene.vector.vector_name if gene.vector else '',
                 'VectorID': gene.vector.vector_id if gene.vector else '',
-                'v5NC': gene.vector.NC5 if gene.vector else '',
-                'v3NC': gene.vector.NC3 if gene.vector else '',
-                'i5nc': gene.i5nc or '',
-                'i3nc': gene.i3nc or '',
+                'v5NC': normalize_sequence_text(gene.vector.NC5 if gene.vector else ''),
+                'v3NC': normalize_sequence_text(gene.vector.NC3 if gene.vector else ''),
+                'i5nc': normalize_sequence_text(gene.i5nc),
+                'i3nc': normalize_sequence_text(gene.i3nc),
                 'ForbiddenSeqs': gene.forbid_seq or '',
                 'OriginalSeq': gene.original_seq or '',
                 'OriginalGCContent': gene.original_gc_content if gene.original_gc_content is not None else '',
-                'ModifiedSeq': modified_seq or '',
+                'ModifiedSeq': normalize_sequence_text(modified_seq),
                 'ModifiedGCContent': gene.modified_gc_content if gene.modified_gc_content is not None else '',
                 'Status': gene.status or '',
                 'PenaltyScore': gene.penalty_score if gene.penalty_score is not None else '',
@@ -1679,6 +1978,7 @@ def bulk_download_geneinfo_excel(request):
                 'BsaI_Positions': bsai_positions_str,
                 'BsmBI_Count': bsmbi_info['count'],
                 'BsmBI_Positions': bsmbi_positions_str,
+                'Decision': decision_text,
                 'ModifiedSeqFallback': 'Yes' if used_modified_fallback else 'No',
             }
 
@@ -1696,16 +1996,41 @@ def bulk_download_geneinfo_excel(request):
                 row['PalindromeRepeats_penalty'] = analysis.get('PalindromeRepeats_penalty_score', '')
                 row['InvertedRepeats_penalty'] = analysis.get('InvertedRepeats_penalty_score', '')
 
-                # 添加位置信息（原始注释格式）
-                row['HighGC_positions'] = analysis.get('HighGC', '')
-                row['LowGC_positions'] = analysis.get('LowGC', '')
-                row['W12S12Motifs_positions'] = analysis.get('W12S12Motifs', '')
-                row['LongRepeats_positions'] = analysis.get('LongRepeats', '')
-                row['Homopolymers_positions'] = analysis.get('Homopolymers', '')
-                row['DoubleNT_positions'] = analysis.get('DoubleNT', '')
-                row['TandemRepeats_positions'] = analysis.get('TandemRepeats', '')
-                row['PalindromeRepeats_positions'] = analysis.get('PalindromeRepeats', '')
-                row['InvertedRepeats_positions'] = analysis.get('InvertedRepeats', '')
+                # 添加位置信息（转换为 1-based 坐标）
+                def _to_1based(features_data):
+                    """将原始 0-based 位置数据转换为 1-based 用于 Excel 输出"""
+                    if not features_data:
+                        return ''
+                    position_keys = {'start', 'end', 'stem1_start', 'stem1_end', 'stem2_start', 'stem2_end'}
+                    items = features_data if isinstance(features_data, list) else [features_data]
+                    converted = []
+                    for item in items:
+                        if not isinstance(item, dict):
+                            converted.append(item)
+                            continue
+                        new_item = {}
+                        for k, v in item.items():
+                            if k in position_keys:
+                                if isinstance(v, list):
+                                    new_item[k] = [p + 1 if isinstance(p, (int, float)) else p for p in v]
+                                elif isinstance(v, (int, float)):
+                                    new_item[k] = int(v) + 1
+                                else:
+                                    new_item[k] = v
+                            else:
+                                new_item[k] = v
+                        converted.append(new_item)
+                    return converted
+
+                row['HighGC_positions'] = _to_1based(analysis.get('HighGC', ''))
+                row['LowGC_positions'] = _to_1based(analysis.get('LowGC', ''))
+                row['W12S12Motifs_positions'] = _to_1based(analysis.get('W12S12Motifs', ''))
+                row['LongRepeats_positions'] = _to_1based(analysis.get('LongRepeats', ''))
+                row['Homopolymers_positions'] = _to_1based(analysis.get('Homopolymers', ''))
+                row['DoubleNT_positions'] = _to_1based(analysis.get('DoubleNT', ''))
+                row['TandemRepeats_positions'] = _to_1based(analysis.get('TandemRepeats', ''))
+                row['PalindromeRepeats_positions'] = _to_1based(analysis.get('PalindromeRepeats', ''))
+                row['InvertedRepeats_positions'] = _to_1based(analysis.get('InvertedRepeats', ''))
             else:
                 # 如果没有analysis_results，填充空值
                 for feature in ['HighGC', 'LowGC', 'W12S12Motifs', 'LongRepeats', 'Homopolymers',
@@ -1715,18 +2040,22 @@ def bulk_download_geneinfo_excel(request):
 
             # 处理片段信息
             if gene.fragments_data:
-                frag_data = gene.fragments_data
+                frag_data = normalize_fragments_data_for_gene(gene, gene.fragments_data)
+                fragments = frag_data.get('fragments', [])
                 row['IsFragmented'] = 'Yes' if frag_data.get('need_fragmentation') else 'No'
-                row['CloningMethod'] = frag_data.get('cloning_method', '')
-                row['TotalFragments'] = frag_data.get('total_fragments', 1)
+                row['VectorMethod'] = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else ''
+                row['FragmentMethod'] = frag_data.get('cloning_method', '')
+                row['TotalFragments'] = len(fragments) if fragments else frag_data.get('total_fragments', 1)
                 row['MustCut'] = frag_data.get('mustcut_positions', '')
 
                 # 片段详情(格式: "Frag1(0-1000,25.5);Frag2(1000-2000,27.8)")
-                fragments = frag_data.get('fragments', [])
                 if fragments:
                     frag_details = []
                     for frag in fragments:
-                        frag_details.append(f"Frag{frag['index']}({frag['start']}-{frag['end']},{frag['penalty_score']})")
+                        start_1based = int(frag.get('start', 0)) + 1
+                        end_pos = int(frag.get('end', 0))
+                        penalty = frag.get('penalty_score', 0)
+                        frag_details.append(f"Frag{frag['index']}({start_1based}-{end_pos},{penalty})")
                     row['FragmentDetails'] = '; '.join(frag_details)
                 else:
                     row['FragmentDetails'] = ''
@@ -1735,7 +2064,8 @@ def bulk_download_geneinfo_excel(request):
                 row['FragmentWarning'] = frag_data.get('warning', '')
             else:
                 row['IsFragmented'] = 'No'
-                row['CloningMethod'] = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else ''
+                row['VectorMethod'] = gene.vector.cloning_method if gene.vector and gene.vector.cloning_method else ''
+                row['FragmentMethod'] = ''
                 row['TotalFragments'] = 1
                 row['MustCut'] = ''
                 row['FragmentDetails'] = ''
@@ -1743,15 +2073,25 @@ def bulk_download_geneinfo_excel(request):
 
             data_rows.append(row)
 
+        if changed_genes:
+            GeneInfo.objects.bulk_update(changed_genes, restriction_fields)
+
         df = pd.DataFrame(data_rows)
 
-        # 添加 fullSeq 列：v5NC + i5NC + ModifiedSeq + i3NC + v3NC
+        # 统一清洗序列字段：None/NaN/'nan'/'none'/'null' -> ''
+        seq_columns = ['v5NC', 'i5nc', 'ModifiedSeq', 'i3nc', 'v3NC']
+        for col in seq_columns:
+            df[col] = df[col].map(normalize_sequence_text)
+
+        # 添加 fullSeq 列：v5NC + i5NC + OriginalSeq(insert) + i3NC + v3NC
+        # 注意：不能用ModifiedSeq，因为ModifiedSeq是combined_seq = iU20+i5nc+insert+i3nc+iD20
+        # 使用ModifiedSeq会导致iU20/iD20和i5nc/i3nc被重复拼接
         df['FullSeq'] = (
-            df['v5NC'].fillna('') +
-            df['i5nc'].fillna('') +
-            df['ModifiedSeq'].fillna('') +
-            df['i3nc'].fillna('') +
-            df['v3NC'].fillna('')
+            df['v5NC'] +
+            df['i5nc'] +
+            df['OriginalSeq'] +
+            df['i3nc'] +
+            df['v3NC']
         )
 
         # 调整列顺序
@@ -1770,11 +2110,11 @@ def bulk_download_geneinfo_excel(request):
             'PalindromeRepeats_penalty', 'PalindromeRepeats_positions',
             'InvertedRepeats_penalty', 'InvertedRepeats_positions',
             # 酶切位点
-            'BsaI_Count', 'BsaI_Positions', 'BsmBI_Count', 'BsmBI_Positions',
+            'BsaI_Count', 'BsaI_Positions', 'BsmBI_Count', 'BsmBI_Positions', 'Decision',
             # 序列信息
             'FullSeq', 'ModifiedSeqFallback',
             # 片段信息
-            'IsFragmented', 'CloningMethod', 'TotalFragments', 'MustCut', 'FragmentDetails', 'FragmentWarning'
+            'IsFragmented', 'VectorMethod', 'FragmentMethod', 'TotalFragments', 'MustCut', 'FragmentDetails', 'FragmentWarning'
         ]
         df = df[column_order]
 
@@ -1910,8 +2250,14 @@ def export_order_to_csv(request, order_id):
             'ForbiddenSeqs': gene_info.forbid_seq,
             'VectorID': gene_info.vector.vector_id if gene_info.vector else None,
             'VectorName': gene_info.vector.vector_name,
-            'Seq5NC': gene_info.vector.NC5 + (gene_info.i5nc if gene_info.i5nc is not None else ''),
-            'Seq3NC': (gene_info.i3nc if gene_info.i3nc is not None else '') + gene_info.vector.NC3,
+            'Seq5NC': (
+                normalize_sequence_text(gene_info.vector.NC5 if gene_info.vector else '') +
+                normalize_sequence_text(gene_info.i5nc)
+            ),
+            'Seq3NC': (
+                normalize_sequence_text(gene_info.i3nc) +
+                normalize_sequence_text(gene_info.vector.NC3 if gene_info.vector else '')
+            ),
             'i5nc': gene_info.i5nc,
             'i3nc': gene_info.i3nc,
             'InquiryID': order.inquiry_id,
@@ -1919,7 +2265,7 @@ def export_order_to_csv(request, order_id):
 
         # 添加切割信息（如果存在）
         if gene_info.fragments_data and gene_info.fragments_data.get('need_fragmentation'):
-            frag_data = gene_info.fragments_data
+            frag_data = normalize_fragments_data_for_gene(gene_info, gene_info.fragments_data)
             gene_data.update({
                 'Fragmented': 'Yes',
                 'TotalFragments': frag_data.get('total_fragments', ''),
@@ -2287,6 +2633,13 @@ def vector_automation_design_trigger(request):
     """
     if request.method == 'POST':
         vector_id = request.POST.get('vector_id')
+        forced_method = request.POST.get('forced_method') or None
+
+        # 校验指定的克隆方法
+        valid_methods = {'Gibson', 'GoldenGate', 'T4'}
+        if forced_method and forced_method not in valid_methods:
+            return JsonResponse({'status': 'error', 'message': f'不支持的克隆方法: {forced_method}'})
+
         try:
             vector = Vector.objects.get(user=request.user, id=vector_id)
 
@@ -2304,7 +2657,7 @@ def vector_automation_design_trigger(request):
 
             # 触发异步任务
             from user_center.tasks import async_vector_automation_design
-            task = async_vector_automation_design.delay(vector_id)
+            task = async_vector_automation_design.delay(vector_id, forced_method=forced_method)
 
             return JsonResponse({
                 'status': 'success',

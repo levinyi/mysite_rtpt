@@ -498,9 +498,9 @@ def vector_manage(request):
 def vector_data_api(request):
     '''获取所有的vector数据,展示在前端表格中'''
     vector_list = Vector.objects.values(
-        'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20', 
+        'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
         'status','user__username', 'vector_file', 'vector_png', 'vector_gb',
-        'design_status', 'cloning_method'
+        'design_status', 'cloning_method', 'design_error'
     )
     return JsonResponse({'data': list(vector_list)})
 
@@ -512,8 +512,14 @@ def vector_automation_design_trigger(request):
     管理员触发载体改造自动化设计
     """
     vector_id = request.POST.get('vector_id')
+    forced_method = request.POST.get('forced_method') or None
     if not vector_id:
         return JsonResponse({'status': 'error', 'message': 'Missing vector ID'})
+
+    # 校验指定的克隆方法
+    valid_methods = {'Gibson', 'GoldenGate', 'T4'}
+    if forced_method and forced_method not in valid_methods:
+        return JsonResponse({'status': 'error', 'message': f'不支持的克隆方法: {forced_method}'})
 
     try:
         vector = Vector.objects.get(id=vector_id)
@@ -528,7 +534,7 @@ def vector_automation_design_trigger(request):
     vector.save()
 
     from user_center.tasks import async_vector_automation_design
-    task = async_vector_automation_design.delay(vector_id)
+    task = async_vector_automation_design.delay(vector_id, forced_method=forced_method)
 
     return JsonResponse({
         'status': 'success',
@@ -575,6 +581,14 @@ def vector_automation_design_status(request):
         hetero_dg = None
         if forward_seq and reverse_seq:
             hetero_dg = VectorAutomationDesigner.calculate_dimer_dg(forward_seq, reverse_seq)
+
+        colony_primers = []
+        if vector.colony_pcr_primers:
+            try:
+                colony_primers = json.loads(vector.colony_pcr_primers)
+            except (ValueError, TypeError):
+                colony_primers = []
+
         response_data.update({
             'v5nc': vector.NC5,
             'v3nc': vector.NC3,
@@ -593,10 +607,84 @@ def vector_automation_design_status(request):
             'primer_forward_homodimer_dg': forward_dg,
             'primer_reverse_homodimer_dg': reverse_dg,
             'primer_heterodimer_dg': hetero_dg,
-            'has_genbank': bool(vector.vector_gb)
+            'colony_pcr_primers': colony_primers,
+            'has_genbank': bool(vector.vector_gb),
+            'has_colony_csv': bool(colony_primers),
         })
 
     return JsonResponse(response_data)
+
+
+@login_required
+@require_GET
+def vector_colony_pcr_csv(request, vector_id):
+    """
+    导出菌落PCR 5对引物 CSV
+    表头：Plasmid_number, upstream, Start_pos, downstream, upstream+downstream,
+          ColonyPCR_primer_F, ColonyPCR_primer_F(5'-3'),
+          ColonyPCR_primer_R, ColonyPCR_primer_R(5'-3')
+    """
+    import csv
+
+    try:
+        vector = Vector.objects.get(id=vector_id)
+    except Vector.DoesNotExist:
+        return HttpResponse('Vector not found', status=404)
+
+    if not vector.colony_pcr_primers:
+        return HttpResponse('No colony PCR primers', status=404)
+
+    try:
+        pairs = json.loads(vector.colony_pcr_primers)
+    except (ValueError, TypeError):
+        return HttpResponse('Invalid colony PCR data', status=500)
+
+    plasmid_number = vector.vector_id or vector.vector_name or f'Vector_{vector.id}'
+    safe_name = plasmid_number.replace('/', '_').replace('\\', '_')
+    filename = f'{safe_name}_ColonyPCR.csv'
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{quote(filename)}"'
+    response.write('﻿')  # UTF-8 BOM 让 Excel 正确识别中文
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Plasmid_number',
+        'upstream',
+        'Start_pos',
+        'downstream',
+        'upstream+downstream',
+        'ColonyPCR_primer_F',
+        "ColonyPCR_primer_F(5'-3')",
+        'ColonyPCR_primer_R',
+        "ColonyPCR_primer_R(5'-3')",
+        'Note',
+    ])
+
+    for pair in pairs:
+        fwd = pair.get('forward') or {}
+        rev = pair.get('reverse') or {}
+        fwd_seq = fwd.get('sequence', '') or ''
+        rev_seq = rev.get('sequence', '') or ''
+        pair_idx = pair.get('index') or 0
+        if pair_idx == 1:
+            note = '★ Best (shortest amplicon, recommended for first try)'
+        else:
+            note = f'Backup #{pair_idx}'
+        writer.writerow([
+            plasmid_number,
+            fwd_seq,
+            pair.get('insert_start_pos', ''),
+            rev_seq,
+            f'{fwd_seq}{rev_seq}',
+            fwd.get('name', ''),
+            fwd_seq,
+            rev.get('name', ''),
+            rev_seq,
+            note,
+        ])
+
+    return response
 
 
 @csrf_exempt  # 使用此装饰器来禁用 CSRF 保护，如果你在 AJAX 请求中已提供 CSRF token，则不需要这个装饰器
@@ -627,26 +715,30 @@ def vector_update_field(request):
 # @is_secondary_admin_required
 def vector_delete(request):
     '''删除vector文件'''
-    if request.method == 'POST':
-        vector_id = request.POST.get('vector_id')
-        vector = Vector.objects.get(id=vector_id)
-    
-        if vector.vector_file:
-            file_path = vector.vector_file.path
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        if vector.vector_gb:
-            file_path = vector.vector_gb.path
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        if vector.vector_png:
-            file_path = vector.vector_png.path
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        vector.delete()
-        return JsonResponse({'status': 'success', 'message': 'Vector deleted Successfully'})
-    else:
+    if request.method != 'POST':
         return JsonResponse({'status': 'failed', 'message': 'Not A Post Request.'})
+
+    vector_id = request.POST.get('vector_id') or request.POST.get('gene_id')
+    if not vector_id:
+        return JsonResponse({'status': 'failed', 'message': 'Missing vector_id'})
+
+    try:
+        vector = Vector.objects.get(id=vector_id)
+    except (Vector.DoesNotExist, ValueError):
+        return JsonResponse({'status': 'failed', 'message': f'Vector not found: {vector_id}'})
+
+    for field_name in ('vector_file', 'vector_gb', 'vector_png'):
+        field = getattr(vector, field_name, None)
+        if field:
+            try:
+                file_path = field.path
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except (ValueError, OSError):
+                pass
+
+    vector.delete()
+    return JsonResponse({'status': 'success', 'message': 'Vector deleted Successfully'})
 
 
 @login_required
@@ -685,11 +777,24 @@ def vector_upload_file(request):
                 if not uploaded_file.name.endswith('.gb') and not uploaded_file.name.endswith('.gbk'):
                     return JsonResponse({'status': 'failed', 'message': 'Not a genebank file.'})
                 # 验证文件是否为合法的genebank文件
+                # SnapGene 在中文 Windows 上导出的 .gb 常用 GBK 编码（feature label 含中文时），
+                # 这里按 utf-8 → gbk → latin-1 顺序兜底，避免中文标签直接报错
+                raw_bytes = uploaded_file.read()
+                text = None
+                for enc in ('utf-8', 'gbk', 'latin-1'):
+                    try:
+                        text = raw_bytes.decode(enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if text is None:
+                    return JsonResponse({'status': 'failed', 'message': '文件编码无法识别，请确认是 GenBank 格式文件'})
                 try:
-                    file_content = StringIO(uploaded_file.read().decode('utf-8'))
-                    record = SeqIO.read(file_content, "genbank")
+                    record = SeqIO.read(StringIO(text), "genbank")
                 except Exception as e:
                     return JsonResponse({'status': 'failed', 'message': str(e)})
+                # 读完后游标在末尾，重置一下让后续 vector.vector_gb = uploaded_file 能存到完整内容
+                uploaded_file.seek(0)
                 # 如果存在旧的genebank文件，先删除
                 if vector.vector_gb:
                     file_path = vector.vector_gb.path

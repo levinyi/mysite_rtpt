@@ -34,9 +34,10 @@ def get_previous(value, arg):
 @register.simple_tag
 def highlight_sequence_with_offset(sequence, highlights, i5nc):
     """
-    针对 original_seq 的高亮，位移前移i5nc的长度
+    针对 original_seq 的高亮
+    分析已在OriginalSeq上运行，位置直接相对于insert，无需偏移
     """
-    offset = len(i5nc) + 20
+    offset = 0
     return highlight_sequence(sequence, highlights, offset)
 
 # @register.filter
@@ -224,15 +225,13 @@ def count_enzyme_sites(gene, enzyme_name):
         位点数量 (整数)
     """
     try:
-        from user_center.utils.sequence_processing import get_enzyme_sites
-
-        sequence = gene.saved_seq if gene.saved_seq else gene.original_seq
-        if not sequence:
-            return 0
-
-        result = get_enzyme_sites(sequence, enzyme_name)
-        return result['count']
-    except Exception as e:
+        enzyme = (enzyme_name or '').strip().lower()
+        if enzyme == 'bsai':
+            return int(gene.bsai_count or 0)
+        if enzyme == 'bsmbi':
+            return int(gene.bsmbi_count or 0)
+        return 0
+    except Exception:
         return 0
 
 @register.filter
