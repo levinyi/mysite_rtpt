@@ -201,6 +201,15 @@
         margin-bottom: 1rem;
     }
 
+    .group-toggle-btn {
+        color: #0d6efd;
+        text-decoration: none;
+    }
+
+    .group-toggle-btn:hover {
+        color: #0a58ca;
+    }
+
 </style>
 {% endblock %}
 {% block content %}
@@ -525,6 +534,17 @@
                     <option value="low">Low (≤10)</option>
                 </select>
             </div>
+            <div class="col-md-3 mb-2">
+                <label for="groupSortOrder" class="form-label small mb-1">Submission Time:</label>
+                <select class="form-control" id="groupSortOrder">
+                    <option value="asc">Oldest First</option>
+                    <option value="desc">Newest First</option>
+                </select>
+                <div class="btn-group w-100 mt-2" role="group" aria-label="Group visibility">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="expandAllGroupsBtn">Expand All</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="collapseAllGroupsBtn">Collapse All</button>
+                </div>
+            </div>
         </div>
         <div id="fragmentationStatusContainer" class="alert alert-info d-none" role="alert">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -565,16 +585,23 @@
             </thead>
             <tbody>
                 {% for group in grouped_shopping_cart %}
-                <tr class="date-header">
+                <tr class="date-header" data-date="{{ group.date }}">
                     <td class="table-info" >
                         <input type="checkbox" class="date-select-checkbox" data-date="{{ group.date }}">
                     </td>
-                    <td colspan="15" class="table-info text-start"> {{ group.date }}</td>
+                    <td colspan="15" class="table-info text-start">
+                        <button type="button" class="btn btn-link btn-sm p-0 me-2 group-toggle-btn" data-date="{{ group.date }}" aria-expanded="true">
+                            <i class="bi bi-chevron-down"></i>
+                            <span class="visually-hidden group-toggle-label">Collapse group</span>
+                        </button>
+                        {{ group.date }}
+                    </td>
                 </tr>
                 {% for gene in group.genes %}
                 <tr data-status="{{ gene.status }}"
                     data-optimization-status="{{ gene.optimization_status }}"
                     data-penalty-score="{{ gene.penalty_score|default:'0' }}"
+                    data-date="{{ group.date }}"
                     class="{% if gene.penalty_score == 0 or gene.penalty_score == None %}severity-ok{% elif gene.penalty_score <= 28 %}severity-warn{% else %}severity-high{% endif %}">
                     <td>
                         <!-- 复选框 -->
@@ -635,7 +662,7 @@
                     </td>
                     <td class="restriction-sites-cell">
                         <!-- 限制性酶切位点信息 -->
-                        {% with bsai_count=gene|count_enzyme_sites:"BsaI" bsmbi_count=gene|count_enzyme_sites:"BsmBI" %}
+                        {% with bsai_count=gene.bsai_count|default:0 bsmbi_count=gene.bsmbi_count|default:0 %}
                             {% if bsai_count == 0 and bsmbi_count == 0 %}
                                 <small class="text-muted">None</small>
                             {% else %}
@@ -1030,6 +1057,226 @@
         var totalBeforeDiscount = 0;
         var totalAfterDiscount = 0;
 
+        const GROUP_SORT_STORAGE_KEY = 'shopping_cart_group_sort_order';
+        const GROUP_COLLAPSE_STORAGE_KEY = 'shopping_cart_group_collapsed_v1';
+        const $cartTableBody = $('#shopping-cart-table tbody');
+        const $groupSortOrder = $('#groupSortOrder');
+
+        let groupCollapsedState = loadCollapsedState();
+
+        function getCartGeneRows() {
+            return $cartTableBody.find('tr[data-status]');
+        }
+
+        function getFilterMatchedGeneRows() {
+            return getCartGeneRows().filter(function() {
+                return $(this).attr('data-filter-match') !== '0';
+            });
+        }
+
+        function getFilterMatchedGeneCheckboxes() {
+            return getFilterMatchedGeneRows().find('input.gene-checkbox');
+        }
+
+        function loadCollapsedState() {
+            try {
+                const raw = localStorage.getItem(GROUP_COLLAPSE_STORAGE_KEY);
+                if (!raw) {
+                    return {};
+                }
+                const parsed = JSON.parse(raw);
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function saveCollapsedState() {
+            try {
+                localStorage.setItem(GROUP_COLLAPSE_STORAGE_KEY, JSON.stringify(groupCollapsedState));
+            } catch (error) {
+                // Ignore storage failures (e.g., private mode).
+            }
+        }
+
+        function getSavedSortOrder() {
+            try {
+                const saved = localStorage.getItem(GROUP_SORT_STORAGE_KEY);
+                return saved === 'desc' ? 'desc' : 'asc';
+            } catch (error) {
+                return 'asc';
+            }
+        }
+
+        function saveSortOrder(order) {
+            try {
+                localStorage.setItem(GROUP_SORT_STORAGE_KEY, order);
+            } catch (error) {
+                // Ignore storage failures (e.g., private mode).
+            }
+        }
+
+        function iterateGroups(callback) {
+            let currentHeader = null;
+            let currentRows = [];
+
+            $cartTableBody.children('tr').each(function() {
+                if (this.classList.contains('date-header')) {
+                    if (currentHeader) {
+                        callback(currentHeader, currentRows);
+                    }
+                    currentHeader = this;
+                    currentRows = [];
+                } else if (currentHeader) {
+                    currentRows.push(this);
+                }
+            });
+
+            if (currentHeader) {
+                callback(currentHeader, currentRows);
+            }
+        }
+
+        function parseGroupDate(dateText) {
+            const normalized = dateText ? dateText.replace(' ', 'T') : '';
+            const timestamp = Date.parse(normalized);
+            return Number.isNaN(timestamp) ? null : timestamp;
+        }
+
+        function compareGroupDate(left, right) {
+            const leftTimestamp = parseGroupDate(left);
+            const rightTimestamp = parseGroupDate(right);
+
+            if (leftTimestamp !== null && rightTimestamp !== null) {
+                return leftTimestamp - rightTimestamp;
+            }
+            return left.localeCompare(right);
+        }
+
+        function sortGroups(order) {
+            const groups = [];
+            iterateGroups(function(headerElement, rowElements) {
+                groups.push({
+                    date: String($(headerElement).data('date') || ''),
+                    header: headerElement,
+                    rows: rowElements
+                });
+            });
+
+            groups.sort(function(left, right) {
+                return compareGroupDate(left.date, right.date);
+            });
+            if (order === 'desc') {
+                groups.reverse();
+            }
+
+            const fragment = document.createDocumentFragment();
+            groups.forEach(function(group) {
+                fragment.appendChild(group.header);
+                group.rows.forEach(function(rowElement) {
+                    fragment.appendChild(rowElement);
+                });
+            });
+
+            if ($cartTableBody.length) {
+                $cartTableBody[0].appendChild(fragment);
+            }
+        }
+
+        function updateGroupToggleVisual($header, collapsed) {
+            const $button = $header.find('.group-toggle-btn');
+            const $icon = $button.find('i');
+            const $label = $button.find('.group-toggle-label');
+
+            $button.attr('aria-expanded', collapsed ? 'false' : 'true');
+            $icon.removeClass('bi-chevron-down bi-chevron-right')
+                .addClass(collapsed ? 'bi-chevron-right' : 'bi-chevron-down');
+            $label.text(collapsed ? 'Expand group' : 'Collapse group');
+        }
+
+        function applyGroupVisibility() {
+            iterateGroups(function(headerElement, rowElements) {
+                const $header = $(headerElement);
+                const groupDate = String($header.data('date') || '');
+                const isCollapsed = !!groupCollapsedState[groupDate];
+                const matchedRows = rowElements.filter(function(rowElement) {
+                    return rowElement.getAttribute('data-filter-match') !== '0';
+                });
+
+                if (matchedRows.length === 0) {
+                    $header.hide();
+                    rowElements.forEach(function(rowElement) {
+                        $(rowElement).hide();
+                    });
+                    $header.find('.date-select-checkbox').prop({
+                        checked: false,
+                        indeterminate: false,
+                        disabled: true
+                    });
+                    updateGroupToggleVisual($header, false);
+                    return;
+                }
+
+                $header.show();
+                updateGroupToggleVisual($header, isCollapsed);
+                rowElements.forEach(function(rowElement) {
+                    const isMatched = rowElement.getAttribute('data-filter-match') !== '0';
+                    $(rowElement).toggle(isMatched && !isCollapsed);
+                });
+                $header.find('.date-select-checkbox').prop('disabled', false);
+            });
+        }
+
+        function updateDateSelectCheckboxes() {
+            iterateGroups(function(headerElement, rowElements) {
+                const $header = $(headerElement);
+                const $dateCheckbox = $header.find('.date-select-checkbox');
+                const matchedRowCheckboxes = rowElements
+                    .filter(function(rowElement) {
+                        return rowElement.getAttribute('data-filter-match') !== '0';
+                    })
+                    .map(function(rowElement) {
+                        return $(rowElement).find('input.gene-checkbox').get(0);
+                    })
+                    .filter(function(checkbox) {
+                        return checkbox && !checkbox.disabled;
+                    });
+
+                if (matchedRowCheckboxes.length === 0) {
+                    $dateCheckbox.prop({
+                        checked: false,
+                        indeterminate: false,
+                        disabled: true
+                    });
+                    return;
+                }
+
+                const checkedCount = matchedRowCheckboxes.filter(function(checkbox) {
+                    return checkbox.checked;
+                }).length;
+
+                $dateCheckbox.prop('disabled', false);
+                $dateCheckbox.prop('checked', checkedCount === matchedRowCheckboxes.length);
+                $dateCheckbox.prop('indeterminate', checkedCount > 0 && checkedCount < matchedRowCheckboxes.length);
+            });
+        }
+
+        function setAllGroupsCollapsed(collapsed) {
+            groupCollapsedState = {};
+            if (collapsed) {
+                iterateGroups(function(headerElement) {
+                    const groupDate = String($(headerElement).data('date') || '');
+                    if (groupDate) {
+                        groupCollapsedState[groupDate] = true;
+                    }
+                });
+            }
+            saveCollapsedState();
+            applyGroupVisibility();
+            updateDateSelectCheckboxes();
+            updateSelectAllCheckboxes();
+        }
+
         function calculatePricesAndLengths() {
             // 初始化分类
             lengthGroups = {
@@ -1043,7 +1290,7 @@
             const selectedVectors = new Set();
 
             // 处理选中的基因复选框
-            $('input.gene-checkbox:checked:visible').each(function() {
+            getFilterMatchedGeneCheckboxes().filter(':checked').each(function() {
                 var length = $(this).data('length');
                 var group = length < 450 ? '<450' : length < 3001 ? '450-3000' : length < 5001 ? '3001-5000' : '>5001';
                 lengthGroups[group].count++;
@@ -1227,7 +1474,7 @@
 
             // 更新页面显示
             $('#total-price').text('Total ￥: ≈' + totalPrice.toFixed(2));
-            $('#total-genes').text('Total ' + $('input.gene-checkbox:checked:visible').length + ' Genes');
+            $('#total-genes').text('Total ' + getFilterMatchedGeneCheckboxes().filter(':checked').length + ' Genes');
             $('#total-length').text('Total ' + totalLength + ' bp');
         }
 
@@ -1237,15 +1484,16 @@
         $('input.gene-checkbox').change(function() {
             updateTotalPrice();
             updateSelectAllCheckboxes();
+            updateDateSelectCheckboxes();
         });
 
         // 更新"Select All"复选框状态
         function updateSelectAllCheckboxes() {
-            const visibleCheckboxes = $('input.gene-checkbox').filter(function() {
-                return $(this).closest('tr').css('display') !== 'none';
+            const eligibleCheckboxes = getFilterMatchedGeneCheckboxes().filter(function() {
+                return !this.disabled;
             });
-            const visibleCheckedCount = visibleCheckboxes.filter(':checked').length;
-            const allChecked = visibleCheckboxes.length > 0 && visibleCheckedCount === visibleCheckboxes.length;
+            const checkedCount = eligibleCheckboxes.filter(':checked').length;
+            const allChecked = eligibleCheckboxes.length > 0 && checkedCount === eligibleCheckboxes.length;
 
             $('#selectAllTop, #selectAllBottom').prop('checked', allChecked);
         }
@@ -1258,25 +1506,57 @@
         // 监听全选复选框
         $('#selectAllTop, #selectAllBottom').click(function() {
             const state = this.checked;
-            $('input[name="gene_id"]:not(.modal .gene-checkbox)').each(function() {
-                if (!this.disabled && $(this).closest('tr').css('display') !== 'none') {
+            getFilterMatchedGeneCheckboxes().each(function() {
+                if (!this.disabled) {
                     this.checked = state;
                 }
             });
             $('#selectAllTop, #selectAllBottom').prop('checked', state);
             updateTotalPrice();
+            updateDateSelectCheckboxes();
+            updateSelectAllCheckboxes();
         });
 
         // 监听日期复选框
-        $('.date-select-checkbox').on('click', function() {
+        $('.date-select-checkbox').on('change', function() {
             const date = $(this).data('date');
             const isChecked = this.checked;
-            $('.gene-checkbox[data-date="' + date + '"]:visible').each(function() {
+            getFilterMatchedGeneRows().filter(function() {
+                return $(this).data('date') === date;
+            }).find('.gene-checkbox').each(function() {
                 if (!this.disabled) {
                     this.checked = isChecked;
                 }
             });
             updateTotalPrice();
+            updateSelectAllCheckboxes();
+            updateDateSelectCheckboxes();
+        });
+
+        // 监听分组展开/折叠
+        $cartTableBody.on('click', '.group-toggle-btn', function() {
+            const groupDate = String($(this).data('date') || '');
+            if (!groupDate) {
+                return;
+            }
+
+            if (groupCollapsedState[groupDate]) {
+                delete groupCollapsedState[groupDate];
+            } else {
+                groupCollapsedState[groupDate] = true;
+            }
+            saveCollapsedState();
+            applyGroupVisibility();
+            updateDateSelectCheckboxes();
+            updateSelectAllCheckboxes();
+        });
+
+        $('#expandAllGroupsBtn').on('click', function() {
+            setAllGroupsCollapsed(false);
+        });
+
+        $('#collapseAllGroupsBtn').on('click', function() {
+            setAllGroupsCollapsed(true);
         });
 
         // 监听序列状态筛选器的变化
@@ -1294,13 +1574,22 @@
             applyFilters();
         });
 
+        $('#groupSortOrder').on('change', function() {
+            const selectedOrder = this.value === 'desc' ? 'desc' : 'asc';
+            saveSortOrder(selectedOrder);
+            sortGroups(selectedOrder);
+            applyGroupVisibility();
+            updateDateSelectCheckboxes();
+            updateSelectAllCheckboxes();
+        });
+
         // 应用筛选器函数
         function applyFilters() {
             const selectedStatus = $('#statusFilter').val();
             const selectedOptStatus = $('#optimizationStatusFilter').val();
             const selectedPenalty = $('#penaltyScoreFilter').val();
 
-            $('tbody tr[data-status]').each(function() {
+            getCartGeneRows().each(function() {
                 const rowStatus = $(this).data('status');
                 const rowOptStatus = $(this).data('optimization-status');
                 const penaltyScore = parseFloat($(this).data('penalty-score')) || 0;
@@ -1321,12 +1610,21 @@
 
                 // 显示/隐藏行
                 const shouldShow = statusMatch && optStatusMatch && penaltyMatch;
-                $(this).toggle(shouldShow);
+                $(this).attr('data-filter-match', shouldShow ? '1' : '0');
             });
 
+            applyGroupVisibility();
+            updateDateSelectCheckboxes();
             updateTotalPrice();
             updateSelectAllCheckboxes();
         }
+
+        // 初始化分组排序、折叠与筛选状态
+        getCartGeneRows().attr('data-filter-match', '1');
+        const initialSortOrder = getSavedSortOrder();
+        $groupSortOrder.val(initialSortOrder);
+        sortGroups(initialSortOrder);
+        applyFilters();
 
         // 提交按钮处理
         $('#checkoutButton').on('click', function () {
@@ -2089,7 +2387,7 @@ function showFragmentDetails(geneId, geneName) {
 
                 row.innerHTML = `
                     <td class="text-center">${fragment.index}</td>
-                    <td>${fragment.start}-${fragment.end}</td>
+                    <td>${(Number(fragment.start) || 0) + 1}-${fragment.end}</td>
                     <td class="text-end">${fragment.length}</td>
                     <td class="text-end ${penaltyClass}">${(fragment.penalty_score || 0).toFixed(2)}</td>
                     <td><code class="small">${fragment.adapter_left || '-'}</code></td>
