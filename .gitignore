@@ -23,3 +23,10 @@ script_tool/temp/
 *.pkl
 *.npy
 test_*.py
+# Celery beat 运行时调度状态
+celerybeat-schedule*
+# 设计/二进制产物（不进仓库）
+*.jpg
+*.jpeg
+*.xlsx
+*.drawio

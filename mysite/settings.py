@@ -29,7 +29,10 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = ['*']
 CORS_ORIGIN_ALLOW_ALL = True
-CSRF_TRUSTED_ORIGINS = ['https://www.rootpath.com.cn']
+CSRF_TRUSTED_ORIGINS = ['https://www.rootpath.com.cn', 'https://rootpath.com.cn']
+
+# 告诉 Django 信任反向代理传递的 HTTPS 头
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 INSTALLED_APPS = [
@@ -60,7 +63,6 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',  # 放在 SessionMiddleware 之后
     'django.middleware.common.CommonMiddleware',  # 放在 LocaleMiddleware 之后
-    'mysite.middleware.DynamicCsrfTrustedOriginsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -186,6 +188,8 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000 # 上传文件最大字段数
 CELERY_BROKER_URL = config('CELERY_BROKER_URL')
 # 使用Redis作为结果存储
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
+# 队列隔离：与同 broker 上的兄弟项目避免串台。所有 .delay() 默认路由到此队列。
+CELERY_TASK_DEFAULT_QUEUE = config('CELERY_TASK_DEFAULT_QUEUE', default='rtpt')
 
 # Django 缓存配置（使用Redis）
 CACHES = {
