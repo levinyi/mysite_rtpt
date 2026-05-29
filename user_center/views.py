@@ -1558,7 +1558,7 @@ def cart_genbank_download(request, gene_id):
     new_feature_names = ['i5NC', gene.gene_name, 'i3NC']
 
     vector = gene.vector
-    if vector.vector_gb and os.path.exists(vector.vector_gb.path):
+    if vector and vector.vector_gb and os.path.exists(vector.vector_gb.path):
         vector_genbank_file_path = vector.vector_gb.path  # Get the file path
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=True) as temp_file: # 确保文件使用后自动删除，减少空间占用
             # 计算基因序列在插入序列中的起始位置（i5nc之后）
@@ -1566,17 +1566,24 @@ def cart_genbank_download(request, gene_id):
 
             # 使用新的函数，添加序列评估特征和fragments标注
             normalized_fragments_data = normalize_fragments_data_for_gene(gene, gene.fragments_data)
-            addAnalysisFeaturesAndFragments(
-                genebank_file=vector_genbank_file_path,
-                output_file=temp_file.name,
-                new_sequences=new_sequences,
-                new_feature_names=new_feature_names,
-                start_feature_label='iU20',
-                end_feature_label='iD20',
-                analysis_results=gene.analysis_results,
-                fragments_data=normalized_fragments_data,
-                gene_start_pos_in_insert=gene_start_pos_in_insert
-            )
+            try:
+                addAnalysisFeaturesAndFragments(
+                    genebank_file=vector_genbank_file_path,
+                    output_file=temp_file.name,
+                    new_sequences=new_sequences,
+                    new_feature_names=new_feature_names,
+                    start_feature_label='iU20',
+                    end_feature_label='iD20',
+                    analysis_results=gene.analysis_results,
+                    fragments_data=normalized_fragments_data,
+                    gene_start_pos_in_insert=gene_start_pos_in_insert
+                )
+            except ValueError as e:
+                # 载体GenBank文件缺少iU20/iD20插入位点标记，无法定位插入区间
+                return HttpResponse(
+                    f"Cannot generate GenBank: vector '{vector.vector_name}' is missing iU20/iD20 insertion markers ({e}). Please contact the administrator to fix the vector file.",
+                    status=422
+                )
             temp_file.seek(0)
             response = HttpResponse(temp_file.read(), content_type='application/genbank')
             response['Content-Disposition'] = f'attachment; filename="RootPath-{vector.vector_name}-{gene.gene_name}.gb"'
@@ -1847,7 +1854,7 @@ def bulk_download_genbank(request):
                     i3nc = gene.i3nc or ''
 
                     vector = gene.vector
-                    if vector.vector_gb:
+                    if vector and vector.vector_gb:
                         vector_genbank_file_path = vector.vector_gb.path
                         with tempfile.NamedTemporaryFile(mode='w+', suffix='.gb', delete=False) as temp_file:
                             # 计算基因序列在插入序列中的起始位置（i5nc之后）
@@ -1876,6 +1883,9 @@ def bulk_download_genbank(request):
                         zf.writestr(f"Error-{gene_id}.txt", "No vector GenBank file found")
                 except GeneInfo.DoesNotExist:
                     zf.writestr(f"Error-{gene_id}.txt", "Gene not found")
+                except ValueError as e:
+                    # 载体GenBank文件缺少iU20/iD20标记等，跳过该基因，不影响其它基因
+                    zf.writestr(f"Error-{gene_id}.txt", f"Cannot generate GenBank: {e}")
 
             if changed_genes:
                 GeneInfo.objects.bulk_update(changed_genes, restriction_fields)
