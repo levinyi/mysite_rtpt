@@ -1,0 +1,4 @@
+{% load i18n %}
+{% autoescape off %}
+请确认你的 RootPath 邮箱地址
+{% endautoescape %}
