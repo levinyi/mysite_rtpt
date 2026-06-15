@@ -118,6 +118,51 @@
         </div>
     </form>
 </div>
+
+<!-- Danger Zone: 注销账号 -->
+<div class="card-header bg-transparent border-bottom mt-4 mb-2">
+    <h3 class="card-header-title mb-0 text-danger">Danger Zone</h3>
+</div>
+<div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 rounded" style="border:1px solid #f1c6c6; background:#fdf3f3;">
+        <div>
+            <h6 class="mb-1">注销账号 / Delete account</h6>
+            <p class="text-muted small mb-0">永久删除你的账号及名下所有载体、订单、基因信息与个人资料，<strong class="text-danger">不可恢复</strong>。</p>
+        </div>
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteAccountModal">
+            <i class="bi bi-trash3 me-1"></i>注销账号
+        </button>
+    </div>
+</div>
+
+<!-- 注销确认弹窗 -->
+<div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-labelledby="deleteAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteAccountModalLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>注销账号</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-semibold mb-2">此操作不可恢复！</p>
+                <p class="mb-3">注销后，你的账号以及名下<strong>所有载体、订单、基因信息、个人资料</strong>都会被永久删除，无法找回。</p>
+                <div class="mb-3">
+                    <label class="form-label">请输入当前密码确认身份</label>
+                    <input type="password" class="form-control" id="deleteAccountPassword" placeholder="当前密码" autocomplete="current-password">
+                    <div class="text-danger small mt-1 d-none" id="deleteAccountError"></div>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="deleteAccountConfirm">
+                    <label class="form-check-label" for="deleteAccountConfirm">我已了解此操作不可恢复，确认删除我的账号</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="deleteAccountSubmit" disabled>永久删除账号</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block javascript %}
 <script>
@@ -137,5 +182,45 @@
             }
         });
     }
+
+    // 注销账号
+    (function () {
+        const cb = document.getElementById('deleteAccountConfirm');
+        const btn = document.getElementById('deleteAccountSubmit');
+        const pwd = document.getElementById('deleteAccountPassword');
+        const err = document.getElementById('deleteAccountError');
+        if (!cb || !btn) return;
+
+        const showErr = (msg) => { err.textContent = msg; err.classList.remove('d-none'); };
+        cb.addEventListener('change', () => { btn.disabled = !cb.checked; });
+
+        btn.addEventListener('click', function () {
+            err.classList.add('d-none'); err.textContent = '';
+            const password = pwd.value;
+            if (!password) { showErr('请输入当前密码'); return; }
+
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+            $.ajax({
+                url: "{% url 'user_account:delete_account' %}",
+                type: 'POST',
+                data: { 'csrfmiddlewaretoken': '{{ csrf_token }}', 'password': password },
+                dataType: 'json',
+                success: function (data) {
+                    if (data.status === 'success') {
+                        alert('账号已注销');
+                        window.location.href = '/';
+                    } else {
+                        showErr(data.message || '注销失败');
+                        btn.disabled = false; btn.textContent = '永久删除账号';
+                    }
+                },
+                error: function () {
+                    showErr('注销失败，请重试');
+                    btn.disabled = false; btn.textContent = '永久删除账号';
+                }
+            });
+        });
+    })();
 </script>
 {% endblock %}
