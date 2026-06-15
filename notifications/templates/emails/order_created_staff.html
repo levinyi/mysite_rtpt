@@ -1,12 +1,15 @@
-<html>
-<body>
-  <h1>新订单生成！</h1>
-  <p>订单号：{{ order.inquiry_id }}</p>
-  <p>订单客户：{{ order.user }}</p>
-  <p>基因数量：{{ order.gene_infos|length }}</p>
-  <p>订单金额：{{ order.total_price }}</p>
-  <p>订单状态：{{ order.status }}</p>
-  <p>订单创建时间：{{ order.order_time }}</p>
-  <p>订单详情：<a href="/user_center/view_order_detail/39">点击查看详情</a></p>
-  <span>您收到此邮件是因为您在RootPath Staff Group中，当有新订单时会收到通知。</span>
-</body>
+{% extends "emails/base_email.html" %}
+{% block badge %}新订单{% endblock %}
+{% block heading %}新订单：#{{ order.inquiry_id }}{% endblock %}
+{% block body %}
+  <p style="margin:0 0 14px;">有新订单生成，信息如下：</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    {% include "emails/_row.html" with label="订单号" value=order.inquiry_id %}
+    {% include "emails/_row.html" with label="下单客户" value=order.user.username %}
+    {% include "emails/_row.html" with label="基因数量" value=order.gene_infos.count %}
+    {% include "emails/_row.html" with label="订单状态" value=order.status %}
+    {% include "emails/_row.html" with label="创建时间" value=order.order_time %}
+  </table>
+  {% include "emails/_button.html" with url=base_url|add:"super_manage/order_manage/" text="查看订单管理" %}
+  <p style="margin:14px 0 0;font-size:12px;color:#97a1b3;">你收到此邮件是因为你在 RootPath 管理通知名单中。</p>
+{% endblock %}

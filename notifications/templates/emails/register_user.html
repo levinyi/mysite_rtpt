@@ -1,9 +1,9 @@
-<!-- notifications/templates/emails/register_user.html -->
-<html>
-<body>
-  <h1>欢迎注册，{{ user.username }}！</h1>
-  <p>点击下面的链接完成验证：</p>
-  <p><a href="{{ verify_link }}">{{ verify_link }}</a></p>
-  <p>www.rootpath.com.cn</p>
-</body>
-</html>
+{% extends "emails/base_email.html" %}
+{% block badge %}欢迎加入{% endblock %}
+{% block heading %}欢迎注册 RootPath，{{ user.username }}！{% endblock %}
+{% block body %}
+  <p style="margin:0 0 14px;">感谢你注册 RootPath。请点击下面的按钮完成邮箱验证，激活你的账户：</p>
+  {% include "emails/_button.html" with url=verify_link text="验证邮箱" %}
+  <p style="margin:16px 0 0;font-size:12px;color:#97a1b3;">若按钮无法点击，请复制以下链接到浏览器打开：<br>
+    <a href="{{ verify_link }}" style="color:#0a3a8c;word-break:break-all;">{{ verify_link }}</a></p>
+{% endblock %}

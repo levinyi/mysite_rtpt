@@ -1,9 +1,11 @@
-<html>
-<body>
-  <h1>您的 Vector 文件已上传！</h1>
-  <p> 我们已经收到您上传的Vector 文件，我们的工作人员将会在24小时内审核您的文件。审核通过后，您的文件将会被发布到我们的网站上。</p>
-  <p>Vector 名称：{{ vector.vector_name }}</p>
-  <p>Vector 上传时间：{{ vector.create_date }}</p>
-  <p>Vector 审核状态：{{ vector.status }}</p>
-  <p>Vector 详情：</p>
-</body>
+{% extends "emails/base_email.html" %}
+{% block badge %}已收到{% endblock %}
+{% block heading %}你的 Vector 文件已上传！{% endblock %}
+{% block body %}
+  <p style="margin:0 0 14px;">我们已收到你上传的 Vector 文件，工作人员将在 24 小时内审核。审核通过后即可在网站上查看使用。</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    {% include "emails/_row.html" with label="Vector 名称" value=vector.vector_name %}
+    {% include "emails/_row.html" with label="上传时间" value=vector.create_date %}
+    {% include "emails/_row.html" with label="当前状态" value=vector.status %}
+  </table>
+{% endblock %}

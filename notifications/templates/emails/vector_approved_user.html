@@ -1,12 +1,13 @@
-<html>
-<body>
-  <h1>您的 Vector 已通过审核！</h1>
-  <p> 我们已经审核您上传的 Vector 文件，您的文件已经通过审核，现在可以在我们的网站上查看您的文件。</p>
-  <p> Vector 名称：{{ vector.vector_name }}</p>
-  <p> 赋予新的 Vector ID：{{ vector.vector_id }}</p>
-  <p> Vector 上传时间：{{ vector.created_at }}</p>
-  <p> Vector 审核状态：{{ vector.status }}</p>
-  <p> Vector 详情：</p>
-  <p> <a href="{{ vector.url }}">点击查看您的 Vector 文件</a></p>
-
-</body>
+{% extends "emails/base_email.html" %}
+{% block badge %}审核通过{% endblock %}
+{% block heading %}你的 Vector 已通过审核！{% endblock %}
+{% block body %}
+  <p style="margin:0 0 14px;">我们已审核你上传的 Vector 文件，现已通过审核（ReadyToUse），可在网站上查看使用：</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    {% include "emails/_row.html" with label="Vector 名称" value=vector.vector_name %}
+    {% include "emails/_row.html" with label="Vector ID" value=vector.vector_id|default:"(待分配)" %}
+    {% include "emails/_row.html" with label="上传时间" value=vector.create_date %}
+    {% include "emails/_row.html" with label="当前状态" value=vector.status %}
+  </table>
+  {% include "emails/_button.html" with url=base_url|add:"user_center/manage_vector/" text="查看我的 Vector" %}
+{% endblock %}

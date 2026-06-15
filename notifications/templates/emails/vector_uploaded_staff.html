@@ -1,12 +1,15 @@
-<html>
-<body>
-  <h2>收到用户提交的待设计 Vector，请尽快处理</h2>
-  <p>客户名称：{{ vector.user.username }}</p>
-  <p>客户邮箱：{{ vector.user.email|default:"(未填写)" }}</p>
-  <p>Vector 名称：{{ vector.vector_name }}</p>
-  <p>Vector ID：{{ vector.vector_id|default:"(待分配)" }}</p>
-  <p>提交时间：{{ vector.create_date }}</p>
-  <p>当前状态：{{ vector.status }}</p>
-  <p>请到管理后台「Vector Manage」处理：<a href="{{ base_url }}super_manage/vector_manage/">{{ base_url }}super_manage/vector_manage/</a></p>
-</body>
-</html>
+{% extends "emails/base_email.html" %}
+{% block badge %}待设计载体{% endblock %}
+{% block heading %}收到待设计 Vector，请尽快处理{% endblock %}
+{% block body %}
+  <p style="margin:0 0 14px;">用户提交了一个待设计的 Vector：</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    {% include "emails/_row.html" with label="客户名称" value=vector.user.username %}
+    {% include "emails/_row.html" with label="客户邮箱" value=vector.user.email|default:"(未填写)" %}
+    {% include "emails/_row.html" with label="Vector 名称" value=vector.vector_name %}
+    {% include "emails/_row.html" with label="Vector ID" value=vector.vector_id|default:"(待分配)" %}
+    {% include "emails/_row.html" with label="提交时间" value=vector.create_date %}
+    {% include "emails/_row.html" with label="当前状态" value=vector.status %}
+  </table>
+  {% include "emails/_button.html" with url=base_url|add:"super_manage/vector_manage/" text="去 Vector Manage 处理" %}
+{% endblock %}

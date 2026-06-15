@@ -1,12 +1,14 @@
-<html>
-<body>
-  <h1>Vector 审核已完成</h1>
-  <p>用户上传的 Vector 已审核通过，请知悉。</p>
-  <p>用户名称：{{ vector.user.username }}</p>
-  <p>用户邮箱：{{ vector.user.email }}</p>
-  <p>Vector 名称：{{ vector.vector_name }}</p>
-  <p>Vector ID：{{ vector.vector_id }}</p>
-  <p>Vector 上传时间：{{ vector.create_date }}</p>
-  <p>Vector 审核状态：{{ vector.status }}</p>
-</body>
-</html>
+{% extends "emails/base_email.html" %}
+{% block badge %}审核完成{% endblock %}
+{% block heading %}Vector 审核完成{% endblock %}
+{% block body %}
+  <p style="margin:0 0 14px;">用户上传的 Vector 已审核通过（ReadyToUse），请知悉：</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    {% include "emails/_row.html" with label="客户名称" value=vector.user.username %}
+    {% include "emails/_row.html" with label="客户邮箱" value=vector.user.email|default:"(未填写)" %}
+    {% include "emails/_row.html" with label="Vector 名称" value=vector.vector_name %}
+    {% include "emails/_row.html" with label="Vector ID" value=vector.vector_id|default:"(待分配)" %}
+    {% include "emails/_row.html" with label="上传时间" value=vector.create_date %}
+    {% include "emails/_row.html" with label="当前状态" value=vector.status %}
+  </table>
+{% endblock %}

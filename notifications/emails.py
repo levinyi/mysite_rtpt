@@ -27,6 +27,8 @@ def send_templated_email(subject, recipient_list, template_name, context=None):
     """
     if context is None:
         context = {}
+    # 所有邮件模板都能用 {{ base_url }} 拼绝对链接（邮件里相对链接无效）
+    context.setdefault('base_url', getattr(settings, 'BASE_URL', ''))
 
     # 纯文本(可选): 如果你模板里只写HTML，这里也可以改成简短的文本
     text_content = "请使用支持HTML的邮件客户端查看内容"
