@@ -40,6 +40,7 @@ urlpatterns = [
     path('user_manage_old/', views.user_manage_old, name='user_manage_old'),
     path('user_manage/', views.user_manage, name='user_manage'),
     path('user_data_api/', views.user_data_api, name='user_data_api'),
+    path('toggle_user_verify/', views.toggle_user_verify, name='toggle_user_verify'),
 
     path('view_user_profile/<str:user_id>/', views.view_user_profile, name='view_user_profile'),
     path('save_user_profile/<str:user_id>/', views.save_user_profile, name='save_user_profile'),

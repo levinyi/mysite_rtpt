@@ -54,7 +54,17 @@ document.addEventListener("DOMContentLoaded", function() {
                     { name: 'Company' },
                     { name: 'Phone' },
                     { name: 'Register Time' },
-                    { name: 'Is Verify', formatter: (cell) => cell ? 'Yes' : 'No'},
+                    { name: 'Is Verify', formatter: (cell, row) => {
+                        const userId = row.cells[1].data.userId;
+                        return gridjs.html(`
+                            <div class="form-check form-switch d-inline-flex justify-content-center m-0">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       style="cursor:pointer;" ${cell ? 'checked' : ''}
+                                       title="点击切换该用户的已审核状态"
+                                       onchange="toggleVerify(this, '${userId}')">
+                            </div>
+                        `);
+                    }},
                 ],
                 data: data.data.map((user, index) => [
                     index + 1,
@@ -99,7 +109,50 @@ document.addEventListener("DOMContentLoaded", function() {
         });
 });
 
+// 手动开关用户的 is_verify（已审核）
+function toggleVerify(checkbox, userId) {
+    const desired = checkbox.checked;
+    checkbox.disabled = true;
+    fetch("{% url 'super_manage:toggle_user_verify' %}", {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `user_id=${encodeURIComponent(userId)}&is_verify=${desired ? '1' : '0'}`,
+    })
+    .then(r => r.json())
+    .then(data => {
+        checkbox.disabled = false;
+        if (data.status === 'success') {
+            checkbox.checked = data.is_verify;
+            if (typeof layer !== 'undefined') {
+                layer.msg(data.is_verify ? 'Verified ✓' : 'Unverified', { icon: 1, time: 800 });
+            }
+        } else {
+            checkbox.checked = !desired;  // 回滚
+            alert(data.message || '更新失败');
+        }
+    })
+    .catch(() => {
+        checkbox.disabled = false;
+        checkbox.checked = !desired;  // 回滚
+        alert('更新失败，请重试');
+    });
+}
 
-
+function getCookie(name) {
+    let value = null;
+    if (document.cookie && document.cookie !== '') {
+        for (const raw of document.cookie.split(';')) {
+            const cookie = raw.trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                value = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return value;
+}
 </script>
 {% endblock %}

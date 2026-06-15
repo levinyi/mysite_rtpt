@@ -988,6 +988,32 @@ def user_data_api(request):
         })
     return JsonResponse({'data': data})
 
+
+@login_required
+# @is_secondary_admin_required
+@require_POST
+def toggle_user_verify(request):
+    """管理员在用户列表手动开关某用户的 is_verify（已审核）。
+    传 is_verify=1/0 按指定值设置；不传则翻转当前值。"""
+    user_id = request.POST.get('user_id')
+    if not user_id:
+        return JsonResponse({'status': 'error', 'message': 'Missing user_id'})
+    try:
+        user = User.objects.get(id=user_id)
+    except (User.DoesNotExist, ValueError):
+        return JsonResponse({'status': 'error', 'message': 'User not found'})
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    raw = request.POST.get('is_verify')
+    if raw is not None:
+        new_val = str(raw).lower() in ('1', 'true', 'yes', 'on')
+    else:
+        new_val = not profile.is_verify
+    profile.is_verify = new_val
+    profile.save(update_fields=['is_verify'])
+    return JsonResponse({'status': 'success', 'is_verify': new_val})
+
+
 @login_required
 # @is_secondary_admin_required
 def view_user_profile(request, user_id):
