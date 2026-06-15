@@ -211,9 +211,14 @@ CACHES = {
 
 # 是否必须验证邮箱，常见选项有:
 # "mandatory": 用户注册后，必须先点邮箱验证链接才能登录
-# "optional":  用户可以不验证就登录，但会提示验证
+# "optional":  用户可以不验证就登录，但会发验证邮件、点击后置 is_verify=True
 # "none":      不启用邮件验证
-ACCOUNT_EMAIL_VERIFICATION = "none"
+# 默认 optional：开启验证邮件 + is_verify 跟踪，但不阻断登录（避免老用户/admin/demo 被锁）。
+# 确认老用户都已 backfill 验证后，可在 .env 设 ACCOUNT_EMAIL_VERIFICATION=mandatory 强制阻断。
+ACCOUNT_EMAIL_VERIFICATION = config('ACCOUNT_EMAIL_VERIFICATION', default='optional')
+
+# 注册表单扩展字段（手机 + 公司，选填），见 user_account/forms.py
+ACCOUNT_SIGNUP_FORM_CLASS = 'user_account.forms.CustomSignupForm'
 
 # 是否必须填写邮箱
 ACCOUNT_EMAIL_REQUIRED = True
