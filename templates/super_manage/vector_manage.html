@@ -316,7 +316,7 @@
                     `);
                 }
             },
-            { name: 'Vector_GB',
+            { name: 'Vector_GB', width: '200px',
                 formatter: (cell, row) => {
                     const vectorId = row.cells[2].data;
                     return gridjs.html(`
@@ -331,7 +331,7 @@
                 width: '220px',
                 formatter: buildAutomationFormatter(allowDesign)
             },
-            { name: 'Status',
+            { name: 'Status', width: '120px',
                 formatter: (cell) => {
                     const badgeClass = (cell || '').toLowerCase() === 'readytouse' ? 'bg-primary' : 'bg-info';
                     return gridjs.html(`<span class="badge ${badgeClass}">${cell || ''}</span>`);
