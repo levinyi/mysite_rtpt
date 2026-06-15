@@ -112,19 +112,13 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
 
+# 按需求放宽密码校验：允许常见密码、纯数字、短密码（仅要求非空且两次输入一致）。
+# 如需恢复强度校验，把下面对应的 validator 取消注释即可。
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    # {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    # {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 6}},
+    # {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    # {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 # Internationalization
