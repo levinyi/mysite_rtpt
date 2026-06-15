@@ -506,6 +506,66 @@ def vector_data_api(request):
 
 
 @login_required
+# @is_secondary_admin_required
+@require_GET
+def vector_export_excel(request):
+    """批量导出 Vector 为 Excel 备份。
+
+    可选 ?status=ReadyToUse 过滤（不传则导出全部）。前 7 列与 CSV 导入模板
+    （vector_add_item）表头一致，导出的备份可直接再导回。
+    """
+    status = request.GET.get('status') or None
+    qs = Vector.objects.select_related('user').order_by('-create_date')
+    if status:
+        qs = qs.filter(status=status)
+
+    seq_col = 'Vector_Seq(From_v3NC_Downstream_to_v5NC_Upstream_withoutV3NCv5NC_Seq)'
+    columns = [
+        'Vector_ID', 'Vector_Name', 'iU20', 'iD20', 'v5NC', 'v3NC', seq_col,
+        'i5NC', 'i3NC', 'Status', 'User', 'Cloning_Method',
+        'Antibiotic_Resistance', 'Design_Status', 'Primer_Forward',
+        'Primer_Reverse', 'Create_Date',
+    ]
+    rows = []
+    for v in qs:
+        rows.append({
+            'Vector_ID': v.vector_id,
+            'Vector_Name': v.vector_name,
+            'iU20': v.iu20,
+            'iD20': v.id20,
+            'v5NC': v.NC5,
+            'v3NC': v.NC3,
+            seq_col: v.vector_map,
+            'i5NC': v.i5NC,
+            'i3NC': v.i3NC,
+            'Status': v.status,
+            'User': v.user.username if v.user else 'RootPath',
+            'Cloning_Method': v.cloning_method,
+            'Antibiotic_Resistance': v.antibiotic_resistance,
+            'Design_Status': v.design_status,
+            'Primer_Forward': v.primer_forward,
+            'Primer_Reverse': v.primer_reverse,
+            'Create_Date': v.create_date.strftime('%Y-%m-%d %H:%M:%S') if v.create_date else '',
+        })
+
+    df = pd.DataFrame(rows, columns=columns)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Vectors')
+    output.seek(0)
+
+    now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"vectors_{status or 'all'}_{now}.xlsx"
+    response = HttpResponse(
+        output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{quote(filename)}"'
+    return response
+
+
+@login_required
 @require_POST
 def vector_automation_design_trigger(request):
     """

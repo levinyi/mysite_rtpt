@@ -18,24 +18,58 @@
 <div class="container-fluid pt-1" style="padding-right:50px;">
     <div class="card mt-4">
         <div class="card-header">
-            <div class="row">
-                <div class="col-6">
-                    <h4><i class="bi bi-list-ul"></i> Vectors Pending Design</h4>
-                </div>
-                <div class="col-6 text-end">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
-                        <i class="bi bi-plus-circle-dotted me-2"></i>Add RootPath Vector
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <ul class="nav nav-tabs card-header-tabs mb-0" id="vectorTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pending-tab" data-bs-toggle="tab"
+                                data-bs-target="#pending-pane" type="button" role="tab"
+                                aria-controls="pending-pane" aria-selected="true">
+                            <i class="bi bi-list-ul me-1"></i> Vectors Pending Design
+                            <span class="badge bg-info ms-1" id="pending-count">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ready-tab" data-bs-toggle="tab"
+                                data-bs-target="#ready-pane" type="button" role="tab"
+                                aria-controls="ready-pane" aria-selected="false">
+                            <i class="bi bi-check2-circle me-1"></i> ReadyToUse Vectors
+                            <span class="badge bg-primary ms-1" id="ready-count">0</span>
+                        </button>
+                    </li>
+                </ul>
+                <div class="d-flex gap-2">
+                    <div class="btn-group">
+                        <a href="{% url 'super_manage:vector_export_excel' %}?status=ReadyToUse"
+                           class="btn btn-success btn-sm" title="Download ReadyToUse vectors as Excel backup">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+                        </a>
+                        <button type="button" class="btn btn-success btn-sm dropdown-toggle dropdown-toggle-split"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="visually-hidden">Toggle Export Menu</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'super_manage:vector_export_excel' %}?status=ReadyToUse">
+                                <i class="bi bi-check2-circle me-1"></i>ReadyToUse only (backup)</a></li>
+                            <li><a class="dropdown-item" href="{% url 'super_manage:vector_export_excel' %}">
+                                <i class="bi bi-collection me-1"></i>All vectors</a></li>
+                        </ul>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
+                        <i class="bi bi-plus-circle-dotted me-1"></i>Add RootPath Vector
                     </button>
                 </div>
             </div>
         </div>
-        <div id="vector-table-pending"></div>
-    </div>
-    <div class="card mt-4">
-        <div class="card-header">
-            <h4><i class="bi bi-check2-circle"></i> ReadyToUse Vectors</h4>
+        <div class="card-body p-0">
+            <div class="tab-content" id="vectorTabsContent">
+                <div class="tab-pane fade show active" id="pending-pane" role="tabpanel" aria-labelledby="pending-tab">
+                    <div id="vector-table-pending"></div>
+                </div>
+                <div class="tab-pane fade" id="ready-pane" role="tabpanel" aria-labelledby="ready-tab">
+                    <div id="vector-table-ready"></div>
+                </div>
+            </div>
         </div>
-        <div id="vector-table-ready"></div>
     </div>
 </div>
 <!-- 修改状态模态框 -->
@@ -129,6 +163,10 @@
                 const readyVectors = data.data.filter((vector) => (vector.status || '').toLowerCase() === 'readytouse');
                 const pendingVectors = data.data.filter((vector) => (vector.status || '').toLowerCase() !== 'readytouse');
 
+                // 更新 Tab 上的数量徽标
+                document.getElementById('pending-count').textContent = pendingVectors.length;
+                document.getElementById('ready-count').textContent = readyVectors.length;
+
                 const pendingRows = buildVectorRows(pendingVectors);
                 const readyRows = buildVectorRows(readyVectors);
 
@@ -154,11 +192,21 @@
                     ...gridOptions
                 }).render(document.getElementById('vector-table-pending'));
 
-                new gridjs.Grid({
+                const readyGrid = new gridjs.Grid({
                     columns: buildVectorColumns(false),
                     data: readyRows,
                     ...gridOptions
-                }).render(document.getElementById('vector-table-ready'));
+                });
+                readyGrid.render(document.getElementById('vector-table-ready'));
+
+                // ReadyToUse 表首次在隐藏的 Tab 里渲染，切换显示后强制重绘一次，避免列宽塌陷
+                const readyTab = document.getElementById('ready-tab');
+                if (readyTab) {
+                    readyTab.addEventListener('shown.bs.tab', function onFirstShow() {
+                        readyGrid.forceRender();
+                        readyTab.removeEventListener('shown.bs.tab', onFirstShow);
+                    });
+                }
 
                 // 使用事件委托监听克隆方法下拉框变更（Grid.js 翻页/排序会重建DOM）
                 attachCloningMethodListeners();

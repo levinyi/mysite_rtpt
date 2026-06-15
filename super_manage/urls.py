@@ -25,6 +25,7 @@ urlpatterns = [
     path('vector_manage/vector_automation_design_trigger/', views.vector_automation_design_trigger, name='vector_automation_design_trigger'),
     path('vector_manage/vector_automation_design_status/', views.vector_automation_design_status, name='vector_automation_design_status'),
     path('vector_manage/vector_colony_pcr_csv/<int:vector_id>/', views.vector_colony_pcr_csv, name='vector_colony_pcr_csv'),
+    path('vector_manage/vector_export_excel/', views.vector_export_excel, name='vector_export_excel'),
     path('vector_manage/vector_download/<int:vector_id>/<str:file_type>', views.vector_download, name='vector_download'),
     path('vector_manage/vector_delete/', views.vector_delete, name='vector_delete'),
     path('vector_manage/vector_upload/', views.vector_upload, name='vector_upload'),

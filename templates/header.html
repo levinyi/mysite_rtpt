@@ -21,7 +21,7 @@
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'tools:tools_list' %}">Tools</a></li>
                 <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'user_account:contact_us' %}">Contact Us</a></li>
                 {% if user.is_authenticated and is_secondary_admin %}
-                    <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'super_manage:user_manage' %}">Admin</a></li>
+                    <li class="nav-item"><a class="nav-link px-3 text-light" href="{% url 'super_manage:vector_manage' %}">Admin</a></li>
                 {% endif %}
             </ul>
             <!-- 用户认证逻辑 -->
