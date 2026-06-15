@@ -223,8 +223,8 @@
                 document.getElementById('pending-count').textContent = pendingVectors.length;
                 document.getElementById('ready-count').textContent = readyVectors.length;
 
-                const pendingRows = buildVectorRows(pendingVectors, true);
-                const readyRows = buildVectorRows(readyVectors, false);
+                const pendingRows = buildVectorRows(pendingVectors);
+                const readyRows = buildVectorRows(readyVectors);
 
                 if (pendingGrid) {
                     pendingGrid.updateConfig({ data: pendingRows, columns: buildVectorColumns(true) }).forceRender();
@@ -322,19 +322,25 @@
     }
 
     function buildVectorColumns(allowDesign) {
-        const cols = [
-            { name: '#', width: '52px', sort: false },
+        // 两个 Tab 列结构一致；Design 列在 Pending 可触发设计、在 ReadyToUse 只读 + 查看
+        return [
+            { name: '#', width: '48px', sort: false },
             { name: 'id', hidden: true },
-            { name: 'Vector', width: allowDesign ? '250px' : '290px', formatter: vectorCellFormatter },
-            { name: 'User', width: '120px', formatter: (cell) => cell || 'RootPath' },
-            { name: 'Files', width: '110px', sort: false, formatter: filesCellFormatter },
+            { name: 'Vector', width: '230px', formatter: vectorCellFormatter },
+            { name: 'User', width: '108px', formatter: (cell) => cell || 'RootPath' },
+            { name: 'Files', width: '104px', sort: false, formatter: filesCellFormatter },
+            { name: 'Cloning', width: '110px', formatter: cloningCellFormatter },
+            { name: 'Design', width: '210px', sort: false, formatter: (cell, row) => designCellFormatter(cell, row, allowDesign) },
+            { name: 'Status', width: '110px', formatter: statusCellFormatter },
+            { name: 'Actions', width: '66px', sort: false, formatter: actionsCellFormatter },
         ];
-        if (allowDesign) {
-            cols.push({ name: 'Design', width: '210px', sort: false, formatter: designCellFormatter });
-        }
-        cols.push({ name: 'Status', width: '118px', formatter: statusCellFormatter });
-        cols.push({ name: 'Actions', width: '74px', sort: false, formatter: actionsCellFormatter });
-        return cols;
+    }
+
+    // Cloning 列：克隆方法徽标（编辑在详情抽屉里）
+    function cloningCellFormatter(cell) {
+        const m = cell || '';
+        if (!m) return gridjs.html('<span class="text-muted">—</span>');
+        return gridjs.html(`<span class="badge rounded-pill text-bg-light border">${esc(m)}</span>`);
     }
 
     // Vector 列：名称（粗）+ vector_id（灰色副标）
@@ -383,8 +389,9 @@
         `);
     }
 
-    // Design 列（仅 Pending Tab）：设计状态徽标 + 操作按钮
-    function designCellFormatter(cell, row) {
+    // Design 列：设计状态徽标 + 操作。allowDesign(Pending) 可触发/重试设计；
+    // ReadyToUse 只读：完成的可查看结果，未设计的显示 Manual
+    function designCellFormatter(cell, row, allowDesign) {
         const v = rowVector(row);
         const vectorId = v.id;
         const designStatus = v.design_status || 'Pending';
@@ -396,12 +403,15 @@
                 <option value="GoldenGate">GoldenGate</option>
                 <option value="T4">T4</option>
             </select>`;
+        const viewBtn = `<button class="btn btn-sm btn-outline-info" onclick="viewDesignResults(${vectorId})" title="View Results"><i class="bi bi-eye"></i> View</button>`;
         let statusDisplay = '', buttons = '';
         if (designStatus === 'Completed') {
             statusDisplay = `<div class="mb-1"><span class="badge bg-success">${esc(cloningMethod || 'Completed')}</span></div>`;
-            buttons = `${methodPicker}
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design"><i class="bi bi-arrow-clockwise"></i></button>
-                <button class="btn btn-sm btn-outline-info" onclick="viewDesignResults(${vectorId})" title="View Results"><i class="bi bi-eye"></i></button>`;
+            buttons = allowDesign
+                ? `${methodPicker}
+                   <button class="btn btn-sm btn-outline-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design"><i class="bi bi-arrow-clockwise"></i></button>
+                   ${viewBtn}`
+                : viewBtn;
         } else if (designStatus === 'Processing') {
             statusDisplay = `<div class="mb-1"><span class="badge bg-warning text-dark">Processing…</span></div>`;
             buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
@@ -412,30 +422,33 @@
             if (designError) {
                 statusDisplay += `<div class="mb-1 design-error-preview" style="font-size:.72rem; color:#dc3545; max-width:200px; word-break:break-all; cursor:pointer; text-align:left;" data-error="${esc(designError)}" title="Click to view full error">${esc(errorPreview)}</div>`;
             }
-            buttons = `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry"><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
+            buttons = allowDesign
+                ? `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry"><i class="bi bi-arrow-clockwise"></i> Retry</button>`
+                : '';
         } else {
-            statusDisplay = `<div class="mb-1"><span class="badge bg-secondary">Not Designed</span></div>`;
-            buttons = `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`;
+            if (allowDesign) {
+                statusDisplay = `<div class="mb-1"><span class="badge bg-secondary">Not Designed</span></div>`;
+                buttons = `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`;
+            } else {
+                statusDisplay = `<div class="mb-1"><span class="badge bg-light text-secondary border">Manual</span></div>`;
+            }
         }
         return gridjs.html(`<div style="text-align:center;">${statusDisplay}${buttons}</div>`);
     }
 
-    // buildAutomationFormatter 已被 designCellFormatter 取代（设计列只在 Pending Tab 出现）
-
-    function buildVectorRows(vectors, allowDesign) {
-        return vectors.map((vector, index) => {
-            const row = [
-                index + 1,                                                       // #
-                vector.id,                                                       // id (hidden, 主键)
-                `${vector.vector_name || ''} ${vector.vector_id || ''}`.trim(),  // Vector (可搜索文本)
-                vector.user__username || 'RootPath',                            // User
-                '',                                                              // Files (格式化器从 vectorById 取)
-            ];
-            if (allowDesign) row.push(vector.design_status || 'Pending');        // Design
-            row.push(vector.status || '');                                       // Status
-            row.push('');                                                        // Actions
-            return row;
-        });
+    function buildVectorRows(vectors) {
+        // 列顺序：# / id(hidden) / Vector / User / Files / Cloning / Design / Status / Actions
+        return vectors.map((vector, index) => [
+            index + 1,                                                       // #
+            vector.id,                                                       // id (hidden, 主键)
+            `${vector.vector_name || ''} ${vector.vector_id || ''}`.trim(),  // Vector (可搜索文本)
+            vector.user__username || 'RootPath',                            // User
+            '',                                                              // Files (格式化器从 vectorById 取)
+            vector.cloning_method || '',                                     // Cloning (可搜索)
+            vector.design_status || 'Pending',                               // Design (可搜索)
+            vector.status || '',                                             // Status
+            '',                                                              // Actions
+        ]);
     }
 
     function startAutomationDesign(vectorId) {
