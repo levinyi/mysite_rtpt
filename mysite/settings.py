@@ -214,6 +214,9 @@ ACCOUNT_EMAIL_VERIFICATION = config('ACCOUNT_EMAIL_VERIFICATION', default='optio
 # 注册表单扩展字段（手机 + 公司，选填），见 user_account/forms.py
 ACCOUNT_SIGNUP_FORM_CLASS = 'user_account.forms.CustomSignupForm'
 
+# allauth 自带 6 位密码下限，与上面清空的 AUTH_PASSWORD_VALIDATORS 配合一并放宽
+ACCOUNT_PASSWORD_MIN_LENGTH = 1
+
 # 是否必须填写邮箱
 ACCOUNT_EMAIL_REQUIRED = True
 
