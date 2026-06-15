@@ -58,6 +58,25 @@ def get_group_emails(group_name):
     except Group.DoesNotExist:
         return []
 
+
+def get_admin_notify_emails():
+    """固定的管理员通知收件人（settings.ADMIN_NOTIFY_EMAILS）。"""
+    return [e for e in getattr(settings, "ADMIN_NOTIFY_EMAILS", []) if e]
+
+
+def staff_recipients(group_name):
+    """
+    合并“某用户组的有效邮箱”+“固定管理员邮箱”，去掉空值并去重（保持顺序）。
+    这样即使组没配好（成员邮箱为空），管理员仍能收到通知。
+    """
+    combined = [e for e in get_group_emails(group_name) if e] + get_admin_notify_emails()
+    seen, result = set(), []
+    for e in combined:
+        if e and e not in seen:
+            seen.add(e)
+            result.append(e)
+    return result
+
 # =============== 专用函数示例 ================
 
 def send_registration_user_email(user, verify_link):
@@ -77,14 +96,14 @@ def send_registration_user_email(user, verify_link):
 
 def send_registration_staff_notify(user):
     """
-    用户注册后，通知管理员(或某一组人员)
+    用户注册后，通知管理员（StaffGroup 成员 + settings.ADMIN_NOTIFY_EMAILS）
     """
     subject = f"新用户注册 - {user.username}"
     template_name = 'emails/register_staff.html'
     context = {'user': user}
-    staff_emails = get_group_emails("StaffGroup")  # 例如你定义了一个叫 StaffGroup 的 group
-    if staff_emails:
-        send_templated_email(subject, staff_emails, template_name, context)
+    recipients = staff_recipients("StaffGroup")
+    if recipients:
+        send_templated_email(subject, recipients, template_name, context)
 
 def send_password_reset_user_email(user, reset_link):
     subject = "密码重置链接"
@@ -122,12 +141,17 @@ def send_vector_uploaded_user_email(vector):
     send_templated_email(subject, [email], template_name, context)
 
 def send_vector_uploaded_staff_notify(vector):
-    subject = f"用户 {vector.user.username} 上传了文件 - {vector.vector_file}"
+    """
+    用户提交了一个待设计的 Vector，通知管理员去做 design
+    （TechStaffGroup 成员 + settings.ADMIN_NOTIFY_EMAILS）
+    """
+    customer = vector.user.username if vector.user else 'RootPath'
+    subject = f"待设计 Vector：{customer} 提交了 {vector.vector_name}"
     template_name = 'emails/vector_uploaded_staff.html'
-    context = {'vector': vector}
-    staff_emails = get_group_emails("TechStaffGroup")
-    if staff_emails:
-        send_templated_email(subject, staff_emails, template_name, context)
+    context = {'vector': vector, 'base_url': getattr(settings, 'BASE_URL', '')}
+    recipients = staff_recipients("TechStaffGroup")
+    if recipients:
+        send_templated_email(subject, recipients, template_name, context)
 
 def send_vector_approved_user_email(vector):
     subject = f"文件已审核通过 - {vector.vector_name}"

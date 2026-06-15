@@ -181,6 +181,13 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 SERVER_EMAIL = config('SERVER_EMAIL')
 BASE_URL = config('BASE_URL')
 
+# 管理员通知收件人：用户注册、用户提交待设计载体时发到这里。
+# 默认 dushiyi@rootpath.com.cn，可用 .env 的 ADMIN_NOTIFY_EMAILS 覆盖（逗号分隔多个）。
+ADMIN_NOTIFY_EMAILS = [
+    e.strip() for e in str(config('ADMIN_NOTIFY_EMAILS', default='dushiyi@rootpath.com.cn')).split(',')
+    if e.strip()
+]
+
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000 # 上传文件最大字段数
 
 # Celery 配置

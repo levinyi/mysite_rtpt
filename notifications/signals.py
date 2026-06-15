@@ -44,9 +44,9 @@ def order_created_signal(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Vector)
 def vector_uploaded_signal(sender, instance, created, **kwargs):
-    if created:
-        # 文件上传成功时
-        async_send_vector_uploaded_user_email.delay(instance.id)
+    # 只在“用户(非 RootPath)提交了一个尚未 ReadyToUse 的载体”时通知管理员去 design。
+    # 排除：RootPath 目录导入(user=None)、管理员直接建成的 ReadyToUse 载体。
+    if created and instance.user_id and (instance.status or '').lower() != 'readytouse':
         async_send_vector_uploaded_staff_notify.delay(instance.id)
 
 @receiver(post_save, sender=Vector)

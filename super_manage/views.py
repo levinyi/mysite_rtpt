@@ -960,7 +960,7 @@ def user_data_api(request):
         User.objects
         .select_related('userprofile')
         .values(
-            'id', 'username', 'email',
+            'id', 'username', 'email', 'date_joined',
             'userprofile__first_name', 'userprofile__last_name', 'userprofile__department',
             'userprofile__phone', 'userprofile__company', 'userprofile__shipping_address',
             'userprofile__photo', 'userprofile__register_time', 'userprofile__is_verify'
@@ -968,6 +968,10 @@ def user_data_api(request):
     )
     data = []
     for u in qs:
+        # 注册时间优先用 User.date_joined（每个用户都有、权威），
+        # 没有时再退回 UserProfile.register_time（无 profile 的用户会是空）
+        joined = u['date_joined']
+        register_time = joined.strftime('%Y-%m-%d %H:%M') if joined else (u['userprofile__register_time'] or '')
         data.append({
             'user__id': u['id'],
             'user__username': u['username'],
@@ -979,7 +983,7 @@ def user_data_api(request):
             'company': u['userprofile__company'],
             'shipping_address': u['userprofile__shipping_address'],
             'photo': u['userprofile__photo'],
-            'register_time': u['userprofile__register_time'],
+            'register_time': register_time,
             'is_verify': u['userprofile__is_verify'],
         })
     return JsonResponse({'data': data})
