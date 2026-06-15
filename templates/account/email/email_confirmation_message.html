@@ -1,0 +1,12 @@
+{% extends "emails/base_email.html" %}
+{% load account %}
+{% block badge %}邮箱验证{% endblock %}
+{% block heading %}请确认你的邮箱地址{% endblock %}
+{% block body %}
+  {% user_display user as user_display %}
+  <p style="margin:0 0 14px;">你好 {{ user_display }}，感谢注册 RootPath。请点击下面的按钮确认这个邮箱地址，激活你的账户：</p>
+  {% include "emails/_button.html" with url=activate_url text="确认邮箱" %}
+  <p style="margin:16px 0 0;font-size:12px;color:#97a1b3;">若按钮无法点击，请复制以下链接到浏览器打开：<br>
+    <a href="{{ activate_url }}" style="color:#0a3a8c;word-break:break-all;">{{ activate_url }}</a></p>
+  <p style="margin:12px 0 0;font-size:12px;color:#97a1b3;">若非本人操作，请忽略本邮件。</p>
+{% endblock %}
