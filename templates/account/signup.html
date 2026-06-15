@@ -79,12 +79,12 @@
                       </div>
                     {% else %}
                       <div class="form-floating mb-3">
-                        {{ field|add_class:"form-control"|attr:"placeholder: " }}
+                        {{ field|add_class:"form-control"|add_error_class:"is-invalid"|attr:"placeholder: " }}
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {% if field.name == 'password1' and field.help_text %}
                           <small class="text-muted d-block mt-1">{{ field.help_text }}</small>
                         {% endif %}
-                        {% if field.errors %}<div class="invalid-feedback">{{ field.errors }}</div>{% endif %}
+                        {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors }}</div>{% endif %}
                       </div>
                     {% endif %}
                   {% endfor %}

@@ -79,13 +79,13 @@
                     {% else %}
                       <div class="form-floating mb-3">
                         {% if field.name == "login" %}
-                          {{ field|add_class:"form-control"|attr:"placeholder:Username or Email" }}
+                          {{ field|add_class:"form-control"|add_error_class:"is-invalid"|attr:"placeholder:Username or Email" }}
                           <label for="{{ field.id_for_label }}">Username or Email</label>
                         {% else %}
-                          {{ field|add_class:"form-control"|attr:"placeholder: " }}
+                          {{ field|add_class:"form-control"|add_error_class:"is-invalid"|attr:"placeholder: " }}
                           <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {% endif %}
-                        {% if field.errors %}<div class="invalid-feedback">{{ field.errors }}</div>{% endif %}
+                        {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors }}</div>{% endif %}
                       </div>
                     {% endif %}
                   {% endfor %}
