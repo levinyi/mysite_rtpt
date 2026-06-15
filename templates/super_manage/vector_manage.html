@@ -4,6 +4,7 @@
 {% block title %}Vector Manage{% endblock %}
 {% block extra_head %}
 <style>
+    :root { --vec-brand: #1E3A8A; }
 
     .truncate {
         display: inline-block;
@@ -12,6 +13,41 @@
         overflow: hidden;
         text-overflow: ellipsis;  /* 使用省略号显示截断 */
     }
+
+    /* 主表 Vector 列：名称 + 副标 ID */
+    .vec-cell { line-height: 1.25; }
+    .vec-name { font-weight: 600; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; display: block; }
+    .vec-id { font-size: 11px; color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    /* Files 图标列 */
+    .files-icons { display: flex; gap: 10px; align-items: center; }
+    .files-icons a { font-size: 1.05rem; line-height: 1; text-decoration: none; }
+    .files-icons .f-on { color: var(--vec-brand); }
+    .files-icons .f-off { color: #cbd5e1; }
+    .files-icons .f-off:hover { color: #94a3b8; }
+
+    /* 行操作 ⋯ 按钮 */
+    .vec-actions-btn { border: none; background: transparent; color: #6b7280; font-size: 1.1rem; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+    .vec-actions-btn:hover { background: #f1f5f9; color: var(--vec-brand); }
+
+    /* 详情抽屉 */
+    #vectorDrawer { width: 540px; max-width: 92vw; }
+    .drawer-section { margin-bottom: 1.1rem; }
+    .drawer-section-title { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--vec-brand); border-bottom: 2px solid #e5e7eb; padding-bottom: 4px; margin-bottom: .6rem; }
+    .drawer-meta { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; font-size: 13px; }
+    .drawer-meta .k { color: #6b7280; }
+    .seq-row { padding: 7px 0; border-bottom: 1px dashed #eef2f7; }
+    .seq-row:last-child { border-bottom: 0; }
+    .seq-row .seq-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+    .seq-row .seq-label { font-weight: 600; font-size: 12px; color: #374151; }
+    .seq-row .seq-len { font-size: 11px; color: #9ca3af; }
+    .seq-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; word-break: break-all; color: #111827; background: #f8fafc; border-radius: 6px; padding: 6px 8px; max-height: 96px; overflow: auto; white-space: pre-wrap; }
+    .seq-mono.empty { color: #9ca3af; font-style: italic; }
+    .seq-tools a { font-size: .95rem; color: #6b7280; text-decoration: none; margin-left: 8px; }
+    .seq-tools a:hover { color: var(--vec-brand); }
+    .file-line { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eef2f7; font-size: 13px; }
+    .file-line:last-child { border-bottom: 0; }
+    .file-line .fl-name { color: #475569; font-size: 12px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 {% endblock %}
 {% block manage_content %}
@@ -72,31 +108,6 @@
         </div>
     </div>
 </div>
-<!-- 修改状态模态框 -->
-<div class="modal fade" id="editVectorModal" tabindex="-1" aria-labelledby="editVectorModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="statusModalLabel">Change Vector Status</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- 表单 -->
-                <form id="statusForm">
-                    <div class="mb-3">
-                        <label for="statusSelect" class="form-label">New Status</label>
-                        <select class="form-select" id="statusSelect">
-                            <option value="Received">Received</option>
-                            <option value="ReadyToUse">ReadyToUse</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Submit</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- 上传RootPath Vector 文件模态框 -->
 <div class="modal fade" id="uploadCsvModal" tabindex="-1" aria-labelledby="uploadCsvModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -149,73 +160,109 @@
         </div>
     </div>
 </div>
+
+<!-- 载体详情 / 编辑抽屉 -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="vectorDrawer" aria-labelledby="vectorDrawerTitle">
+    <div class="offcanvas-header text-white" style="background: var(--vec-brand);">
+        <div class="me-2" style="min-width:0;">
+            <h5 class="offcanvas-title mb-0 text-truncate" id="vectorDrawerTitle">Vector</h5>
+            <small class="opacity-75" id="vectorDrawerSubtitle"></small>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body" id="vectorDrawerBody">
+        <!-- 由 JS 动态填充 -->
+    </div>
+</div>
 {% endblock %}
 
 {% block javascript %}
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // 显示加载状态
+    // ---- 全局状态 ----
+    let vectorById = {};            // id -> 完整 vector 对象（详情抽屉 / 格式化器共用）
+    let pendingGrid = null, readyGrid = null;
+    let gridDirty = false;          // 抽屉里改了影响主表的字段后置脏，关闭抽屉时刷新主表
+
+    document.addEventListener("DOMContentLoaded", function () {
+        loadVectors();
+
+        // 关闭详情抽屉时，如改动过影响主表的字段则刷新主表
+        const drawerEl = document.getElementById('vectorDrawer');
+        if (drawerEl) {
+            drawerEl.addEventListener('hidden.bs.offcanvas', function () {
+                if (gridDirty) { gridDirty = false; loadVectors(); }
+            });
+        }
+    });
+
+    function gridOptionsBase() {
+        return {
+            pagination: { enabled: true, limit: 20 },
+            search: true,
+            sort: true,
+            resizable: false,
+            language: {
+                'search': { 'placeholder': '🔍 Search ID / name / user...' },
+                'pagination': { 'showing': 'Showing', 'results': () => 'records' }
+            }
+        };
+    }
+
+    function loadVectors() {
         showLoading();
-        fetch("{% url 'super_manage:vector_data_api' %}")
+        return fetch("{% url 'super_manage:vector_data_api' %}")
             .then(response => response.json())
             .then(data => {
                 hideLoading();
-                const readyVectors = data.data.filter((vector) => (vector.status || '').toLowerCase() === 'readytouse');
-                const pendingVectors = data.data.filter((vector) => (vector.status || '').toLowerCase() !== 'readytouse');
+                vectorById = {};
+                data.data.forEach(v => { vectorById[v.id] = v; });
 
-                // 更新 Tab 上的数量徽标
+                const readyVectors = data.data.filter(v => (v.status || '').toLowerCase() === 'readytouse');
+                const pendingVectors = data.data.filter(v => (v.status || '').toLowerCase() !== 'readytouse');
+
                 document.getElementById('pending-count').textContent = pendingVectors.length;
                 document.getElementById('ready-count').textContent = readyVectors.length;
 
-                const pendingRows = buildVectorRows(pendingVectors);
-                const readyRows = buildVectorRows(readyVectors);
+                const pendingRows = buildVectorRows(pendingVectors, true);
+                const readyRows = buildVectorRows(readyVectors, false);
 
-                const gridOptions = {
-                    pagination: { enabled: true },
-                    search: true,
-                    sort: true,
-                    resizable: false,
-                    language: {
-                        'search': {
-                            'placeholder': '🔍 Search...'
-                        },
-                        'pagination': {
-                            'showing': '😃 Displaying',
-                            'results': () => 'Records'
-                        }
-                    }
-                };
-
-                new gridjs.Grid({
-                    columns: buildVectorColumns(true),
-                    data: pendingRows,
-                    ...gridOptions
-                }).render(document.getElementById('vector-table-pending'));
-
-                const readyGrid = new gridjs.Grid({
-                    columns: buildVectorColumns(false),
-                    data: readyRows,
-                    ...gridOptions
-                });
-                readyGrid.render(document.getElementById('vector-table-ready'));
-
-                // ReadyToUse 表首次在隐藏的 Tab 里渲染，切换显示后强制重绘一次，避免列宽塌陷
-                const readyTab = document.getElementById('ready-tab');
-                if (readyTab) {
-                    readyTab.addEventListener('shown.bs.tab', function onFirstShow() {
-                        readyGrid.forceRender();
-                        readyTab.removeEventListener('shown.bs.tab', onFirstShow);
-                    });
+                if (pendingGrid) {
+                    pendingGrid.updateConfig({ data: pendingRows, columns: buildVectorColumns(true) }).forceRender();
+                } else {
+                    pendingGrid = new gridjs.Grid({ columns: buildVectorColumns(true), data: pendingRows, ...gridOptionsBase() });
+                    pendingGrid.render(document.getElementById('vector-table-pending'));
                 }
 
-                // 使用事件委托监听克隆方法下拉框变更（Grid.js 翻页/排序会重建DOM）
-                attachCloningMethodListeners();
+                if (readyGrid) {
+                    readyGrid.updateConfig({ data: readyRows, columns: buildVectorColumns(false) }).forceRender();
+                } else {
+                    readyGrid = new gridjs.Grid({ columns: buildVectorColumns(false), data: readyRows, ...gridOptionsBase() });
+                    readyGrid.render(document.getElementById('vector-table-ready'));
+                    // ReadyToUse 表首次在隐藏 Tab 里渲染，切到该 Tab 后强制重绘一次，避免列宽塌陷
+                    const readyTab = document.getElementById('ready-tab');
+                    if (readyTab) {
+                        readyTab.addEventListener('shown.bs.tab', function onShow() {
+                            readyGrid.forceRender();
+                            readyTab.removeEventListener('shown.bs.tab', onShow);
+                        });
+                    }
+                }
             })
             .catch(error => {
                 hideLoading();
                 console.error('Error:', error);
             });
-    });
+    }
+
+    // HTML 转义，避免名称/序列里的特殊字符破坏模板
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function rowVector(row) {
+        return vectorById[row.cells[1].data] || {};
+    }
 
     // 点击错误预览查看完整错误信息（使用事件委托）
     document.addEventListener('click', function(e) {
@@ -232,22 +279,7 @@
         }
     });
 
-    // 克隆方法下拉框事件监听器（使用事件委托，避免 Grid.js 翻页/排序后丢失监听器）
-    function attachCloningMethodListeners() {
-        document.addEventListener('change', function(e) {
-            if (e.target.classList.contains('cloning-method-select')) {
-                const select = e.target;
-                const vectorId = select.getAttribute('data-vector-id');
-                const field = select.getAttribute('data-field');
-                const newValue = select.value;
-
-                // 发送更新请求
-                updateVectorField(vectorId, field, newValue, select);
-            }
-        });
-    }
-
-    // 更新载体字段的通用函数
+    // 更新载体字段的通用函数（详情抽屉内的克隆方法/序列编辑复用）
     function updateVectorField(vectorId, field, newValue, element) {
         var csrftoken = getCookie('csrftoken');
 
@@ -290,205 +322,120 @@
     }
 
     function buildVectorColumns(allowDesign) {
-        return [
-            { name: '#', width: '80px'},
-            { name: 'User', width: '120px', formatter: (cell) => cell ? cell : 'RootPath' },
+        const cols = [
+            { name: '#', width: '52px', sort: false },
             { name: 'id', hidden: true },
-            { name: 'ID', width: '200px', formatter: (cell, row) => editableCellFormatter(cell, row, 'vector_id')},
-            { name: 'Name', width: '200px', formatter: (cell, row) => editableCellFormatter(cell, row, 'vector_name')},
-            { name: 'Vector File', width: '200px',
-                formatter: (cell, row) => {
-                    const vectorId = row.cells[2].data;
-                    return gridjs.html(`
-                        ${cell ? `<a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download file" href="/super_manage/vector_manage/vector_download/${vectorId}/file" target="_blank" class="text-decoration-none">${cell}</a>` : ''}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Upload file" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi bi-plus-circle-dotted"></i></a>
-                        <input type="file" style="display: none;" onchange="submitFile(this, '${vectorId}', 'vector_file')">
-                    `);
-                }
-            },
-            { name: 'Vector_png', width: '200px',
-                formatter: (cell, row) => {
-                    const vectorId = row.cells[2].data;
-                    return gridjs.html(`
-                        ${cell ? `<a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download map" href="/super_manage/vector_manage/vector_download/${vectorId}/map" target="_blank" class="text-decoration-none">${cell}</a>` : ''}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Upload file" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi bi-plus-circle-dotted"></i></a>
-                        <input type="file" style="display: none;" onchange="submitFile(this, '${vectorId}', 'vector_png')">
-                    `);
-                }
-            },
-            { name: 'Vector_GB', width: '200px',
-                formatter: (cell, row) => {
-                    const vectorId = row.cells[2].data;
-                    return gridjs.html(`
-                        ${cell ? `<a data-bs-toggle="tooltip" data-bs-replacement="top" title="Download gb" href="/super_manage/vector_manage/vector_download/${vectorId}/gb" target="_blank" class="text-decoration-none">${cell}</a>` : ''}
-                        <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Upload file" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi bi-plus-circle-dotted"></i></a>
-                        <input type="file" style="display: none;" onchange="submitFile(this, '${vectorId}', 'vector_gb')">
-                    `);
-                }
-            },
-            {
-                name: 'Automation Design',
-                width: '220px',
-                formatter: buildAutomationFormatter(allowDesign)
-            },
-            { name: 'Status', width: '120px',
-                formatter: (cell) => {
-                    const badgeClass = (cell || '').toLowerCase() === 'readytouse' ? 'bg-primary' : 'bg-info';
-                    return gridjs.html(`<span class="badge ${badgeClass}">${cell || ''}</span>`);
-                }
-            },
-            { name: 'Edit',
-                width: '100px',
-                formatter: (cell, row) => {
-                    const vectorId = row.cells[2].data;
-                    return gridjs.html(`
-                        <div style="display: flex; justify-content: center;">
-                            <a data-bs-toggle="modal" data-bs-target="#editVectorModal" data-vector-id="${vectorId}" href="javascript:void(0);" class="text-decoration-none"
-                                data-bs-toggle="tooltip" data-bs-replacement="left" title="Edit Status">
-                                <i class="bi bi-pencil-square text-primary me-2"></i>
-                            </a>
-                            <a data-bs-toggle="tooltip" data-bs-replacement="top" title="Delete" href="javascript:" onclick="del_gene(this, ${vectorId})" class="text-decoration-none">
-                                <i class="bi bi-trash text-danger me-2"></i>
-                            </a>
-                        </div>
-                    `);
-                }
-            },
-            { name: 'Seq', width: '200px', formatter: (cell, row) => editableCellFormatter(cell, row, 'vector_map')},
-            { name: 'NC5', width: '150px', formatter: (cell, row) => editableCellFormatter(cell, row, 'NC5')},
-            { name: 'NC3', width: '150px', formatter: (cell, row) => editableCellFormatter(cell, row, 'NC3')},
-            { name: 'iu20', width: '150px', formatter: (cell, row) => editableCellFormatter(cell, row, 'iu20')},
-            { name: 'id20', width: '150px', formatter: (cell, row) => editableCellFormatter(cell, row, 'id20')},
-            {
-                name: 'Cloning Method',
-                width: '200px',
-                formatter: (cell, row) => {
-                    const vectorId = row.cells[2].data;
-                    const currentValue = cell || '';
-                    return gridjs.html(`
-                        <select class="form-select form-select-sm cloning-method-select"
-                                data-vector-id="${vectorId}"
-                                data-field="cloning_method"
-                                style="font-size: 0.85rem;">
-                            <option value="" ${currentValue === '' ? 'selected' : ''}>Not Set</option>
-                            <option value="Gibson" ${currentValue === 'Gibson' ? 'selected' : ''}>Gibson</option>
-                            <option value="GoldenGate" ${currentValue === 'GoldenGate' ? 'selected' : ''}>GoldenGate</option>
-                            <option value="T4" ${currentValue === 'T4' ? 'selected' : ''}>T4</option>
-                        </select>
-                    `);
-                }
-            },
-            { name: 'design_error', hidden: true },
+            { name: 'Vector', width: allowDesign ? '250px' : '290px', formatter: vectorCellFormatter },
+            { name: 'User', width: '120px', formatter: (cell) => cell || 'RootPath' },
+            { name: 'Files', width: '110px', sort: false, formatter: filesCellFormatter },
         ];
+        if (allowDesign) {
+            cols.push({ name: 'Design', width: '210px', sort: false, formatter: designCellFormatter });
+        }
+        cols.push({ name: 'Status', width: '118px', formatter: statusCellFormatter });
+        cols.push({ name: 'Actions', width: '74px', sort: false, formatter: actionsCellFormatter });
+        return cols;
     }
 
-    function buildAutomationFormatter(allowDesign) {
-        return (cell, row) => {
-            const vectorId = row.cells[2].data;
-            const designStatus = cell || 'Pending';
-            const vectorStatus = row.cells[9] ? row.cells[9].data : '';
-            const cloningMethod = row.cells[16] ? row.cells[16].data : '';
+    // Vector 列：名称（粗）+ vector_id（灰色副标）
+    function vectorCellFormatter(cell, row) {
+        const v = rowVector(row);
+        const name = v.vector_name || '(no name)';
+        const vid = v.vector_id || '';
+        return gridjs.html(`
+            <div class="vec-cell">
+                <span class="vec-name" title="${esc(name)}">${esc(name)}</span>
+                ${vid ? `<span class="vec-id" title="${esc(vid)}">${esc(vid)}</span>` : ''}
+            </div>
+        `);
+    }
 
-            let statusDisplay = '';
-            let buttons = '';
+    // Files 列：源文件 / 图谱 / GenBank 三个图标，有则下载、无则上传
+    function filesCellFormatter(cell, row) {
+        const v = rowVector(row);
+        const id = v.id;
+        const icon = (present, dl, ic, label, fieldType) => present
+            ? `<a class="f-on" title="Download ${label}" href="${dl}" target="_blank"><i class="bi ${ic}"></i></a>`
+            : `<a class="f-off" title="Upload ${label}" href="javascript:void(0);" onclick="uploadFile(this)"><i class="bi ${ic}"></i></a><input type="file" style="display:none;" onchange="submitFile(this, '${id}', '${fieldType}')">`;
+        return gridjs.html(`
+            <div class="files-icons">
+                ${icon(!!v.vector_file, `/super_manage/vector_manage/vector_download/${id}/file`, 'bi-file-earmark-text', 'source file', 'vector_file')}
+                ${icon(!!v.vector_png, `/super_manage/vector_manage/vector_download/${id}/map`, 'bi-image', 'map image', 'vector_png')}
+                ${icon(!!v.vector_gb, `/super_manage/vector_manage/vector_download/${id}/gb`, 'bi-file-earmark-code', 'GenBank file', 'vector_gb')}
+            </div>
+        `);
+    }
 
-            if (designStatus === 'Completed') {
-                const methodLabel = cloningMethod || 'Completed';
-                statusDisplay = `<div class="mb-2"><span class="badge bg-success">${methodLabel}</span></div>`;
-                if (allowDesign) {
-                    buttons = `
-                        <select class="form-select form-select-sm mb-1" id="method-select-${vectorId}" style="font-size: 0.75rem;">
-                            <option value="">Auto</option>
-                            <option value="Gibson">Gibson</option>
-                            <option value="GoldenGate">GoldenGate</option>
-                            <option value="T4">T4</option>
-                        </select>
-                        <button class="btn btn-sm btn-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <button class="btn btn-sm btn-info" onclick="viewDesignResults(${vectorId})" title="View Results">
-                            <i class="bi bi-eye"></i> View
-                        </button>
-                    `;
-                } else {
-                    buttons = `
-                        <button class="btn btn-sm btn-info" onclick="viewDesignResults(${vectorId})" title="View Results">
-                            <i class="bi bi-eye"></i> View
-                        </button>
-                    `;
-                }
-            } else if (designStatus === 'Processing') {
-                statusDisplay = `<div class="mb-2"><span class="badge bg-warning text-dark">Processing...</span></div>`;
-                buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
-            } else if (designStatus === 'Failed') {
-                const designError = row.cells[17] ? row.cells[17].data : '';
-                const errorPreview = designError.length > 50 ? designError.substring(0, 50) + '...' : designError;
-                statusDisplay = `<div class="mb-2"><span class="badge bg-danger">Failed</span></div>`;
-                if (designError) {
-                    // 用 data attribute 存储错误信息，避免 onclick 中拼接特殊字符
-                    const safeError = designError.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-                    statusDisplay += `<div class="mb-2 design-error-preview" style="font-size: 0.75rem; color: #dc3545; max-width: 200px; word-break: break-all; cursor: pointer; text-align: left;"
-                        data-error="${safeError}"
-                        title="Click to view full error">${errorPreview}</div>`;
-                }
-                buttons = allowDesign
-                    ? `<select class="form-select form-select-sm mb-1" id="method-select-${vectorId}" style="font-size: 0.75rem;">
-                            <option value="">Auto</option>
-                            <option value="Gibson">Gibson</option>
-                            <option value="GoldenGate">GoldenGate</option>
-                            <option value="T4">T4</option>
-                       </select>
-                       <button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry Design"><i class="bi bi-arrow-clockwise"></i> Retry</button>`
-                    : `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-x-circle"></i> Locked</button>`;
-            } else {
-                const isReady = (vectorStatus || '').toLowerCase() === 'readytouse';
-                if (!allowDesign && isReady) {
-                    statusDisplay = `<div class="mb-2"><span class="badge bg-secondary">Manual ReadyToUse</span></div>`;
-                    buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-lock"></i> No Design</button>`;
-                } else {
-                    statusDisplay = `<div class="mb-2"><span class="badge bg-secondary">Not Designed</span></div>`;
-                    buttons = allowDesign
-                        ? `<select class="form-select form-select-sm mb-1" id="method-select-${vectorId}" style="font-size: 0.75rem;">
-                                <option value="">Auto</option>
-                                <option value="Gibson">Gibson</option>
-                                <option value="GoldenGate">GoldenGate</option>
-                                <option value="T4">T4</option>
-                           </select>
-                           <button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`
-                        : `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-lock"></i> Locked</button>`;
-                }
+    // Status 列：徽标
+    function statusCellFormatter(cell) {
+        const s = cell || '';
+        const badge = s.toLowerCase() === 'readytouse' ? 'bg-primary' : 'bg-info';
+        return gridjs.html(`<span class="badge ${badge}">${esc(s)}</span>`);
+    }
+
+    // Actions 列：单个按钮打开详情抽屉（改状态/删除/编辑/序列全在抽屉里）
+    function actionsCellFormatter(cell, row) {
+        const v = rowVector(row);
+        return gridjs.html(`
+            <button class="vec-actions-btn" type="button" title="View / Edit details" onclick="openVectorDrawer(${v.id})">
+                <i class="bi bi-pencil-square"></i>
+            </button>
+        `);
+    }
+
+    // Design 列（仅 Pending Tab）：设计状态徽标 + 操作按钮
+    function designCellFormatter(cell, row) {
+        const v = rowVector(row);
+        const vectorId = v.id;
+        const designStatus = v.design_status || 'Pending';
+        const cloningMethod = v.cloning_method || '';
+        const methodPicker = `
+            <select class="form-select form-select-sm mb-1" id="method-select-${vectorId}" style="font-size: 0.75rem;">
+                <option value="">Auto</option>
+                <option value="Gibson">Gibson</option>
+                <option value="GoldenGate">GoldenGate</option>
+                <option value="T4">T4</option>
+            </select>`;
+        let statusDisplay = '', buttons = '';
+        if (designStatus === 'Completed') {
+            statusDisplay = `<div class="mb-1"><span class="badge bg-success">${esc(cloningMethod || 'Completed')}</span></div>`;
+            buttons = `${methodPicker}
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design"><i class="bi bi-arrow-clockwise"></i></button>
+                <button class="btn btn-sm btn-outline-info" onclick="viewDesignResults(${vectorId})" title="View Results"><i class="bi bi-eye"></i></button>`;
+        } else if (designStatus === 'Processing') {
+            statusDisplay = `<div class="mb-1"><span class="badge bg-warning text-dark">Processing…</span></div>`;
+            buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
+        } else if (designStatus === 'Failed') {
+            const designError = v.design_error || '';
+            const errorPreview = designError.length > 40 ? designError.substring(0, 40) + '…' : designError;
+            statusDisplay = `<div class="mb-1"><span class="badge bg-danger">Failed</span></div>`;
+            if (designError) {
+                statusDisplay += `<div class="mb-1 design-error-preview" style="font-size:.72rem; color:#dc3545; max-width:200px; word-break:break-all; cursor:pointer; text-align:left;" data-error="${esc(designError)}" title="Click to view full error">${esc(errorPreview)}</div>`;
             }
-
-            return gridjs.html(`
-                <div style="text-align: center;">
-                    ${statusDisplay}
-                    ${buttons}
-                </div>
-            `);
-        };
+            buttons = `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry"><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
+        } else {
+            statusDisplay = `<div class="mb-1"><span class="badge bg-secondary">Not Designed</span></div>`;
+            buttons = `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`;
+        }
+        return gridjs.html(`<div style="text-align:center;">${statusDisplay}${buttons}</div>`);
     }
 
-    function buildVectorRows(vectors) {
-        return vectors.map((vector, index) => [
-            index + 1,
-            vector.user__username,
-            vector.id,
-            vector.vector_id,
-            vector.vector_name,
-            vector.vector_file ? vector.vector_file.split('/').pop() : '',
-            vector.vector_png ? vector.vector_png.split('/').pop() : '',
-            vector.vector_gb ? vector.vector_gb.split('/').pop() : '',
-            vector.design_status || 'Pending',
-            vector.status || '',
-            '', // Edit and Delete button
-            vector.vector_map,
-            vector.NC5,
-            vector.NC3,
-            vector.iu20,
-            vector.id20,
-            vector.cloning_method || '',
-            vector.design_error || '',
-        ]);
+    // buildAutomationFormatter 已被 designCellFormatter 取代（设计列只在 Pending Tab 出现）
+
+    function buildVectorRows(vectors, allowDesign) {
+        return vectors.map((vector, index) => {
+            const row = [
+                index + 1,                                                       // #
+                vector.id,                                                       // id (hidden, 主键)
+                `${vector.vector_name || ''} ${vector.vector_id || ''}`.trim(),  // Vector (可搜索文本)
+                vector.user__username || 'RootPath',                            // User
+                '',                                                              // Files (格式化器从 vectorById 取)
+            ];
+            if (allowDesign) row.push(vector.design_status || 'Pending');        // Design
+            row.push(vector.status || '');                                       // Status
+            row.push('');                                                        // Actions
+            return row;
+        });
     }
 
     function startAutomationDesign(vectorId) {
@@ -769,62 +716,253 @@
         }
     }
 
-    function editableCellFormatter(cell, row, field) {
-        const vectorId = row.cells[2].data;
-        const isSeqField = field === 'vector_map';  // 检查是否为 Seq 列
-        
-        return gridjs.html(`
-            <span 
-                class="editable-field ${isSeqField ? 'truncate' : ''}" 
-                id="display-${field}-${vectorId}" 
-                title="${cell || ''}"  <!-- 设置悬停显示完整内容 -->
-                ${cell || ''}
-            </span>
-            <input type="text" id="input-${field}-${vectorId}" class="form-control d-none" value="${cell || ''}" style="max-width: 100px;" />
-            <a href="javascript:void(0);" onclick="editField('${vectorId}', '${field}')" title="Edit"><i class="bi bi-pencil-square text-primary"></i></a>
-            <a href="javascript:void(0);" onclick="saveEditedField('${vectorId}', '${field}')" id="save-${field}-${vectorId}" class="d-none" title="Save"><i class="bi bi-check-square text-success"></i></a>
-        `);
+    // ====================== 详情 / 编辑抽屉 ======================
+    function openVectorDrawer(dbId) {
+        if (!vectorById[dbId]) return;
+        document.getElementById('vectorDrawerBody').innerHTML = renderDrawerBody(dbId);
+        setDrawerHeader(dbId);
+        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('vectorDrawer')).show();
     }
 
-    function editField(vectorId, field) {
-        document.getElementById(`display-${field}-${vectorId}`).classList.add('d-none');
-        document.getElementById(`input-${field}-${vectorId}`).classList.remove('d-none');
-        document.getElementById(`save-${field}-${vectorId}`).classList.remove('d-none');
+    function refreshDrawer(dbId) {
+        document.getElementById('vectorDrawerBody').innerHTML = renderDrawerBody(dbId);
+        setDrawerHeader(dbId);
     }
 
-    function saveEditedField(vectorId, field) {
-        const inputElem = document.getElementById(`input-${field}-${vectorId}`);
-        const newValue = inputElem.value;
-        var csrftoken = getCookie('csrftoken');
+    function setDrawerHeader(dbId) {
+        const v = vectorById[dbId] || {};
+        document.getElementById('vectorDrawerTitle').textContent = v.vector_name || '(no name)';
+        document.getElementById('vectorDrawerSubtitle').textContent =
+            (v.vector_id || 'no ID') + '  ·  ' + (v.user__username || 'RootPath');
+    }
 
+    function designStatusBadge(s) {
+        s = s || 'Pending';
+        const map = { 'Completed': 'bg-success', 'Processing': 'bg-warning text-dark', 'Failed': 'bg-danger' };
+        return `<span class="badge ${map[s] || 'bg-secondary'}">${esc(s)}</span>`;
+    }
+
+    function baseName(p) { return p ? String(p).split('/').pop() : ''; }
+
+    // 单个可编辑字段（短文本 input / 长序列 textarea），含复制 + 编辑
+    function editableFieldRow(dbId, field, label, value, opts) {
+        opts = opts || {};
+        const v = value || '';
+        const lenTag = opts.long ? ` <span class="seq-len">${v.length} bp</span>` : '';
+        const display = opts.long
+            ? `<div class="seq-mono ${v ? '' : 'empty'}">${v ? esc(v) : '—'}</div>`
+            : `<div class="${v ? '' : 'text-muted'}" style="font-size:13px;">${v ? esc(v) : '—'}</div>`;
+        return `
+            <div class="seq-row">
+                <div class="seq-head">
+                    <span class="seq-label">${esc(label)}${lenTag}</span>
+                    <span class="seq-tools" id="fld-tools-${field}">
+                        ${v ? `<a href="javascript:void(0)" title="Copy" onclick="copyField('${field}')"><i class="bi bi-clipboard"></i></a>` : ''}
+                        <a href="javascript:void(0)" title="Edit" onclick="startFieldEdit('${field}')"><i class="bi bi-pencil"></i></a>
+                    </span>
+                </div>
+                <div id="fld-disp-${field}">${display}</div>
+                <div id="fld-edit-${field}" class="d-none mt-1">
+                    <textarea class="form-control form-control-sm" id="ta-${field}" rows="${opts.long ? 4 : 1}"
+                              style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;">${esc(v)}</textarea>
+                    <div class="mt-1 text-end">
+                        <button class="btn btn-sm btn-light" onclick="cancelFieldEdit(${dbId})">Cancel</button>
+                        <button class="btn btn-sm btn-primary" onclick="saveDrawerField(${dbId}, '${field}')">Save</button>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    // 文件行：有则下载 + 替换，无则上传
+    function fileLine(dbId, present, name, dl, label, fieldType, icon) {
+        const right = present
+            ? `<a class="btn btn-sm btn-outline-primary" href="${dl}" target="_blank" title="Download"><i class="bi bi-download"></i></a>
+               <a class="btn btn-sm btn-outline-secondary ms-1" href="javascript:void(0)" title="Replace" onclick="uploadFile(this)"><i class="bi bi-arrow-repeat"></i></a><input type="file" style="display:none;" onchange="submitFile(this, '${dbId}', '${fieldType}')">`
+            : `<a class="btn btn-sm btn-primary" href="javascript:void(0)" title="Upload" onclick="uploadFile(this)"><i class="bi bi-upload"></i> Upload</a><input type="file" style="display:none;" onchange="submitFile(this, '${dbId}', '${fieldType}')">`;
+        return `
+            <div class="file-line">
+                <span style="min-width:0;">
+                    <i class="bi ${icon} me-2" style="color: var(--vec-brand);"></i>${esc(label)}
+                    <span class="fl-name d-block">${present ? esc(name) : '<span class="text-muted">— not uploaded</span>'}</span>
+                </span>
+                <span class="text-nowrap ms-2">${right}</span>
+            </div>`;
+    }
+
+    function renderDrawerBody(dbId) {
+        const v = vectorById[dbId] || {};
+        let html = '';
+
+        // Basics
+        html += `
+            <div class="drawer-section">
+                <div class="drawer-section-title">Basics</div>
+                <div class="drawer-meta">
+                    <span class="k">User</span><span>${esc(v.user__username || 'RootPath')}</span>
+                    <span class="k">Design</span><span>${designStatusBadge(v.design_status)}</span>
+                    <span class="k">Status</span>
+                    <span class="d-flex align-items-center gap-2">
+                        <select class="form-select form-select-sm" id="drawer-status-${dbId}" style="max-width:160px;">
+                            <option value="Received" ${(v.status || '') === 'Received' ? 'selected' : ''}>Received</option>
+                            <option value="ReadyToUse" ${(v.status || '') === 'ReadyToUse' ? 'selected' : ''}>ReadyToUse</option>
+                        </select>
+                        <button class="btn btn-sm btn-primary" onclick="saveDrawerStatus(${dbId})">Set</button>
+                    </span>
+                    <span class="k">Cloning</span>
+                    <span>
+                        <select class="form-select form-select-sm" id="drawer-cloning-${dbId}" style="max-width:160px;" onchange="saveDrawerCloning(${dbId})">
+                            <option value="" ${!v.cloning_method ? 'selected' : ''}>Not Set</option>
+                            <option value="Gibson" ${v.cloning_method === 'Gibson' ? 'selected' : ''}>Gibson</option>
+                            <option value="GoldenGate" ${v.cloning_method === 'GoldenGate' ? 'selected' : ''}>GoldenGate</option>
+                            <option value="T4" ${v.cloning_method === 'T4' ? 'selected' : ''}>T4</option>
+                        </select>
+                    </span>
+                </div>
+            </div>`;
+
+        // Identity
+        html += `
+            <div class="drawer-section">
+                <div class="drawer-section-title">Identity</div>
+                ${editableFieldRow(dbId, 'vector_name', 'Name', v.vector_name, {})}
+                ${editableFieldRow(dbId, 'vector_id', 'Vector ID', v.vector_id, {})}
+            </div>`;
+
+        // Files
+        html += `
+            <div class="drawer-section">
+                <div class="drawer-section-title">Files</div>
+                ${fileLine(dbId, !!v.vector_file, baseName(v.vector_file), `/super_manage/vector_manage/vector_download/${dbId}/file`, 'Source file', 'vector_file', 'bi-file-earmark-text')}
+                ${fileLine(dbId, !!v.vector_png, baseName(v.vector_png), `/super_manage/vector_manage/vector_download/${dbId}/map`, 'Map image', 'vector_png', 'bi-image')}
+                ${fileLine(dbId, !!v.vector_gb, baseName(v.vector_gb), `/super_manage/vector_manage/vector_download/${dbId}/gb`, 'GenBank', 'vector_gb', 'bi-file-earmark-code')}
+            </div>`;
+
+        // Sequences
+        html += `
+            <div class="drawer-section">
+                <div class="drawer-section-title">Sequences</div>
+                ${editableFieldRow(dbId, 'NC5', 'v5NC', v.NC5, { long: true })}
+                ${editableFieldRow(dbId, 'NC3', 'v3NC', v.NC3, { long: true })}
+                ${editableFieldRow(dbId, 'iu20', 'iU20', v.iu20, { long: true })}
+                ${editableFieldRow(dbId, 'id20', 'iD20', v.id20, { long: true })}
+                ${editableFieldRow(dbId, 'i5NC', 'i5NC', v.i5NC, { long: true })}
+                ${editableFieldRow(dbId, 'i3NC', 'i3NC', v.i3NC, { long: true })}
+                ${editableFieldRow(dbId, 'vector_map', 'Full Seq', v.vector_map, { long: true })}
+            </div>`;
+
+        // Automation design results
+        if ((v.design_status || '') === 'Completed') {
+            html += `
+                <div class="drawer-section">
+                    <div class="drawer-section-title">Automation Design</div>
+                    <button class="btn btn-sm btn-outline-info" onclick="viewDesignResults(${dbId})">
+                        <i class="bi bi-eye"></i> View design results (primers, colony PCR)
+                    </button>
+                </div>`;
+        }
+
+        // Danger zone
+        html += `
+            <div class="drawer-section">
+                <div class="drawer-section-title text-danger" style="border-bottom-color:#f3c2c2;">Danger Zone</div>
+                <button class="btn btn-sm btn-outline-danger" onclick="del_gene(this, ${dbId})">
+                    <i class="bi bi-trash"></i> Delete this vector
+                </button>
+            </div>`;
+
+        return html;
+    }
+
+    function startFieldEdit(field) {
+        document.getElementById(`fld-disp-${field}`).classList.add('d-none');
+        document.getElementById(`fld-tools-${field}`).classList.add('d-none');
+        document.getElementById(`fld-edit-${field}`).classList.remove('d-none');
+        const ta = document.getElementById(`ta-${field}`);
+        if (ta) ta.focus();
+    }
+
+    function cancelFieldEdit(dbId) {
+        refreshDrawer(dbId);  // 丢弃未保存改动，从 vectorById 重建
+    }
+
+    function saveDrawerField(dbId, field) {
+        const ta = document.getElementById(`ta-${field}`);
+        if (!ta) return;
+        const value = ta.value;
+        const csrftoken = getCookie('csrftoken');
         showLoading();
-
         $.ajax({
             url: "{% url 'super_manage:vector_update_field' %}",
             type: "POST",
-            data: {
-                'csrfmiddlewaretoken': csrftoken,
-                'vector_id': vectorId,
-                'field': field,
-                'value': newValue
-            },
-            success: function(response) {
+            data: { 'csrfmiddlewaretoken': csrftoken, 'vector_id': dbId, 'field': field, 'value': value },
+            success: function (resp) {
                 hideLoading();
-                if (response.status === 'success') {
-                    alert('更新成功');
-                    document.getElementById(`display-${field}-${vectorId}`).innerText = newValue;
-                    document.getElementById(`display-${field}-${vectorId}`).classList.remove('d-none');
-                    inputElem.classList.add('d-none');
-                    document.getElementById(`save-${field}-${vectorId}`).classList.add('d-none');
+                if (resp.status === 'success') {
+                    vectorById[dbId][field] = value;
+                    if (field === 'vector_name' || field === 'vector_id') gridDirty = true;
+                    layer.msg('Saved', { icon: 1, time: 800 });
+                    refreshDrawer(dbId);
                 } else {
-                    alert('更新失败: ' + response.message);
+                    layer.msg('Save failed: ' + (resp.message || ''), { icon: 2 });
                 }
             },
-            error: function(xhr, errmsg, err) {
-                hideLoading();
-                alert('更新失败');
-            }
+            error: function () { hideLoading(); layer.msg('Save failed', { icon: 2 }); }
         });
+    }
+
+    function saveDrawerStatus(dbId) {
+        const newStatus = document.getElementById(`drawer-status-${dbId}`).value;
+        const csrftoken = getCookie('csrftoken');
+        showLoading();
+        $.ajax({
+            url: '/super_manage/vector_edit_item/',
+            type: 'POST',
+            data: { 'csrfmiddlewaretoken': csrftoken, 'vector_id': dbId, 'new_status': newStatus },
+            success: function (resp) {
+                hideLoading();
+                if (resp.status === 'success') {
+                    vectorById[dbId].status = newStatus;
+                    gridDirty = true;  // 可能在 Pending / ReadyToUse 之间移动
+                    layer.msg('Status updated', { icon: 1, time: 800 });
+                    refreshDrawer(dbId);
+                } else {
+                    layer.msg('Update failed: ' + (resp.message || ''), { icon: 2 });
+                }
+            },
+            error: function () { hideLoading(); layer.msg('Update failed', { icon: 2 }); }
+        });
+    }
+
+    function saveDrawerCloning(dbId) {
+        const sel = document.getElementById(`drawer-cloning-${dbId}`);
+        const value = sel.value;
+        vectorById[dbId].cloning_method = value;
+        gridDirty = true;  // Design 列显示克隆方法
+        updateVectorField(dbId, 'cloning_method', value, sel);
+    }
+
+    function copyField(field) {
+        const ta = document.getElementById(`ta-${field}`);
+        if (!ta) return;
+        const text = ta.value;
+        const done = () => layer.msg('Copied', { icon: 1, time: 700 });
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        } else {
+            fallbackCopy(text, done);
+        }
+    }
+
+    function fallbackCopy(text, done) {
+        const tmp = document.createElement('textarea');
+        tmp.value = text;
+        tmp.style.position = 'fixed';
+        tmp.style.opacity = '0';
+        document.body.appendChild(tmp);
+        tmp.focus(); tmp.select();
+        try { document.execCommand('copy'); if (done) done(); }
+        catch (e) { layer.msg('Copy failed', { icon: 2 }); }
+        document.body.removeChild(tmp);
     }
 
     // 删除Vector
@@ -868,48 +1006,7 @@
         });
     }
 
-    $('#editVectorModal').on('show.bs.modal', function (event) {
-        var button = $(event.relatedTarget); // Button that triggered the modal
-        var vectorId = button.data('vector-id'); // Extract info from data-* attributes
-        $(this).attr('data-vector-id', vectorId);
-    });
-
-    // 修改Vector状态
-    document.getElementById('statusForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        var modal = document.getElementById('editVectorModal');
-        var vectorId = modal.getAttribute('data-vector-id');
-        var status = document.getElementById('statusSelect').value;
-
-        // 确保 vectorId 实际上已经被设置
-        if (!vectorId) {
-            alert('Vector ID is missing');
-            return;
-        }
-
-        $.ajax({
-            url: '/super_manage/vector_edit_item/',
-            type: 'POST',
-            data: {
-                'csrfmiddlewaretoken': '{{ csrf_token }}',
-                'vector_id': vectorId,
-                'new_status': status
-            },
-            success: function(response) {
-                // 处理成功的响应
-                $('#editVectorModal').modal('hide');
-                alert('修改成功');
-                setTimeout(function () {
-                    window.location.reload();
-                }, 1000);
-            },
-            error: function() {
-                // 处理错误的响应
-                alert('修改失败');
-            }
-        });
-    });
+    // （Vector 状态变更已移入详情抽屉的 saveDrawerStatus，旧 editVectorModal 不再使用）
 
     // 上传文件
     function uploadFile(uploadLink) {
