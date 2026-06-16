@@ -2,6 +2,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
+from allauth.account.signals import email_confirmed, user_signed_up
 from notifications.tasks import (
     async_send_registration_user_email,
     async_send_registration_staff_notify,
@@ -17,14 +18,21 @@ from product.models import Vector
 from user_center.models import OrderInfo
 User = get_user_model()
 
-@receiver(post_save, sender=User)
-def user_registered_signal(sender, instance, created, **kwargs):
-    if created:
-        # 新用户创建成功时，假设我们有一个 “verify_link” 的生成逻辑
-        # verify_link = f"https://rootpath.com.cn/verify/{instance.id}/token..."
-        # 异步发送
-        # async_send_registration_user_email.delay(instance.id, verify_link)
-        async_send_registration_staff_notify.delay(instance.id)
+# ── 注册通知：改为「邮箱验证通过后」才通知管理员（防机器人刷收件箱）──────────────
+# 旧逻辑是 post_save(User, created) 一建号就通知，导致机器人用任意域名（含 gmail/
+# yahoo）批量注册时管理员被刷屏。改成下面两个信号后：
+#   - 普通邮箱注册：用户点了验证链接（email_confirmed）才通知 → 机器人不验证 = 不通知；
+#   - 社交登录（飞书等，无邮箱验证环节）：注册即视为可信内部用户，立即通知。
+@receiver(email_confirmed)
+def notify_staff_on_email_confirmed(request, email_address, **kwargs):
+    async_send_registration_staff_notify.delay(email_address.user_id)
+
+
+@receiver(user_signed_up)
+def notify_staff_on_social_signup(request, user, **kwargs):
+    # 仅社交登录（kwargs 带 sociallogin）即时通知；普通邮箱注册等 email_confirmed。
+    if kwargs.get('sociallogin') is not None:
+        async_send_registration_staff_notify.delay(user.id)
 
 # @receiver(post_save, sender=User)
 # def user_password_reset_signal(sender, instance, created, **kwargs):

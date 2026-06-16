@@ -17,6 +17,22 @@ class CustomSignupForm(forms.Form):
         max_length=254, required=False, label='Company / Institute',
         widget=forms.TextInput(attrs={'placeholder': 'Company / Institute (optional)'}),
     )
+    # 蜜罐字段：页面上对真人隐藏（signup.html 把它渲染到屏幕外），脚本/机器人通常会
+    # 把所有 input 一并填上 → 填了即判为机器人。与邮箱域名无关，能挡换用 gmail/yahoo
+    # 等真实域名的批量注册。真人留空 → 校验通过。
+    website = forms.CharField(
+        required=False, label='',
+        widget=forms.TextInput(attrs={
+            'autocomplete': 'off', 'tabindex': '-1', 'aria-hidden': 'true',
+            'style': 'position:absolute!important;left:-9999px!important;height:0;',
+        }),
+    )
+
+    def clean_website(self):
+        if (self.cleaned_data.get('website') or '').strip():
+            # 不暴露真实原因，避免提示机器人；表单整体失败 → 不建号、不发通知。
+            raise forms.ValidationError('注册校验失败，请重试。')
+        return ''
 
     def clean_phone(self):
         # phone 在模型上是 unique，注册时若与已有号码重复要友好报错（而非 500）

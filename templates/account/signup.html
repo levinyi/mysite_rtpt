@@ -71,7 +71,10 @@
                   {% endif %}
 
                   {% for field in form %}
-                    {% if field.field.widget.input_type == 'checkbox' %}
+                    {% if field.name == 'website' %}
+                      {# 蜜罐字段：屏幕外隐藏，真人看不到；机器人若填了会在 clean_website 被判机器人 #}
+                      <div style="position:absolute;left:-9999px;height:0;overflow:hidden;" aria-hidden="true">{{ field }}</div>
+                    {% elif field.field.widget.input_type == 'checkbox' %}
                       <div class="form-check mb-3">
                         {{ field|add_class:"form-check-input" }}
                         <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
