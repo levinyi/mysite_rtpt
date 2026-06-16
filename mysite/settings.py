@@ -68,6 +68,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',  # allauth中间件
+    # super_manage 后台访问控制：只允许 superuser / staff / SecondaryAdminGroup，
+    # 堵住「任何登录用户直达 /super_manage/ 读全站数据」的越权漏洞。放最后，确保 request.user 已就绪。
+    'super_manage.middleware.SuperManageAccessMiddleware',
 ]
 
 
