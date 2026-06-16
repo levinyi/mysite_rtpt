@@ -241,6 +241,32 @@ ACCOUNT_SESSION_REMEMBER = True
 SITE_ID = 1
 AUTHENTICATION_BACKENDS = [
     # allauth 需要同时包含这两个后端
-    'django.contrib.auth.backends.ModelBackend', 
+    'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+# ── ANTI-BOT 注册加固（2026-06-16，应对机器人批量注册）──────────────────────────
+# 1) 自定义 allauth Adapter：注册时拦截一次性 / 抛弃型邮箱域名（见 user_account/adapter.py）。
+#    机器人邮箱被直接拒，用户不会被创建 → 也就不会触发"新用户注册"管理员通知邮件。
+ACCOUNT_ADAPTER = 'user_account.adapter.AntiBotAccountAdapter'
+
+# 2) 社交登录（飞书 / 微信 / GitHub）豁免邮箱验证：
+#    即使把 ACCOUNT_EMAIL_VERIFICATION 切到 mandatory，飞书登录也永不被卡。
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+
+# 3) 注册 / 登录接口按 IP 限流，挡批量脚本（allauth 65 的 ACCOUNT_RATE_LIMITS，整体覆盖默认值）。
+#    signup 收紧到 5 次/分钟·IP、30 次/小时·IP；其余沿用 allauth 合理默认。
+ACCOUNT_RATE_LIMITS = {
+    'login': '30/m/ip',
+    'login_failed': '10/m/ip,5/5m/key',
+    'signup': '5/m/ip,30/h/ip',
+    'reset_password': '20/m/ip,5/m/key',
+    'reset_password_from_key': '20/m/ip',
+    'confirm_email': '1/3m/key',
+    'change_password': '5/m/user',
+    'manage_email': '10/m/user',
+}
+# 可选：追加更多一次性邮箱域名（无需改代码）。例：DISPOSABLE_EMAIL_DOMAINS_EXTRA=a.com,b.net
+DISPOSABLE_EMAIL_DOMAINS_EXTRA = [
+    e.strip() for e in str(config('DISPOSABLE_EMAIL_DOMAINS_EXTRA', default='')).split(',') if e.strip()
 ]
