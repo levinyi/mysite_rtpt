@@ -761,9 +761,14 @@ def vector_update_field(request):
 
         # 获取相应的 vector 实例
         vector = Vector.objects.get(id=vector_id)
-        
+
         # 检查并更新字段
         if hasattr(vector, field):
+            # 布尔字段（如 is_public 公开开关）：POST 传来的是字符串，需转成真正的布尔值
+            from django.db.models import BooleanField
+            model_field = vector._meta.get_field(field)
+            if isinstance(model_field, BooleanField):
+                value = str(value).strip().lower() in ('1', 'true', 'yes', 'on')
             setattr(vector, field, value)
             vector.save()
             return JsonResponse({'status': 'success', 'message': 'Field updated successfully'})

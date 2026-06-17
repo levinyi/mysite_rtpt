@@ -382,7 +382,7 @@ def order_create(request):
 
         return JsonResponse({'status': 'success', 'message': 'Data saved successfully'})
     else:
-        company_vectors = Vector.objects.filter(user=None)
+        company_vectors = Vector.objects.filter(is_public=True)  # 公司公开载体（客户目录可见）
         species_list = Species.objects.all()
         # 假设 species_list 是您的物种模型列表
         species_names = [species.species_name for species in species_list]
@@ -2564,8 +2564,8 @@ def customer_vector_data_api(request):
 
 @login_required
 def rootpath_vector_data_api(request):
-    '''获取公司的vector数据'''
-    vector_list = Vector.objects.filter(user=None).values(
+    '''获取公司的vector数据（只给客户看公开的）'''
+    vector_list = Vector.objects.filter(is_public=True).values(
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
         'status', 'user__username', 'vector_file', 'vector_png', 'vector_gb'
     )
@@ -2576,10 +2576,12 @@ def rootpath_vector_data_api(request):
 def vector_upload(request):
     '''当用户在manage_vector页面点击上传按钮时，调用此函数，上传自己的vector文件'''
     if request.method == 'POST':
+        from user_account.permissions import vector_owner_for
         vector_file = request.FILES.get('vector_file')
         vector_name = request.POST.get('vector_name')
+        # 上传者是管理员 -> 归公司(user=None)；客户 -> 归本人。新建默认 is_public=False（公司内部/客户私有）。
         this_vector, created = Vector.objects.update_or_create(
-            user=request.user,
+            user=vector_owner_for(request.user),
             vector_name=vector_name,
             vector_file=vector_file,
             defaults={

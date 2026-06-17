@@ -65,8 +65,19 @@ class Vector(models.Model):
     create_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=255, default='Received')
 
+    # 可见性与归属解耦：
+    #   user=None  + is_public=True  -> 公司公开载体（客户目录可见）
+    #   user=None  + is_public=False -> 公司内部载体（仅后台/管理员可见）
+    #   user=客户  + is_public=False -> 客户私有载体（仅该客户可见）
+    # 归属由“上传者身份”决定：管理员上传 -> user=None（公司）；客户上传 -> user=客户。
+    is_public = models.BooleanField(default=False, verbose_name="是否对客户公开")
+
     def is_company_vector(self):
         return self.user is None
+
+    def is_visible_to_customers(self):
+        """是否出现在客户目录里（公司公开载体）。"""
+        return self.is_public
 
     def __str__(self):
         return self.vector_name
