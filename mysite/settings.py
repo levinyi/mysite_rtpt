@@ -273,3 +273,9 @@ ACCOUNT_RATE_LIMITS = {
 DISPOSABLE_EMAIL_DOMAINS_EXTRA = [
     e.strip() for e in str(config('DISPOSABLE_EMAIL_DOMAINS_EXTRA', default='')).split(',') if e.strip()
 ]
+
+# 公司邮箱域名：这些域名禁止用户名密码注册，引导走飞书 SSO（见 user_account/adapter.py）。
+# 只拦本地注册；飞书社交登录走 auto_signup(form=None)、不经过 clean_email，不受影响。
+COMPANY_SSO_EMAIL_DOMAINS = [
+    e.strip() for e in str(config('COMPANY_SSO_EMAIL_DOMAINS', default='rootpath.com.cn,rootpathgx.com')).split(',') if e.strip()
+]
