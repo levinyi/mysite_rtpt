@@ -217,6 +217,10 @@ ACCOUNT_EMAIL_VERIFICATION = config('ACCOUNT_EMAIL_VERIFICATION', default='optio
 # 注册表单扩展字段（手机 + 公司，选填），见 user_account/forms.py
 ACCOUNT_SIGNUP_FORM_CLASS = 'user_account.forms.CustomSignupForm'
 
+# 本地注册表单（仅用户名密码注册）：在此拦截公司邮箱(rootpath)，引导走飞书。
+# 社交/飞书注册用 socialaccount 自己的表单，不经过这里，故不受影响。
+ACCOUNT_FORMS = {'signup': 'user_account.account_forms.LocalSignupForm'}
+
 # allauth 自带 6 位密码下限，与上面清空的 AUTH_PASSWORD_VALIDATORS 配合一并放宽
 ACCOUNT_PASSWORD_MIN_LENGTH = 1
 
