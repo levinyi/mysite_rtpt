@@ -327,7 +327,7 @@
             { name: '#', width: '48px', sort: false },
             { name: 'id', hidden: true },
             { name: 'Vector', width: '230px', formatter: vectorCellFormatter },
-            { name: 'User', width: '108px', formatter: (cell) => cell || 'RootPath' },
+            { name: 'User', width: '140px', formatter: (cell) => cell || 'RootPath' },
             { name: 'Files', width: '104px', sort: false, formatter: filesCellFormatter },
             { name: 'Cloning', width: '110px', formatter: cloningCellFormatter },
             { name: 'Design', width: '210px', sort: false, formatter: (cell, row) => designCellFormatter(cell, row, allowDesign) },
@@ -442,7 +442,7 @@
             index + 1,                                                       // #
             vector.id,                                                       // id (hidden, 主键)
             `${vector.vector_name || ''} ${vector.vector_id || ''}`.trim(),  // Vector (可搜索文本)
-            vector.user__username || 'RootPath',                            // User
+            vector.user__username || (vector.is_public ? 'RootPath (public)' : 'RootPath (internal)'),  // User
             '',                                                              // Files (格式化器从 vectorById 取)
             vector.cloning_method || '',                                     // Cloning (可搜索)
             vector.design_status || 'Pending',                               // Design (可搜索)
@@ -812,6 +812,20 @@
                 <div class="drawer-section-title">Basics</div>
                 <div class="drawer-meta">
                     <span class="k">User</span><span>${esc(v.user__username || 'RootPath')}</span>
+                    <span class="k">Visible to</span>
+                    <span class="d-flex align-items-center gap-2">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="drawer-public-${dbId}" ${v.is_public ? 'checked' : ''}
+                                   ${v.user__username ? 'disabled' : ''}
+                                   onchange="saveDrawerPublic(${dbId})">
+                            <label class="form-check-label small" for="drawer-public-${dbId}">
+                                ${v.user__username
+                                    ? 'Owned by ' + esc(v.user__username) + ' — only that customer'
+                                    : (v.is_public ? 'All customers (public)' : 'Backend only (internal)')}
+                            </label>
+                        </div>
+                    </span>
                     <span class="k">Design</span><span>${designStatusBadge(v.design_status)}</span>
                     <span class="k">Status</span>
                     <span class="d-flex align-items-center gap-2">
@@ -944,6 +958,15 @@
             },
             error: function () { hideLoading(); layer.msg('Update failed', { icon: 2 }); }
         });
+    }
+
+    function saveDrawerPublic(dbId) {
+        const box = document.getElementById(`drawer-public-${dbId}`);
+        const value = box.checked;
+        vectorById[dbId].is_public = value;
+        gridDirty = true;  // User 列显示 public / internal
+        updateVectorField(dbId, 'is_public', value ? 'true' : 'false', box);
+        refreshDrawer(dbId);
     }
 
     function saveDrawerCloning(dbId) {

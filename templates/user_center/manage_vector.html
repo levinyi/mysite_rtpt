@@ -81,9 +81,15 @@
             </div>
         </div>
         <div class="card-body">
+            {% if is_backend_admin %}
+            <div class="alert alert-warning" role="alert">
+            管理员视图：这里同时列出你自己名下的载体和<strong>公司内部（未公开）</strong>载体——你代客户上传的 pCVaxxx 都归公司，会出现在这张表里。要让所有客户在下方 RootPath Vectors 看到某个载体，去后台 Vector Manage 的抽屉里把 Visible to 打开。
+            </div>
+            {% else %}
             <div class="alert alert-info" role="alert">
             Please note: Once you've uploaded your vector file, it will require approval by RootPath staff. Only when the status is updated to 'ReadyToUse' will your vector be available on the ordering page.
             </div>
+            {% endif %}
             <div id="customer-vector-table"></div>
         </div>
     </div>

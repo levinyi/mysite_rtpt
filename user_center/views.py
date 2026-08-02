@@ -16,10 +16,12 @@ from django.shortcuts import get_list_or_404, render, get_object_or_404, redirec
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 
 from product.models import GeneSynEnzymeCutSite, Species, Vector
+from user_account.permissions import is_backend_admin
 from tools.scripts.AnalysisSequence import convert_gene_table_to_RepeatsFinder_Format, process_gene_table_results
 from tools.scripts.ParsingGenBank import addMultipleFeaturesToGeneBank, addAnalysisFeaturesAndFragments
 # from tools.scripts.penalty_score_predict import predict_new_data_from_df
@@ -42,6 +44,19 @@ from user_center.utils.sequence_processing import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def workspace_vectors(user):
+    """前台 My Vectors 的工作集。
+
+    客户 = 自己名下的载体；后台管理员 = 自己名下 + 公司内部未公开的载体。
+    管理员代客户上传的载体归属公司(user=None)，不并进来的话上传完前台两个列表
+    都看不见，也没法拿来下单。已公开的公司载体不并入，避免和 RootPath Vectors
+    那张表重复。
+    """
+    if is_backend_admin(user):
+        return Vector.objects.filter(Q(user=user) | Q(user__isnull=True, is_public=False))
+    return Vector.objects.filter(user=user)
 
 # Create your views here.
 @login_required()
@@ -389,7 +404,7 @@ def order_create(request):
 
         # 然后将这个列表转换为 JSON, 用于前端Handsontable中展示物种列表
         species_names_json = json.dumps(species_names)
-        customer_vectors = Vector.objects.filter(user=request.user, status="ReadyToUse")
+        customer_vectors = workspace_vectors(request.user).filter(status="ReadyToUse")
         return render(request, 'user_center/manage_order_create.html', {'customer_vectors': customer_vectors, 'company_vectors': company_vectors, 'species_names_json': species_names_json})
 
 
@@ -2548,12 +2563,13 @@ def process_sequence_get_highlight_position(seq, forbidden_seq):
 def manage_vector(request):
     '''list vectors of the company and the user'''
     '''前端页面通过javascript从下面的customer_vector_data_api和rootpath_vector_data_api获取数据'''
-    return render(request, 'user_center/manage_vector.html')
+    return render(request, 'user_center/manage_vector.html',
+                  {'is_backend_admin': is_backend_admin(request.user)})
 
 @login_required
 def customer_vector_data_api(request):
     '''获取用户的vector数据'''
-    vector_list = Vector.objects.filter(user=request.user).values(
+    vector_list = workspace_vectors(request.user).values(
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
         'status', 'user__username', 'vector_file', 'vector_png', 'vector_gb',
         'design_status', 'cloning_method', 'i5NC', 'i3NC'
@@ -2598,7 +2614,7 @@ def vector_delete(request):
     if request.method == 'POST':
         try:
             vector_id = request.POST.get('vector_id')
-            vector = Vector.objects.get(user=request.user, id=vector_id)
+            vector = workspace_vectors(request.user).get(id=vector_id)
 
             # 删除与之关联的文件
             # 删除原始GenBank文件
@@ -2653,7 +2669,7 @@ def vector_automation_design_trigger(request):
             return JsonResponse({'status': 'error', 'message': f'不支持的克隆方法: {forced_method}'})
 
         try:
-            vector = Vector.objects.get(user=request.user, id=vector_id)
+            vector = workspace_vectors(request.user).get(id=vector_id)
 
             # 检查是否已上传文件
             if not vector.vector_file:
@@ -2699,7 +2715,7 @@ def vector_automation_design_status(request):
     if request.method == 'GET':
         vector_id = request.GET.get('vector_id')
         try:
-            vector = Vector.objects.get(user=request.user, id=vector_id)
+            vector = workspace_vectors(request.user).get(id=vector_id)
 
             def parse_primer(value):
                 if value and '::' in value:
@@ -2763,7 +2779,7 @@ def vector_automation_design_download(request, vector_id):
     下载改造后的GenBank文件
     """
     try:
-        vector = Vector.objects.get(user=request.user, id=vector_id)
+        vector = workspace_vectors(request.user).get(id=vector_id)
 
         if not vector.vector_gb:
             return JsonResponse({

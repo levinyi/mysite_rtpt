@@ -501,7 +501,7 @@ def vector_data_api(request):
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
         'i5NC', 'i3NC',
         'status','user__username', 'vector_file', 'vector_png', 'vector_gb',
-        'design_status', 'cloning_method', 'design_error'
+        'design_status', 'cloning_method', 'design_error', 'is_public'
     )
     return JsonResponse({'data': list(vector_list)})
 
