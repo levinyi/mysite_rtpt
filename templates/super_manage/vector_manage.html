@@ -6,6 +6,14 @@
 <style>
     :root { --vec-brand: #1E3A8A; }
 
+    /* 紧凑表格：grid.js 主题默认 td padding 12px/24px 且 box-sizing:content-box，
+       行被撑高，且 8 列 × 48px 不可压缩的横向 padding 会挤掉最后一列(Actions)的内容 */
+    .gridjs-th,
+    .gridjs-td { box-sizing: border-box; padding: 8px 10px; font-size: 13px; vertical-align: middle; }
+    .gridjs-th { padding-top: 9px; padding-bottom: 9px; font-size: 12px; }
+    .gridjs-td .btn-sm { --bs-btn-padding-y: .2rem; --bs-btn-padding-x: .45rem; --bs-btn-font-size: .72rem; line-height: 1.25; }
+    .gridjs-tbody .gridjs-tr:hover .gridjs-td { background-color: #f8fafc; }
+
     .truncate {
         display: inline-block;
         max-width: 150px;  /* 限制宽度，可根据需求调整 */
@@ -15,12 +23,19 @@
     }
 
     /* 主表 Vector 列：名称 + 副标 ID */
-    .vec-cell { line-height: 1.25; }
-    .vec-name { font-weight: 600; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; display: block; }
+    .vec-cell { line-height: 1.2; }
+    .vec-name { font-weight: 600; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block; }
     .vec-id { font-size: 11px; color: #6b7280; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .vec-user { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Design 列：徽标 / 方法选择 / 按钮单行排布，放不下才换行 */
+    .vec-design { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+    .vec-method-select { width: 74px; font-size: .7rem; line-height: 1.25; padding: .2rem 1.2rem .2rem .35rem; background-position: right .25rem center; }
+    .vec-design-tag { flex: 0 0 100%; line-height: 1.1; }
+    .vec-design-err { flex: 1 0 100%; font-size: .7rem; color: #dc3545; word-break: break-all; cursor: pointer; line-height: 1.2; }
 
     /* Files 图标列 */
-    .files-icons { display: flex; gap: 10px; align-items: center; }
+    .files-icons { display: flex; gap: 8px; align-items: center; }
     .files-icons a { font-size: 1.05rem; line-height: 1; text-decoration: none; }
     .files-icons .f-on { color: var(--vec-brand); }
     .files-icons .f-off { color: #cbd5e1; }
@@ -324,16 +339,23 @@
     function buildVectorColumns(allowDesign) {
         // 两个 Tab 列结构一致；Design 列在 Pending 可触发设计、在 ReadyToUse 只读 + 查看
         return [
-            { name: '#', width: '48px', sort: false },
+            { name: '#', width: '50px', sort: false },
             { name: 'id', hidden: true },
-            { name: 'Vector', width: '230px', formatter: vectorCellFormatter },
-            { name: 'User', width: '140px', formatter: (cell) => cell || 'RootPath' },
-            { name: 'Files', width: '104px', sort: false, formatter: filesCellFormatter },
-            { name: 'Cloning', width: '110px', formatter: cloningCellFormatter },
-            { name: 'Design', width: '210px', sort: false, formatter: (cell, row) => designCellFormatter(cell, row, allowDesign) },
-            { name: 'Status', width: '110px', formatter: statusCellFormatter },
-            { name: 'Actions', width: '66px', sort: false, formatter: actionsCellFormatter },
+            { name: 'Vector', width: '210px', formatter: vectorCellFormatter },
+            { name: 'User', width: '130px', formatter: userCellFormatter },
+            { name: 'Files', width: '84px', sort: false, formatter: filesCellFormatter },
+            { name: 'Cloning', width: '96px', formatter: cloningCellFormatter },
+            // ReadyToUse 只有徽标 + View，不需要 Pending 那么宽
+            { name: 'Design', width: allowDesign ? '196px' : '150px', sort: false, formatter: (cell, row) => designCellFormatter(cell, row, allowDesign) },
+            { name: 'Status', width: '96px', formatter: statusCellFormatter },
+            { name: 'Actions', width: '76px', sort: false, formatter: actionsCellFormatter },
         ];
+    }
+
+    // User 列：过长的用户名/邮箱截断成一行，完整值挂 title
+    function userCellFormatter(cell) {
+        const u = cell || 'RootPath';
+        return gridjs.html(`<span class="vec-user" title="${esc(u)}">${esc(u)}</span>`);
     }
 
     // Cloning 列：克隆方法徽标（编辑在详情抽屉里）
@@ -397,43 +419,43 @@
         const designStatus = v.design_status || 'Pending';
         const cloningMethod = v.cloning_method || '';
         const methodPicker = `
-            <select class="form-select form-select-sm mb-1" id="method-select-${vectorId}" style="font-size: 0.75rem;">
+            <select class="form-select form-select-sm vec-method-select" id="method-select-${vectorId}" title="Cloning method">
                 <option value="">Auto</option>
                 <option value="Gibson">Gibson</option>
                 <option value="GoldenGate">GoldenGate</option>
                 <option value="T4">T4</option>
             </select>`;
         const viewBtn = `<button class="btn btn-sm btn-outline-info" onclick="viewDesignResults(${vectorId})" title="View Results"><i class="bi bi-eye"></i> View</button>`;
-        let statusDisplay = '', buttons = '';
+        const parts = [];
         if (designStatus === 'Completed') {
-            statusDisplay = `<div class="mb-1"><span class="badge bg-success">${esc(cloningMethod || 'Completed')}</span></div>`;
-            buttons = allowDesign
-                ? `${methodPicker}
-                   <button class="btn btn-sm btn-outline-primary me-1" onclick="startAutomationDesign(${vectorId})" title="Re-design"><i class="bi bi-arrow-clockwise"></i></button>
-                   ${viewBtn}`
-                : viewBtn;
+            parts.push(`<span class="badge bg-success">${esc(cloningMethod || 'Completed')}</span>`);
+            if (allowDesign) {
+                parts.push(methodPicker);
+                parts.push(`<button class="btn btn-sm btn-outline-primary" onclick="startAutomationDesign(${vectorId})" title="Re-design"><i class="bi bi-arrow-clockwise"></i></button>`);
+            }
+            parts.push(viewBtn);
         } else if (designStatus === 'Processing') {
-            statusDisplay = `<div class="mb-1"><span class="badge bg-warning text-dark">Processing…</span></div>`;
-            buttons = `<button class="btn btn-sm btn-secondary" disabled><i class="bi bi-hourglass-split"></i> Wait</button>`;
+            parts.push(`<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Processing…</span>`);
         } else if (designStatus === 'Failed') {
             const designError = v.design_error || '';
             const errorPreview = designError.length > 40 ? designError.substring(0, 40) + '…' : designError;
-            statusDisplay = `<div class="mb-1"><span class="badge bg-danger">Failed</span></div>`;
-            if (designError) {
-                statusDisplay += `<div class="mb-1 design-error-preview" style="font-size:.72rem; color:#dc3545; max-width:200px; word-break:break-all; cursor:pointer; text-align:left;" data-error="${esc(designError)}" title="Click to view full error">${esc(errorPreview)}</div>`;
-            }
-            buttons = allowDesign
-                ? `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry"><i class="bi bi-arrow-clockwise"></i> Retry</button>`
-                : '';
-        } else {
+            parts.push(`<span class="badge bg-danger">Failed</span>`);
             if (allowDesign) {
-                statusDisplay = `<div class="mb-1"><span class="badge bg-secondary">Not Designed</span></div>`;
-                buttons = `${methodPicker}<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`;
-            } else {
-                statusDisplay = `<div class="mb-1"><span class="badge bg-light text-secondary border">Manual</span></div>`;
+                parts.push(methodPicker);
+                parts.push(`<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry"><i class="bi bi-arrow-clockwise"></i></button>`);
             }
+            if (designError) {
+                parts.push(`<div class="vec-design-err design-error-preview" data-error="${esc(designError)}" title="Click to view full error">${esc(errorPreview)}</div>`);
+            }
+        } else if (allowDesign) {
+            // 徽标独占一行，下面一行放"方法下拉 + Design"，196px 列宽内不会挤成三行
+            parts.push(`<div class="vec-design-tag"><span class="badge bg-secondary">Not Designed</span></div>`);
+            parts.push(methodPicker);
+            parts.push(`<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`);
+        } else {
+            parts.push(`<span class="badge bg-light text-secondary border">Manual</span>`);
         }
-        return gridjs.html(`<div style="text-align:center;">${statusDisplay}${buttons}</div>`);
+        return gridjs.html(`<div class="vec-design">${parts.join('')}</div>`);
     }
 
     function buildVectorRows(vectors) {
