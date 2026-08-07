@@ -777,7 +777,7 @@ class VectorAutomationDesigner:
             design_result: 克隆方法设计结果
             parsed_data: 解析后的GenBank数据
             target_tm: 目标Tm值（默认60℃）
-            variant: 引物名里的图谱版本号（改造 'M1' / 不改造 'A1'）
+            variant: 引物名里的图谱版本号（改造 'M1'；不改造传空串，见 generate_primer_name）
 
         Returns:
             dict: 引物设计结果或None
@@ -1002,15 +1002,16 @@ class VectorAutomationDesigner:
             self.errors.append("骨架PCR引物设计失败：正反向引物间存在明显二聚体")
             return None
 
+        # 骨架引物只在不改造模式下设计，质粒没动过，引物名里用原编号、不带版本号
         forward['template_start'] = v3nc_start
         forward['template_end'] = v3nc_start + forward['length']
         forward['name'] = self.generate_primer_name(
-            vector_code, '3BB', f"{forward['template_start']}-{forward['template_end']}", variant='A1')
+            vector_code, '3BB', f"{forward['template_start']}-{forward['template_end']}", variant='')
 
         reverse['template_start'] = v5nc_end - reverse['length']
         reverse['template_end'] = v5nc_end
         reverse['name'] = self.generate_primer_name(
-            vector_code, '5BBrc', f"{reverse['template_start']}-{reverse['template_end']}", variant='A1')
+            vector_code, '5BBrc', f"{reverse['template_start']}-{reverse['template_end']}", variant='')
 
         return {'forward': forward, 'reverse': reverse, 'heterodimer_dg': hetero_dg}
 
@@ -1753,7 +1754,9 @@ class VectorAutomationDesigner:
         """
         生成引物名称，编号用 xxxx 占位，待人工从引物总表分配唯一编号后替换。
         NC-PCR 默认前缀 YHYxxxx；菌落 PCR 传 prefix='OJYxxx'。
-        variant 跟随图谱版本号：改造版 'M1'，不改造版 'A1'。
+        variant 跟随图谱版本号：改造版 'M1'；不改造版传空串——按 VectorID 命名规则，
+        加版本号就意味着换了一条质粒，而不改造模式下客户手里始终是原来那条 pCVaxxx，
+        所以引物名里只能出现原编号（YHYxxxx-pCVa406-3BB，不是 pCVa406A1-3BB）。
         """
         code = vector_code or 'Vector'
         return f"{prefix}-{code}{variant}-{suffix}"

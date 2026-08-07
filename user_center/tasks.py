@@ -40,7 +40,10 @@ def async_vector_automation_design(vector_id, forced_method=None, modify=True):
         vector = Vector.objects.get(pk=vector_id)
 
         modify = bool(modify)
-        variant = 'M1' if modify else 'A1'
+        # 图谱版本号：改造后是一条新质粒，编号进位到 M1；不改造则一个碱基没动，
+        # 按 VectorID 命名规则加任何版本号都等于宣称换了质粒，所以只能沿用原编号
+        # （pCVa406(Amp) 永远是 pCVa406(Amp)），版本位留空。
+        variant = 'M1' if modify else ''
         if not modify:
             # 不改造只走 Gibson：显式指定，失败时错误信息才说得清楚
             # （不指定的话自动选择会在 Gibson 失败后悄悄落到 GG/T4）
@@ -163,11 +166,16 @@ def async_vector_automation_design(vector_id, forced_method=None, modify=True):
             append_error_message('菌落PCR引物设计失败')
 
         # 4. 生成设计后GenBank文件
-        # 构建输出文件名：改造版 M1，不改造版 A1（Annotated），只差版本号这一位
+        # 构建输出文件名：
+        #   改造版   pCVa406M1(Amp)-xxx.gb
+        #   不改造版 pCVa406(Amp)-xxx-Annotated.gb
+        # 不改造版编号段保持原样（见上面 variant 的说明），尾巴上的 -Annotated 只是文件标记，
+        # 不属于 VectorID——它和客户上传的原件同目录同名，不区分会被 Django 追加随机后缀。
+        map_tag = '' if modify else '-Annotated'
         if resistance:
-            output_filename = f"{vector_code}{variant}({resistance})-{filename_suffix}.gb"
+            output_filename = f"{vector_code}{variant}({resistance})-{filename_suffix}{map_tag}.gb"
         else:
-            output_filename = f"{vector_code}{variant}-{filename_suffix}.gb"
+            output_filename = f"{vector_code}{variant}-{filename_suffix}{map_tag}.gb"
             append_error_message('未在文件名中找到抗性信息')
 
         # 在临时目录生成 GenBank 文件，避免与 Django 存储路径冲突

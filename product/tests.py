@@ -437,13 +437,14 @@ class VectorNoModifyDesignTests(TestCase):
         design_result = designer.select_cloning_method(parsed, forced_method='Gibson')
         self.assertIsNotNone(design_result, f'Gibson 设计失败: {designer.errors}')
 
-        variant = 'M1' if modify else 'A1'
+        # 不改造模式下质粒没变，编号不进位，版本位留空
+        variant = 'M1' if modify else ''
         primers = designer.design_nc_pcr_primers(
             design_result, parsed, vector_code='pCVaTEST', variant=variant)
         backbone = None if modify else designer.design_backbone_pcr_primers(
             design_result, parsed, vector_code='pCVaTEST')
 
-        out_path = os.path.join(self._tmpdir, f'out_{variant}.gb')
+        out_path = os.path.join(self._tmpdir, f"out_{'M1' if modify else 'plain'}.gb")
         designer.generate_modified_genbank(
             design_result, parsed, primers, out_path, f'pCVaTEST{variant}',
             colony_primers=None, modify=modify, backbone_primers=backbone,
@@ -547,9 +548,15 @@ class VectorNoModifyDesignTests(TestCase):
         designer = VectorAutomationDesigner(self.gb_path)
         self.assertTrue(
             designer.generate_primer_name('pCVa001', '5OL', '0-30').endswith('pCVa001M1-5OL'))
+        # 不改造：引物名里只能出现原编号，加版本号就等于指向另一条质粒
         self.assertTrue(
-            designer.generate_primer_name('pCVa001', '5OL', '0-30', variant='A1')
-            .endswith('pCVa001A1-5OL'))
+            designer.generate_primer_name('pCVa001', '5OL', '0-30', variant='')
+            .endswith('pCVa001-5OL'))
+
+    def test_backbone_primer_names_keep_the_original_vector_code(self):
+        _, _, backbone = self._design(modify=False)
+        self.assertEqual(backbone['forward']['name'].split('-')[1], 'pCVaTEST')
+        self.assertEqual(backbone['reverse']['name'].split('-')[1], 'pCVaTEST')
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix='vec_task_test_'))
@@ -578,7 +585,7 @@ class VectorDesignTaskTests(TestCase):
         vector.vector_file.save('pCVa777(Kan)-test.gb', ContentFile(self.gb_bytes), save=True)
         return vector
 
-    def test_task_not_modified_writes_a1_file_and_backbone_primers(self):
+    def test_task_not_modified_keeps_the_vector_id_and_adds_backbone_primers(self):
         from user_center.tasks import async_vector_automation_design
 
         vector = self._make_vector()
@@ -590,8 +597,20 @@ class VectorDesignTaskTests(TestCase):
         vector.refresh_from_db()
         self.assertIs(vector.modify_vector, False)
         self.assertEqual(vector.design_status, 'Completed')
-        self.assertIn('A1(Kan)', os.path.basename(vector.vector_gb.name))
-        self.assertNotIn('M1', os.path.basename(vector.vector_gb.name))
+
+        # 质粒没改，编号不能进位：VectorID、图谱文件名、引物名里都只能是 pCVa777
+        self.assertEqual(vector.vector_id, 'pCVa777(Kan)')
+        gb_name = os.path.basename(vector.vector_gb.name)
+        self.assertTrue(gb_name.startswith('pCVa777(Kan)-'), gb_name)
+        self.assertNotIn('M1', gb_name)
+        self.assertNotIn('A1', gb_name)
+        # 和客户上传的原件同目录，靠 -Annotated 区分，否则会被 Django 追加随机后缀
+        self.assertTrue(gb_name.endswith('-Annotated.gb'), gb_name)
+        self.assertNotEqual(gb_name, os.path.basename(vector.vector_file.name))
+        for field in (vector.primer_forward, vector.primer_reverse,
+                      vector.backbone_primer_forward, vector.backbone_primer_reverse):
+            self.assertIn('-pCVa777-', field.split('::')[0])
+
         self.assertTrue(vector.backbone_primer_forward)
         self.assertTrue(vector.backbone_primer_reverse)
         self.assertIsNotNone(vector.backbone_primer_forward_tm)
@@ -615,6 +634,7 @@ class VectorDesignTaskTests(TestCase):
         vector.refresh_from_db()
         self.assertIs(vector.modify_vector, True)
         self.assertIn('M1(Kan)', os.path.basename(vector.vector_gb.name))
+        self.assertNotIn('-Annotated', os.path.basename(vector.vector_gb.name))
         self.assertIsNone(vector.backbone_primer_forward)
 
         record = SeqIO.read(vector.vector_gb.path, 'genbank')
