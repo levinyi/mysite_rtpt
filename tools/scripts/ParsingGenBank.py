@@ -4,6 +4,45 @@ from Bio.Seq import Seq
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
+def _feature_labels(feature):
+    """返回某 feature 上所有可用于标记匹配的字符串（label + note）。"""
+    return feature.qualifiers.get("label", []) + feature.qualifiers.get("note", [])
+
+
+def _label_matches(target, labels):
+    """不区分大小写的子串匹配，与 vector_automation.py 的解析行为保持一致。
+
+    target 例如 'iU20' / 'iD20'；labels 是 feature 的 label/note 列表。
+    """
+    t = target.lower()
+    return any(t in (l or "").lower() for l in labels)
+
+
+def locate_insertion_site(record, start_feature_label, end_feature_label):
+    """在 GenBank record 中定位插入区间 [start_pos, end_pos)。
+
+    返回 (start_pos, end_pos)，其中 start_pos = iU20 特征的结束坐标，
+    end_pos = iD20 特征的起始坐标。
+
+    与历史实现相比，这里统一了三件事，避免“模型字段/图谱都正常、唯独下载报
+    找不到 iU20/iD20”的不一致：
+      1. 同时检查 label 和 note（部分载体把标记写在 /note 里）；
+      2. 不区分大小写、允许子串（兼容 iu20 / iD20_xxx 等写法）；
+      3. **iD20 优先判定**：若同一 feature 同时挂了 iD20 和 iU20 两个 label
+         （下游位点被误标，415=pCVa259(Kan)-PC1302(dai)+ 即此情况），按 iD20
+         处理，不再被 iU20 分支抢走而丢失 end_pos。
+    """
+    start_pos = None
+    end_pos = None
+    for feature in record.features:
+        labels = _feature_labels(feature)
+        if _label_matches(end_feature_label, labels):
+            end_pos = feature.location.start
+        elif _label_matches(start_feature_label, labels):
+            start_pos = feature.location.end
+    return start_pos, end_pos
+
+
 def modify_locations(features, start_pos, end_pos, new_seq_length):
     offset = new_seq_length - (end_pos - start_pos)
     new_features = []
@@ -73,16 +112,8 @@ def addFeaturesToGeneBank(genebank_file, new_sequence, output_file, start_featur
     record = readGenBank(genebank_file)
     new_seq_length = len(new_sequence)
     
-    start_pos = None
-    end_pos = None
-    
-    for feature in record.features:
-        labels = feature.qualifiers.get("label", [])
-        if start_feature_label in labels:
-            start_pos = feature.location.end
-        elif end_feature_label in labels:
-            end_pos = feature.location.start
-    
+    start_pos, end_pos = locate_insertion_site(record, start_feature_label, end_feature_label)
+
     if start_pos is None or end_pos is None:
         raise ValueError("Start or end feature not found in the GenBank file")
     
@@ -120,22 +151,8 @@ def addMultipleFeaturesToGeneBank(genebank_file, output_file, new_sequences, new
 
     record = readGenBank(genebank_file)
 
-    start_pos = None
-    end_pos = None
-
-    # 寻找指定label的特征位置
-    for feature in record.features:
-        labels = feature.qualifiers.get("label", [])
-        # print("labels: ", labels)
-        if start_feature_label in labels:
-            # print(f"start_feature_label: {start_feature_label}")
-            start_pos = feature.location.end
-            # print(f"start_pos: {feature.location.start}, {feature.location.end}")
-        elif end_feature_label in labels:
-            # print(f"end_feature_label: {end_feature_label}")
-            end_pos = feature.location.start
-            # print(f"end_pos: {feature.location.start}, {feature.location.end}")
-    # print(f"I found start pos and end pos here: \n compare which is bigger\nfeature: {feature}, labels: {labels}, start_pos: {start_pos}, end_pos: {end_pos}")
+    # 寻找指定label的特征位置（统一走 locate_insertion_site，iD20 优先、大小写/note 兼容）
+    start_pos, end_pos = locate_insertion_site(record, start_feature_label, end_feature_label)
 
     if start_pos is None or end_pos is None:
         raise ValueError("无法在GenBank文件中找到指定的起始或终止特征")
@@ -196,16 +213,8 @@ def addAnalysisFeaturesAndFragments(genebank_file, output_file, new_sequences, n
 
     record = readGenBank(genebank_file)
 
-    start_pos = None
-    end_pos = None
-
-    # 寻找指定label的特征位置
-    for feature in record.features:
-        labels = feature.qualifiers.get("label", [])
-        if start_feature_label in labels:
-            start_pos = feature.location.end
-        elif end_feature_label in labels:
-            end_pos = feature.location.start
+    # 寻找指定label的特征位置（统一走 locate_insertion_site，iD20 优先、大小写/note 兼容）
+    start_pos, end_pos = locate_insertion_site(record, start_feature_label, end_feature_label)
 
     if start_pos is None or end_pos is None:
         raise ValueError("无法在GenBank文件中找到指定的起始或终止特征")

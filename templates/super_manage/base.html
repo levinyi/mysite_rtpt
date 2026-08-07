@@ -129,6 +129,12 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{% url 'super_manage:element_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/element_manage/' %}active{% endif %}">
+                            <i class="bi bi-diagram-3 me-2"></i>
+                            <span class="link-text">Element Library</span>
+                        </a>
+                    </li>
+                    <li>
                         <a href="{% url 'super_manage:species_manage' %}" class="nav-link link-body-emphasis {% if request.path == '/super_manage/species_manage/' %}active{% endif %}">
                             <i class="bi bi-tools me-2"></i>
                             <span class="link-text">Species Manage</span>

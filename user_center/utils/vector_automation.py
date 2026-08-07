@@ -257,6 +257,27 @@ class VectorAutomationDesigner:
         return False
 
     @staticmethod
+    def max_homopolymer_run(sequence):
+        """返回序列中最长单碱基连续重复（homopolymer）的长度。
+
+        例如 'ATAAAAAAGC' -> 6（6 连 A）。空序列返回 0。
+        用于菌落PCR引物质量打分：连续 run 越长越差。
+        """
+        sequence = sequence.upper()
+        if not sequence:
+            return 0
+        max_run = 1
+        cur = 1
+        for i in range(1, len(sequence)):
+            if sequence[i] == sequence[i - 1]:
+                cur += 1
+                if cur > max_run:
+                    max_run = cur
+            else:
+                cur = 1
+        return max_run
+
+    @staticmethod
     def has_gc_enrichment(sequence, window=12, max_count=10):
         """
         检查序列是否存在 GC 富集：任意 window bp 窗口内 G 或 C 的数量超过 max_count
@@ -926,11 +947,88 @@ class VectorAutomationDesigner:
             return None
         return {'tm': tm, 'gc': gc, 'hairpin_tm': hairpin_tm, 'homodimer_dg': homodimer_dg}
 
+    @staticmethod
+    def find_start_reference(parsed_data):
+        """在 GenBank features 中查找 "Start" 参考点（用于计算 Start_pos）。
+
+        匹配规则：把 feature 的 label/note 归一化（转小写、去掉点/下划线/空格等
+        非字母数字字符）后，等于 'start'，或以 'startpos' 结尾——可兼容
+        Start / Start.pos / Start_pos / Trim.ref.Start.pos 等写法。
+
+        返回该 feature 的 0-based 起始坐标；找不到返回 None
+        （调用方据此回退到 v5NC 起点——部分载体本就没有 Start 标记）。
+        """
+        features = parsed_data.get('original_features') or []
+        for feature in features:
+            qualifiers = getattr(feature, 'qualifiers', {}) or {}
+            labels = qualifiers.get('label', []) + qualifiers.get('note', [])
+            for lab in labels:
+                norm = re.sub(r'[^a-z0-9]', '', (lab or '').lower())
+                if norm == 'start' or norm.endswith('startpos'):
+                    try:
+                        return int(feature.location.start)
+                    except (TypeError, ValueError, AttributeError):
+                        continue
+        return None
+
+    def _colony_primer_penalty(self, primer):
+        """菌落PCR 单条引物质量罚分，分值越低越好。
+
+        主导项是 homopolymer 连续重复（用户反馈：6 连 A 的引物不应判为 best），
+        其次是 GC 偏离 50%、Tm 偏离 60、发卡、自二聚体、3' GC clamp。
+        """
+        seq = (primer.get('sequence') or '').upper()
+        if not seq:
+            return 999.0
+        penalty = 0.0
+
+        # 1) 单碱基连续重复：>=4 起罚，二次增长（4→2, 5→8, 6→18, 7→32），主导项
+        run = self.max_homopolymer_run(seq)
+        if run >= 4:
+            penalty += (run - 3) ** 2 * 2.0
+
+        # 2) GC 含量偏离 50%
+        gc = primer.get('gc')
+        if gc is None:
+            gc = self.calculate_gc_content(seq)
+        penalty += abs(gc - 50) * 0.3
+
+        # 3) Tm 偏离 target(60)
+        tm = primer.get('tm')
+        if tm is not None:
+            penalty += abs(tm - 60) * 0.5
+
+        # 4) 发卡 Tm（>30℃ 起罚）
+        hairpin_tm = primer.get('hairpin_tm')
+        if hairpin_tm is not None:
+            penalty += max(0.0, hairpin_tm - 30) * 0.2
+
+        # 5) 自二聚体 |ΔG|（>5 起罚）
+        homodimer_dg = primer.get('homodimer_dg')
+        if homodimer_dg is not None:
+            penalty += max(0.0, abs(homodimer_dg) - 5) * 0.3
+
+        # 6) 3' GC clamp：末位非 G/C 略罚
+        if seq[-1] not in 'GC':
+            penalty += 1.0
+
+        return penalty
+
+    def _score_colony_pair(self, pair):
+        """整对引物质量罚分（正向+反向+异源二聚体），越低越好。"""
+        score = self._colony_primer_penalty(pair.get('forward') or {})
+        score += self._colony_primer_penalty(pair.get('reverse') or {})
+        hetero = pair.get('heterodimer_dg')
+        if hetero is not None:
+            score += max(0.0, abs(hetero) - 5) * 0.3
+        return round(score, 2)
+
     def design_colony_pcr_primers(self, parsed_data, design_result, vector_code=None,
                                    num_pairs=5, target_tm=60,
                                    min_dist=50, max_dist=500,
                                    min_primer_len=18, max_primer_len=25,
-                                   candidate_limit=40, dimer_dg_limit=11):
+                                   candidate_limit=40, dimer_dg_limit=11,
+                                   start_ref=None):
         """
         设计菌落PCR引物（5对），适用于所有克隆方法。
 
@@ -1107,6 +1205,40 @@ class VectorAutomationDesigner:
             self.errors.append(
                 f"菌落PCR引物设计：仅找到 {len(pairs)}/{num_pairs} 对合格引物"
             )
+
+        # === 计算下载表所需字段 + 重新评估 best ===
+        # Start 参考点：优先用 GenBank 上的 "Start" 特征（如 Trim.ref.Start.pos）；
+        # 图谱没标 Start 时回退到 v5NC 起点（部分载体本就没有 Start 标记）。
+        if start_ref is None:
+            start_ref = self.find_start_reference(parsed_data)
+        if start_ref is None:
+            start_ref = v5nc_start
+
+        for pair in pairs:
+            f = pair['forward']
+            r = pair['reverse']
+            fwd_start = f['start']
+            rev_far_end = r['template_end']  # 反向引物 5' 起始对应的基因组坐标
+
+            # upstream: 正向引物 5' 起始 → v5NC 起点之间的序列
+            upstream_seq = sequence[fwd_start:v5nc_start].upper()
+            # downstream: v3NC 末尾 → 反向引物（远端）之间的序列
+            downstream_seq = sequence[v3nc_end:rev_far_end].upper()
+
+            pair['upstream_seq'] = upstream_seq
+            pair['downstream_seq'] = downstream_seq
+            # upstream+downstream：合并长度（不是序列拼接）
+            pair['combined_flank_length'] = len(upstream_seq) + len(downstream_seq)
+            # Start_pos：正向引物 5' 起始到 Start 参考点的相对距离
+            pair['start_pos'] = start_ref - fwd_start
+            # 质量罚分，越低越好
+            pair['score'] = self._score_colony_pair(pair)
+
+        # best = 质量罚分最低者；同分时取扩增子较短（index 较小）的一对
+        best_pair = min(pairs, key=lambda p: (p['score'], p['index']))
+        for pair in pairs:
+            pair['is_best'] = (pair is best_pair)
+
         return pairs
 
     @staticmethod

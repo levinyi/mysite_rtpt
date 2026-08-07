@@ -687,10 +687,11 @@
                         </thead>
                         <tbody>
             `;
+            const hasBestFlag = colonyPairs.some(p => p.is_best);
             colonyPairs.forEach(function(pair) {
                 const f = pair.forward || {};
                 const r = pair.reverse || {};
-                const isBest = pair.index === 1;
+                const isBest = hasBestFlag ? !!pair.is_best : (pair.index === 1);
                 const rowCls = isBest ? 'table-warning' : '';
                 const idxCell = isBest
                     ? `<span class="text-warning">★</span><br><span class="fw-bold">${pair.index}</span><br><span class="badge bg-warning text-dark" style="font-size:9px;">Best</span>`
@@ -756,12 +757,57 @@
         if (!vectorById[dbId]) return;
         document.getElementById('vectorDrawerBody').innerHTML = renderDrawerBody(dbId);
         setDrawerHeader(dbId);
+        loadVectorElements(dbId);
         bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('vectorDrawer')).show();
     }
 
     function refreshDrawer(dbId) {
         document.getElementById('vectorDrawerBody').innerHTML = renderDrawerBody(dbId);
         setDrawerHeader(dbId);
+        loadVectorElements(dbId);
+    }
+
+    // 抽屉里的「Elements」区块：这个载体上已登记进元件库的元件
+    function loadVectorElements(dbId) {
+        const box = document.getElementById(`drawer-elements-${dbId}`);
+        if (!box) return;
+
+        const elementLibUrl = "{% url 'super_manage:element_manage' %}";
+        fetch(`/super_manage/vector_elements/${dbId}/`)
+            .then(r => r.json())
+            .then(d => {
+                const rows = d.data || [];
+                if (!rows.length) {
+                    box.innerHTML = `
+                        <div class="text-muted small mb-2">这个载体还没登记任何元件。</div>
+                        <a href="${elementLibUrl}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-magic"></i> 去元件库提取
+                        </a>`;
+                    return;
+                }
+                const typeBadge = t => `<span class="badge bg-light text-dark border">${esc(t)}</span>`;
+                box.innerHTML = `
+                    <table class="table table-sm mb-2">
+                        <thead><tr class="small text-muted">
+                            <th>元件</th><th>类型</th><th>位置</th><th>长度</th>
+                        </tr></thead>
+                        <tbody>
+                        ${rows.map(e => `
+                            <tr>
+                                <td class="small fw-semibold">${esc(e.name)}
+                                    ${e.screen_enabled ? '' : '<span class="text-muted small">(未纳入筛查)</span>'}</td>
+                                <td>${typeBadge(e.element_type_display)}</td>
+                                <td class="small text-muted" style="font-family:ui-monospace,Menlo,monospace;">
+                                    ${e.start}–${e.end} ${e.strand > 0 ? '+' : '−'}</td>
+                                <td class="small text-muted">${e.length} bp</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                    <a href="${elementLibUrl}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-diagram-3"></i> 在元件库中管理
+                    </a>`;
+            })
+            .catch(() => { box.innerHTML = '<span class="text-danger small">元件载入失败</span>'; });
     }
 
     function setDrawerHeader(dbId) {
@@ -909,6 +955,15 @@
                     </button>
                 </div>`;
         }
+
+        // Elements（异步填充，见 loadVectorElements）
+        html += `
+            <div class="drawer-section">
+                <div class="drawer-section-title">Elements</div>
+                <div id="drawer-elements-${dbId}">
+                    <span class="text-muted small">载入中…</span>
+                </div>
+            </div>`;
 
         // Danger zone
         html += `

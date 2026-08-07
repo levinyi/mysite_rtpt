@@ -17,13 +17,20 @@ from django.views.decorators.csrf import csrf_exempt
 import numpy as np
 import pandas as pd
 # from account.models import UserProfile
-from product.models import Species, Vector
+from product.models import (
+    Species, Vector, VectorElement, VectorElementOccurrence, compute_seq_hash,
+)
 from user_account.models import UserProfile
 from user_center.models import OrderInfo
 from user_center.views import \
     vector_download as uc_vector_download, \
     vector_delete as uc_vector_delete
 from user_center.utils.vector_automation import VectorAutomationDesigner
+from user_center.utils.element_extractor import extract_candidates_bulk, commit_candidates
+from user_center.utils.element_screen import (
+    screen_sequence, find_element_by_sequence, invalidate_index_cache,
+    DEFAULT_MIN_LENGTH, DEFAULT_MIN_IDENTITY,
+)
 
 # from account.views import is_secondary_admin
 from django.http import HttpResponseForbidden
@@ -722,22 +729,35 @@ def vector_colony_pcr_csv(request, vector_id):
         'Note',
     ])
 
+    # 兼容历史数据：旧 JSON 没有 is_best 时回退到 index==1
+    has_best_flag = any(pair.get('is_best') for pair in pairs)
+
     for pair in pairs:
         fwd = pair.get('forward') or {}
         rev = pair.get('reverse') or {}
         fwd_seq = fwd.get('sequence', '') or ''
         rev_seq = rev.get('sequence', '') or ''
         pair_idx = pair.get('index') or 0
-        if pair_idx == 1:
-            note = '★ Best (shortest amplicon, recommended for first try)'
+
+        # upstream / downstream / 合并长度（设计时已算好，存于 JSON）
+        upstream_seq = pair.get('upstream_seq', '') or ''
+        downstream_seq = pair.get('downstream_seq', '') or ''
+        combined_len = pair.get('combined_flank_length')
+        if combined_len is None:
+            combined_len = len(upstream_seq) + len(downstream_seq)
+
+        is_best = pair.get('is_best') if has_best_flag else (pair_idx == 1)
+        if is_best:
+            note = '★ Best (recommended)'
         else:
             note = f'Backup #{pair_idx}'
+
         writer.writerow([
             plasmid_number,
-            fwd_seq,
-            pair.get('insert_start_pos', ''),
-            rev_seq,
-            f'{fwd_seq}{rev_seq}',
+            upstream_seq,
+            pair.get('start_pos', ''),
+            downstream_seq,
+            combined_len,
             fwd.get('name', ''),
             fwd_seq,
             rev.get('name', ''),
@@ -1065,3 +1085,325 @@ def species_manage(request):
 def species_data_api(request):
     species_list = Species.objects.values('id', 'species_name', 'species_note', 'species_codon_file')
     return JsonResponse({'data': list(species_list)})
+
+
+# ============================================================================
+# 质粒元件库（Vector Element Library）
+# ============================================================================
+
+@login_required
+def element_manage(request):
+    return render(request, 'super_manage/element_manage.html', {
+        # 列表给 Django 的 {% for %} 用；JSON 串给页面里的 JS 用
+        # （直接把 Python 的 tuple 列表插进 <script> 会渲染成 [('a', 'b')]，不是合法 JS）
+        'element_types': VectorElement.ELEMENT_TYPES,
+        'element_types_json': json.dumps(VectorElement.ELEMENT_TYPES),
+        'risk_levels_json': json.dumps(VectorElement.RISK_LEVELS),
+    })
+
+
+@login_required
+def element_data_api(request):
+    """元件列表。occurrence_count 让管理员一眼看出哪些是"跨多个载体复用"的核心元件。"""
+    qs = (
+        VectorElement.objects
+        .annotate(occurrence_count=Count('occurrences'))
+        .values('id', 'name', 'element_type', 'seq_length', 'sequence', 'aliases',
+                'description', 'source_vector_name', 'source_kind', 'genbank_feature_type',
+                'screen_enabled', 'risk_level', 'is_active', 'created_at', 'occurrence_count')
+        .order_by('element_type', 'name')
+    )
+    type_labels = dict(VectorElement.ELEMENT_TYPES)
+    data = []
+    for row in qs:
+        row['element_type_display'] = type_labels.get(row['element_type'], row['element_type'])
+        row['created_at'] = row['created_at'].strftime('%Y-%m-%d') if row['created_at'] else ''
+        data.append(row)
+    return JsonResponse({'data': data, 'element_types': VectorElement.ELEMENT_TYPES})
+
+
+@login_required
+def element_detail_api(request, element_id):
+    """元件详情：序列 + 它出现在哪些载体上。"""
+    try:
+        element = VectorElement.objects.get(pk=element_id)
+    except VectorElement.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': '元件不存在'}, status=404)
+
+    occurrences = [
+        {
+            'vector_id': occ.vector_id,
+            'vector_name': occ.vector.vector_name,
+            'vector_code': occ.vector.vector_id or '',
+            'owner': occ.vector.user.username if occ.vector.user else '公司',
+            'start': occ.start, 'end': occ.end, 'strand': occ.strand,
+            'label_in_vector': occ.label_in_vector,
+        }
+        for occ in element.occurrences.select_related('vector', 'vector__user').all()
+    ]
+    return JsonResponse({
+        'status': 'success',
+        'element': {
+            'id': element.pk,
+            'name': element.name,
+            'element_type': element.element_type,
+            'element_type_display': element.get_element_type_display(),
+            'sequence': element.sequence,
+            'seq_length': element.seq_length,
+            'aliases': element.aliases or [],
+            'description': element.description,
+            'source_vector_name': element.source_vector_name,
+            'source_kind': element.source_kind,
+            'genbank_feature_type': element.genbank_feature_type,
+            'screen_enabled': element.screen_enabled,
+            'risk_level': element.risk_level,
+            'is_active': element.is_active,
+        },
+        'occurrences': occurrences,
+    })
+
+
+# 只允许改这些字段：VectorElement 上还有 seq_hash / source_vector 等不该被前端直接写的字段
+ELEMENT_EDITABLE_FIELDS = {
+    'name', 'element_type', 'description', 'screen_enabled', 'risk_level', 'is_active', 'sequence',
+}
+
+
+@login_required
+@require_POST
+def element_update_field(request):
+    element_id = request.POST.get('element_id')
+    field = request.POST.get('field')
+    value = request.POST.get('value')
+
+    if not element_id or field not in ELEMENT_EDITABLE_FIELDS:
+        return JsonResponse({'status': 'error', 'message': f'字段不可编辑: {field}'})
+
+    try:
+        element = VectorElement.objects.get(pk=element_id)
+    except VectorElement.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': '元件不存在'})
+
+    if field in ('screen_enabled', 'is_active'):
+        value = str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+    elif field == 'sequence':
+        value = ''.join(str(value).split()).upper()
+        if not value:
+            return JsonResponse({'status': 'error', 'message': '序列不能为空'})
+        clash = VectorElement.objects.filter(seq_hash=compute_seq_hash(value)).exclude(pk=element.pk).first()
+        if clash:
+            return JsonResponse({'status': 'error',
+                                 'message': f'该序列已存在于元件「{clash.name}」，不能重复'})
+
+    setattr(element, field, value)
+    element.save()
+    invalidate_index_cache()
+    return JsonResponse({'status': 'success'})
+
+
+@login_required
+@require_POST
+def element_delete(request):
+    element_id = request.POST.get('element_id')
+    try:
+        element = VectorElement.objects.get(pk=element_id)
+    except (VectorElement.DoesNotExist, ValueError):
+        return JsonResponse({'status': 'error', 'message': '元件不存在'})
+    name = element.name
+    element.delete()   # occurrences 级联删除
+    invalidate_index_cache()
+    return JsonResponse({'status': 'success', 'message': f'已删除元件「{name}」'})
+
+
+MAX_EXTRACT_VECTORS = 200   # 一次解析的载体数上限，防止手滑全选几千个把请求拖死
+
+
+@login_required
+@require_POST
+def element_extract_api(request):
+    """批量解析载体图谱，列出候选元件（不落库）。
+
+    同一条序列在多个载体上只返回一行，带 occurrences —— 勾一次就能把它在所有
+    载体上的出现位置一起入库。
+    """
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': '请求体不是合法 JSON'})
+
+    try:
+        vector_ids = [int(v) for v in (payload.get('vector_ids') or [])]
+    except (TypeError, ValueError):
+        return JsonResponse({'status': 'error', 'message': '载体 ID 格式不对'})
+
+    if not vector_ids:
+        return JsonResponse({'status': 'error', 'message': '请先选择载体'})
+    if len(vector_ids) > MAX_EXTRACT_VECTORS:
+        return JsonResponse({'status': 'error',
+                             'message': f'一次最多解析 {MAX_EXTRACT_VECTORS} 个载体，'
+                                        f'当前选了 {len(vector_ids)} 个，请分批来'})
+
+    vectors = list(Vector.objects.filter(pk__in=vector_ids).select_related('user'))
+    if not vectors:
+        return JsonResponse({'status': 'error', 'message': '选中的载体都不存在'}, status=404)
+
+    result = extract_candidates_bulk(vectors)
+    result['status'] = 'success'
+    result['element_types'] = VectorElement.ELEMENT_TYPES
+    return JsonResponse(result)
+
+
+@login_required
+@require_POST
+def element_commit_api(request):
+    """把管理员勾选的候选元件写进库。"""
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': '请求体不是合法 JSON'})
+
+    selections = payload.get('selections') or []
+    if not selections:
+        return JsonResponse({'status': 'error', 'message': '未选择任何元件'})
+
+    stats = commit_candidates(selections, user=request.user)
+    invalidate_index_cache()
+
+    parts = [f"新建 {stats['created']} 条元件"]
+    if stats['linked']:
+        parts.append(f"关联 {stats['linked']} 条已有元件")
+    parts.append(f"登记 {stats['occurrences']} 处载体出现位置")
+    if stats['skipped']:
+        parts.append(f"跳过 {stats['skipped']} 条")
+    return JsonResponse({'status': 'success', 'message': '，'.join(parts), **stats})
+
+
+@login_required
+@require_GET
+def vector_elements_api(request, vector_id):
+    """某载体上已登记的元件（vector_manage 抽屉里的「本载体元件」）。"""
+    occurrences = (
+        VectorElementOccurrence.objects
+        .filter(vector_id=vector_id)
+        .select_related('element')
+        .order_by('start')
+    )
+    return JsonResponse({'status': 'success', 'data': [
+        {
+            'element_id': occ.element_id,
+            'name': occ.element.name,
+            'element_type': occ.element.element_type,
+            'element_type_display': occ.element.get_element_type_display(),
+            'length': occ.element.seq_length,
+            'start': occ.start, 'end': occ.end, 'strand': occ.strand,
+            'label_in_vector': occ.label_in_vector,
+            'risk_level': occ.element.risk_level,
+            'screen_enabled': occ.element.screen_enabled,
+        }
+        for occ in occurrences
+    ]})
+
+
+@login_required
+@require_POST
+def element_search_api(request):
+    """序列查询：库里有没有这段序列。"""
+    sequence = request.POST.get('sequence', '')
+    try:
+        min_length = int(request.POST.get('min_length') or DEFAULT_MIN_LENGTH)
+        min_identity = float(request.POST.get('min_identity') or DEFAULT_MIN_IDENTITY)
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': '参数格式不对'})
+
+    result = find_element_by_sequence(sequence, min_length=min_length, min_identity=min_identity)
+    if not result.get('ok'):
+        return JsonResponse({'status': 'error', 'message': result.get('error', '查询失败')})
+    result['status'] = 'success'
+    return JsonResponse(result)
+
+
+@login_required
+@require_POST
+def element_screen_api(request):
+    """重组风险筛查：客户序列 vs（元件库 + 目标载体骨架）。"""
+    sequence = request.POST.get('sequence', '')
+    vector_id = request.POST.get('vector_id')
+    try:
+        min_length = int(request.POST.get('min_length') or DEFAULT_MIN_LENGTH)
+        min_identity = float(request.POST.get('min_identity') or DEFAULT_MIN_IDENTITY)
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': '参数格式不对'})
+
+    target_vector = None
+    if vector_id:
+        try:
+            target_vector = Vector.objects.get(pk=vector_id)
+        except (Vector.DoesNotExist, ValueError):
+            return JsonResponse({'status': 'error', 'message': '目标载体不存在'})
+
+    result = screen_sequence(sequence, target_vector=target_vector,
+                             min_length=min_length, min_identity=min_identity)
+    if not result.get('ok'):
+        return JsonResponse({'status': 'error', 'message': result.get('error', '筛查失败')})
+    result['status'] = 'success'
+    return JsonResponse(result)
+
+
+@login_required
+@require_GET
+def element_vector_options_api(request):
+    """载体下拉数据源，两个 tab 共用，各自按标记过滤。
+
+    筛查 tab 要的是有骨架序列的（vector_map 或图谱都能出骨架）；抽取 tab 只能用有
+    GenBank 图谱的 —— 只有裸序列的载体没有 feature 标注，解析出来必然是空的，
+    以前这类载体也列在抽取下拉里，点进去只会得到"无法读取图谱"。
+    """
+    vectors = (
+        Vector.objects
+        .filter(Q(vector_map__gt='') | Q(vector_file__gt='') | Q(vector_gb__gt=''))
+        .annotate(element_count=Count('element_occurrences', distinct=True))
+        .values('id', 'vector_name', 'vector_id', 'status', 'element_count',
+                'vector_file', 'vector_gb')
+        .order_by('vector_name')
+    )
+    return JsonResponse({'data': [{
+        'id': v['id'],
+        'vector_name': v['vector_name'],
+        'vector_id': v['vector_id'],
+        'status': v['status'],
+        # 有 GenBank 图谱才谈得上抽取元件
+        'parseable': bool(v['vector_file'] or v['vector_gb']),
+        'element_count': v['element_count'],
+    } for v in vectors]})
+
+
+@login_required
+@require_GET
+def element_export_csv(request):
+    """导出元件库 CSV。"""
+    qs = VectorElement.objects.annotate(occurrence_count=Count('occurrences')).order_by('element_type', 'name')
+    type_labels = dict(VectorElement.ELEMENT_TYPES)
+
+    rows = [{
+        '元件名': e.name,
+        '类型': type_labels.get(e.element_type, e.element_type),
+        '长度(bp)': e.seq_length,
+        '出现载体数': e.occurrence_count,
+        '来源载体': e.source_vector_name,
+        '来源类型': e.get_source_kind_display(),
+        '别名': '; '.join(e.aliases or []),
+        '纳入筛查': '是' if e.screen_enabled else '否',
+        '风险等级': e.get_risk_level_display(),
+        '启用': '是' if e.is_active else '否',
+        '备注': e.description,
+        '序列': e.sequence,
+    } for e in qs]
+
+    df = pd.DataFrame(rows, columns=['元件名', '类型', '长度(bp)', '出现载体数', '来源载体',
+                                     '来源类型', '别名', '纳入筛查', '风险等级', '启用', '备注', '序列'])
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    filename = f"vector_elements_{datetime.date.today():%Y%m%d}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response.write('﻿')   # BOM，Excel 打开中文不乱码
+    df.to_csv(path_or_buf=response, index=False)
+    return response

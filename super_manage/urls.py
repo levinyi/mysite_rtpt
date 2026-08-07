@@ -50,4 +50,22 @@ urlpatterns = [
     # path('species_manage_old/', views.species_manage_old, name='species_manage_old'),
     path('species_manage/', views.species_manage, name='species_manage'),
     path('species_data_api/', views.species_data_api, name='species_data_api'),
+
+    # 质粒元件库
+    path('element_manage/', views.element_manage, name='element_manage'),
+    path('element_data_api/', views.element_data_api, name='element_data_api'),
+    path('element_detail/<int:element_id>/', views.element_detail_api, name='element_detail_api'),
+    path('element_update_field/', views.element_update_field, name='element_update_field'),
+    path('element_delete/', views.element_delete, name='element_delete'),
+    path('element_export_csv/', views.element_export_csv, name='element_export_csv'),
+
+    # 从载体图谱提取元件 -> 管理员勾选 -> 入库
+    path('element_extract/', views.element_extract_api, name='element_extract_api'),
+    path('element_commit/', views.element_commit_api, name='element_commit_api'),
+    path('vector_elements/<int:vector_id>/', views.vector_elements_api, name='vector_elements_api'),
+
+    # 序列查询 + 重组风险筛查
+    path('element_search/', views.element_search_api, name='element_search_api'),
+    path('element_screen/', views.element_screen_api, name='element_screen_api'),
+    path('element_vector_options/', views.element_vector_options_api, name='element_vector_options_api'),
 ]

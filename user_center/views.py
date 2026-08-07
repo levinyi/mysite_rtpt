@@ -109,6 +109,17 @@ def order_create(request):
         # 处理基因表格，根据列数判断是AA序列还是NT序列，NT序列只有4列，AA序列有6列
         if len(df.columns) == 4:
             # print("Start processing NT sequence")
+            # NT 订单的 CombinedSeq 依赖载体的 iU20/iD20 插入位点序列；用户自建载体若
+            # 尚未解析出 iU20/iD20（字段为 None），此前 vector.iu20.lower() 会抛
+            # AttributeError 导致整页 500，前端表现为 "unexpected token '<'"。
+            # 这里提前校验并返回 4xx JSON，给出明确提示。
+            if not vector.iu20 or not vector.id20:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f"Vector '{vector.vector_name}' is missing iU20/iD20 insertion markers. "
+                               f"Please complete the vector design (iU20/iD20) before creating an order."
+                }, status=422)
+
             df.columns = ['GeneName', 'OriginalSeq', 'i5nc', 'i3nc']  # 重命名列名，方便后续处理
             # 如果i5nc和i3nc为空，填充为''
             df['i5nc'] = df['i5nc'].fillna('')

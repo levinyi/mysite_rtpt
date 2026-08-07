@@ -1,8 +1,14 @@
+import hashlib
 import re
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
 from django.utils import timezone
+
+
+def compute_seq_hash(sequence):
+    """元件去重键：大写序列的 sha1。"""
+    return hashlib.sha1((sequence or '').strip().upper().encode()).hexdigest()
 
 
 class VectorFileStorage(FileSystemStorage):
@@ -81,6 +87,102 @@ class Vector(models.Model):
 
     def __str__(self):
         return self.vector_name
+
+class VectorElement(models.Model):
+    """质粒元件库：一条记录 = 一段有生物学功能的序列（启动子 / 抗性基因 / 复制起点 …）。
+
+    元件由管理员从载体图谱（GenBank features）里挑选入库，也可手工录入。
+    序列一律按功能链方向存（feature.extract 已处理负链），所以同一元件在不同载体上
+    哪怕标注在负链，入库后也是同一条序列、同一个 seq_hash —— 去重靠 seq_hash。
+    """
+
+    ELEMENT_TYPES = [
+        ('promoter', '启动子'),
+        ('terminator', '终止子'),
+        ('ori', '复制起点'),
+        ('resistance', '抗性基因'),
+        ('cds', '编码序列'),
+        ('tag', '标签'),
+        ('signal_peptide', '信号肽'),
+        ('polya', 'polyA 信号'),
+        ('enhancer', '增强子'),
+        ('protein_bind', '蛋白结合位点'),
+        ('rbs', '核糖体结合位点'),
+        ('regulatory', '调控元件'),
+        ('other', '其他'),
+    ]
+    RISK_LEVELS = [('high', '高'), ('medium', '中'), ('low', '低')]
+    SOURCE_KINDS = [('company', '公司载体'), ('customer', '客户载体'), ('manual', '手工录入')]
+
+    name = models.CharField(verbose_name="元件名", max_length=200)
+    element_type = models.CharField(verbose_name="元件类型", max_length=32, choices=ELEMENT_TYPES, default='other')
+    sequence = models.TextField(verbose_name="元件序列")
+    seq_length = models.IntegerField(verbose_name="序列长度", default=0)
+    seq_hash = models.CharField(verbose_name="序列指纹", max_length=40, unique=True, db_index=True,
+                                help_text="sha1(大写序列)，元件去重的唯一键")
+    aliases = models.JSONField(verbose_name="别名", default=list, blank=True,
+                               help_text="同一元件在不同图谱上的其他叫法")
+    description = models.TextField(verbose_name="备注", blank=True, default='')
+
+    source_vector = models.ForeignKey('Vector', verbose_name="来源载体", on_delete=models.SET_NULL,
+                                      null=True, blank=True, related_name='contributed_elements')
+    source_vector_name = models.CharField(verbose_name="来源载体名(快照)", max_length=200, blank=True, default='',
+                                          help_text="来源载体被删掉后仍能追溯出处")
+    source_kind = models.CharField(verbose_name="来源类型", max_length=16, choices=SOURCE_KINDS, default='company')
+    genbank_feature_type = models.CharField(verbose_name="GenBank 原始 feature 类型", max_length=64, blank=True, default='')
+
+    # 重组风险筛查：客户待合成序列会与这些元件比对，命中说明连载体时可能发生同源重组
+    screen_enabled = models.BooleanField(verbose_name="纳入重组风险筛查", default=True)
+    risk_level = models.CharField(verbose_name="风险等级", max_length=8, choices=RISK_LEVELS, default='medium')
+
+    is_active = models.BooleanField(verbose_name="启用", default=True)
+    created_by = models.ForeignKey(User, verbose_name="录入人", on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "质粒元件"
+        verbose_name_plural = "质粒元件库"
+        ordering = ['element_type', 'name']
+        indexes = [
+            models.Index(fields=['element_type', 'is_active']),
+            models.Index(fields=['screen_enabled', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_element_type_display()}, {self.seq_length}bp)"
+
+    def save(self, *args, **kwargs):
+        self.sequence = (self.sequence or '').strip().upper()
+        self.seq_length = len(self.sequence)
+        self.seq_hash = compute_seq_hash(self.sequence)
+        super().save(*args, **kwargs)
+
+
+class VectorElementOccurrence(models.Model):
+    """元件在某个载体上的一次出现（位置 + 链向）。
+
+    元件与载体是多对多：一个元件（如 AmpR）出现在很多载体上，一个载体也含很多元件。
+    有了这张表，"某质粒有哪些关键元件" 和 "某元件出现在哪些质粒上" 都能直接查。
+    """
+
+    element = models.ForeignKey(VectorElement, on_delete=models.CASCADE, related_name='occurrences')
+    vector = models.ForeignKey('Vector', on_delete=models.CASCADE, related_name='element_occurrences')
+    start = models.IntegerField(verbose_name="起始位置", help_text="0-based，闭区间起点")
+    end = models.IntegerField(verbose_name="结束位置", help_text="0-based，开区间终点")
+    strand = models.SmallIntegerField(verbose_name="链向", default=1, help_text="1 正链 / -1 负链")
+    label_in_vector = models.CharField(verbose_name="该图谱上的原始标注", max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "元件出现记录"
+        verbose_name_plural = "元件出现记录"
+        unique_together = ('element', 'vector', 'start', 'end')
+        ordering = ['vector_id', 'start']
+
+    def __str__(self):
+        return f"{self.element.name} @ {self.vector.vector_name} [{self.start}-{self.end}]"
+
 
 class GeneSynEnzymeCutSite(models.Model):
     enzyme_name = models.CharField(verbose_name="酶切位点", max_length=256)

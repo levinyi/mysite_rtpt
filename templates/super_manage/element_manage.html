@@ -1,0 +1,981 @@
+{% extends "super_manage/base.html" %}
+{% load static %}
+{% block title %}Element Library{% endblock %}
+{% block extra_head %}
+<style>
+    :root { --vec-brand: #1E3A8A; }
+
+    .el-name { font-weight: 600; color: #1f2937; }
+    .el-alias { font-size: 11px; color: #9ca3af; }
+    .el-seq { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+              word-break: break-all; color: #111827; background: #f8fafc; border-radius: 6px;
+              padding: 8px 10px; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+    .el-type-badge { font-size: 11px; font-weight: 600; }
+
+    /* 元件类型配色：一眼分清功能类别 */
+    .t-promoter      { background:#dbeafe; color:#1e40af; }
+    .t-terminator    { background:#fee2e2; color:#991b1b; }
+    .t-ori           { background:#dcfce7; color:#166534; }
+    .t-resistance    { background:#fef3c7; color:#92400e; }
+    .t-cds           { background:#e0e7ff; color:#3730a3; }
+    .t-tag           { background:#f3e8ff; color:#6b21a8; }
+    .t-signal_peptide{ background:#ccfbf1; color:#115e59; }
+    .t-polya         { background:#ffe4e6; color:#9f1239; }
+    .t-enhancer      { background:#cffafe; color:#155e75; }
+    .t-protein_bind  { background:#ede9fe; color:#5b21b6; }
+    .t-rbs           { background:#fae8ff; color:#86198f; }
+    .t-regulatory    { background:#e2e8f0; color:#334155; }
+    .t-other         { background:#f1f5f9; color:#64748b; }
+
+    #elementDrawer { width: 560px; max-width: 92vw; }
+    .drawer-section { margin-bottom: 1.1rem; }
+    .drawer-section-title { font-size: 12px; font-weight: 700; letter-spacing: .04em;
+        text-transform: uppercase; color: var(--vec-brand); border-bottom: 2px solid #e5e7eb;
+        padding-bottom: 4px; margin-bottom: .6rem; }
+    .drawer-meta { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
+        align-items: center; font-size: 13px; }
+    .drawer-meta .k { color: #6b7280; }
+
+    /* 候选元件抽取表 */
+    .cand-table td, .cand-table th { font-size: 12.5px; vertical-align: middle; }
+    .cand-seq { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: #64748b; }
+    .dedup-new                  { color:#166534; }
+    .dedup-exists               { color:#94a3b8; }
+    .dedup-exists_new_occurrence{ color:#1e40af; }
+    .dedup-name_clash           { color:#b45309; }
+
+    /* 载体多选清单 */
+    .vec-pick-list { max-height: 188px; overflow-y: auto; border: 1px solid #e5e7eb;
+        border-radius: 6px; padding: 6px 10px; background: #fff;
+        column-width: 230px; column-gap: 20px; }
+    .vec-pick-item { display: block; font-size: 12.5px; line-height: 1.7;
+        break-inside: avoid; cursor: pointer; }
+    .vec-pick-item.is-done { color: #94a3b8; }
+    .vec-pick-item .vec-code { color: #9ca3af; font-size: 11px; }
+    .vec-pick-empty { color: #9ca3af; font-size: 12.5px; }
+    /* 「出现在 N 个载体」徽标，点开看具体位置 */
+    .occ-badge { cursor: pointer; font-size: 11px; font-weight: 600; }
+    .occ-detail td { background: #f8fafc; font-size: 11.5px; }
+    .occ-detail .occ-row { display: flex; gap: 10px; padding: 1px 0; }
+    .occ-detail .occ-row .v { min-width: 190px; font-weight: 600; color: #334155; }
+    .occ-detail .occ-row .p { font-family: ui-monospace, Menlo, monospace; color: #64748b; }
+    .occ-detail .occ-row .done { color: #94a3b8; }
+
+    /* 筛查结果 */
+    .verdict-pass { background:#dcfce7; color:#166534; }
+    .verdict-warn { background:#fef3c7; color:#92400e; }
+    .verdict-risk { background:#fee2e2; color:#991b1b; }
+    .hit-on-target { background: #fff1f2; }
+    .hit-bar { position: relative; height: 18px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+    .hit-bar > span { position: absolute; top: 0; bottom: 0; background: var(--vec-brand); opacity: .75; }
+    .hit-bar.on-target > span { background: #dc2626; }
+    .mono { font-family: ui-monospace, Menlo, monospace; }
+</style>
+{% endblock %}
+{% block manage_content %}
+<div class="container-fluid pt-1" style="padding-right:50px;">
+    <div class="card mt-4">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <ul class="nav nav-tabs card-header-tabs mb-0" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="lib-tab" data-bs-toggle="tab"
+                                data-bs-target="#lib-pane" type="button" role="tab">
+                            <i class="bi bi-collection me-1"></i> 元件库
+                            <span class="badge bg-primary ms-1" id="element-count">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="search-tab" data-bs-toggle="tab"
+                                data-bs-target="#search-pane" type="button" role="tab">
+                            <i class="bi bi-search me-1"></i> 序列查询
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="screen-tab" data-bs-toggle="tab"
+                                data-bs-target="#screen-pane" type="button" role="tab">
+                            <i class="bi bi-shield-exclamation me-1"></i> 重组风险筛查
+                        </button>
+                    </li>
+                </ul>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenExtract">
+                        <i class="bi bi-magic me-1"></i>从载体图谱提取元件
+                    </button>
+                    <a href="{% url 'super_manage:element_export_csv' %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-file-earmark-spreadsheet me-1"></i>导出 CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="tab-content">
+
+                <!-- ============ Tab 1: 元件库 ============ -->
+                <div class="tab-pane fade show active" id="lib-pane" role="tabpanel">
+                    <div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+                        <select class="form-select form-select-sm" id="filterType" style="width:170px;">
+                            <option value="">全部类型</option>
+                            {% for value, label in element_types %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <select class="form-select form-select-sm" id="filterScreen" style="width:170px;">
+                            <option value="">筛查状态：全部</option>
+                            <option value="1">已纳入风险筛查</option>
+                            <option value="0">未纳入</option>
+                        </select>
+                        <span class="text-muted small ms-auto" id="libStats"></span>
+                    </div>
+                    <div id="element-table"></div>
+                </div>
+
+                <!-- ============ Tab 2: 序列查询 ============ -->
+                <div class="tab-pane fade" id="search-pane" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <label class="form-label small fw-semibold">查询序列</label>
+                            <textarea class="form-control mono" id="searchSeq" rows="8"
+                                      placeholder="粘贴一段 DNA 序列，查库里有没有这个元件&#10;（空格/换行会自动忽略）"></textarea>
+                            <div class="d-flex gap-2 mt-2 align-items-end">
+                                <div>
+                                    <label class="form-label small mb-1">最小命中长度</label>
+                                    <input type="number" class="form-control form-control-sm" id="searchMinLen" value="30" style="width:110px;">
+                                </div>
+                                <div>
+                                    <label class="form-label small mb-1">最小一致度</label>
+                                    <input type="number" class="form-control form-control-sm" id="searchMinIdent"
+                                           value="95" min="70" max="100" step="1" style="width:110px;">
+                                </div>
+                                <button class="btn btn-primary btn-sm ms-auto" id="btnSearch">
+                                    <i class="bi bi-search me-1"></i>查询
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <label class="form-label small fw-semibold">结果</label>
+                            <div id="searchResult" class="border rounded p-3 bg-light" style="min-height:260px;">
+                                <span class="text-muted small">在左侧粘贴序列后点「查询」。完全一致的序列会直接命中；部分一致的会给出覆盖度。</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============ Tab 3: 重组风险筛查 ============ -->
+                <div class="tab-pane fade" id="screen-pane" role="tabpanel">
+                    <div class="alert alert-light border small mb-3">
+                        <i class="bi bi-info-circle me-1 text-primary"></i>
+                        把客户待合成序列与<strong>元件库</strong>和<strong>目标载体骨架</strong>比对，
+                        找出足够长、足够一致的同源区段 —— 这类区段在连接到载体后可能发生同源重组。
+                        <span class="text-muted">命中的元件如果本来就长在目标载体上，是最高危的。</span>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <label class="form-label small fw-semibold">客户待合成序列</label>
+                            <textarea class="form-control mono" id="screenSeq" rows="9"
+                                      placeholder="粘贴客户要合成的基因序列"></textarea>
+                            <div class="mt-2">
+                                <label class="form-label small mb-1">目标载体（要连进去的那个）</label>
+                                <select class="form-select form-select-sm" id="screenVector">
+                                    <option value="">— 不指定（只比元件库）—</option>
+                                </select>
+                            </div>
+                            <div class="d-flex gap-2 mt-2 align-items-end">
+                                <div>
+                                    <label class="form-label small mb-1">最小同源长度</label>
+                                    <input type="number" class="form-control form-control-sm" id="screenMinLen" value="30" style="width:110px;">
+                                </div>
+                                <div>
+                                    <label class="form-label small mb-1">最小一致度 %</label>
+                                    <input type="number" class="form-control form-control-sm" id="screenMinIdent"
+                                           value="95" min="70" max="100" step="1" style="width:110px;">
+                                </div>
+                                <button class="btn btn-danger btn-sm ms-auto" id="btnScreen">
+                                    <i class="bi bi-shield-exclamation me-1"></i>筛查
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <label class="form-label small fw-semibold">筛查结果</label>
+                            <div id="screenResult" class="border rounded p-3 bg-light" style="min-height:300px;">
+                                <span class="text-muted small">粘贴序列、选目标载体，然后点「筛查」。</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 从载体图谱提取元件 -->
+<div class="modal fade" id="extractModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-magic me-1"></i>从载体图谱提取元件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        <label class="form-label small fw-semibold mb-0">选择载体（可多选）</label>
+                        <span class="badge bg-primary" id="extractPickCount">已选 0 个</span>
+                        <button class="btn btn-link btn-sm p-0 ms-1 text-decoration-none"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#extractPicker">
+                            <i class="bi bi-chevron-expand"></i> 展开/收起
+                        </button>
+                        <button class="btn btn-primary btn-sm ms-auto" id="btnExtract">
+                            <i class="bi bi-search me-1"></i>解析选中的载体
+                        </button>
+                    </div>
+                    <div class="collapse show" id="extractPicker">
+                        <div class="d-flex gap-2 mb-2 flex-wrap align-items-center">
+                            <input type="text" class="form-control form-control-sm" id="extractSearch"
+                                   placeholder="搜索载体名 / 编号" style="max-width:260px;">
+                            <button class="btn btn-outline-secondary btn-sm" id="btnPickAll">全选</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btnPickNone">清空</button>
+                            <button class="btn btn-outline-primary btn-sm" id="btnPickTodo">只选还没解析过的</button>
+                        </div>
+                        <div class="vec-pick-list" id="extractVectorList">
+                            <span class="vec-pick-empty">载入中…</span>
+                        </div>
+                        <div class="text-muted small mt-2" id="extractPickNote"></div>
+                    </div>
+                </div>
+                <div id="extractResult">
+                    <span class="text-muted small">
+                        勾几个载体后点「解析」。同一条序列在多个载体上会合并成一行 ——
+                        AmpR / ori / T7 promoter 这类只用审一遍，入库时会自动登记到所有相关载体上。
+                    </span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span class="text-muted small me-auto" id="extractSummary"></span>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnCommit" disabled>
+                    <i class="bi bi-database-add me-1"></i>把勾选的元件入库
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 元件详情抽屉 -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="elementDrawer">
+    <div class="offcanvas-header border-bottom">
+        <div>
+            <h5 class="offcanvas-title mb-0" id="elementDrawerTitle">元件</h5>
+            <small class="text-muted" id="elementDrawerSubtitle"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="elementDrawerBody"></div>
+</div>
+
+<script>
+const TYPE_LABELS = {{ element_types_json|safe }}.reduce((m, [v, l]) => (m[v] = l, m), {});
+const RISK_LABELS = {{ risk_levels_json|safe }}.reduce((m, [v, l]) => (m[v] = l, m), {});
+
+let elementGrid = null;
+let allElements = [];
+let extractState = { candidates: [], onlyNew: false };
+let vectorOptions = [];        // 载体下拉/多选的数据源
+let pickedVectorIds = new Set();
+
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function getCookie(name) {
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+}
+function typeBadge(t) {
+    return `<span class="badge el-type-badge t-${esc(t)}">${esc(TYPE_LABELS[t] || t)}</span>`;
+}
+
+// ---------------- Tab 1: 元件库 ----------------
+
+function loadElements() {
+    fetch("{% url 'super_manage:element_data_api' %}")
+        .then(r => r.json())
+        .then(d => { allElements = d.data || []; renderGrid(); });
+}
+
+function filteredElements() {
+    const type = document.getElementById('filterType').value;
+    const screen = document.getElementById('filterScreen').value;
+    return allElements.filter(e => {
+        if (type && e.element_type !== type) return false;
+        if (screen === '1' && !e.screen_enabled) return false;
+        if (screen === '0' && e.screen_enabled) return false;
+        return true;
+    });
+}
+
+function renderGrid() {
+    const rows = filteredElements().map(e => [
+        e.id, e.name, e.element_type, e.seq_length, e.occurrence_count,
+        e.source_vector_name, e.screen_enabled, e.risk_level, e,
+    ]);
+
+    document.getElementById('element-count').textContent = allElements.length;
+    const screened = allElements.filter(e => e.screen_enabled && e.is_active).length;
+    document.getElementById('libStats').textContent =
+        `共 ${allElements.length} 条元件，其中 ${screened} 条纳入重组风险筛查`;
+
+    const columns = [
+        { id: 'id', hidden: true },
+        { id: 'name', name: '元件名', formatter: (cell, row) => {
+            const e = row.cells[8].data;
+            const aliases = (e.aliases || []).length
+                ? `<div class="el-alias">别名: ${esc((e.aliases || []).join(' / '))}</div>` : '';
+            return gridjs.html(`<div class="el-name">${esc(cell)}</div>${aliases}`);
+        }},
+        { id: 'element_type', name: '类型', width: '110px',
+          formatter: c => gridjs.html(typeBadge(c)) },
+        { id: 'seq_length', name: '长度', width: '80px',
+          formatter: c => gridjs.html(`<span class="mono">${c} bp</span>`) },
+        { id: 'occurrence_count', name: '出现载体数', width: '100px', formatter: c =>
+            gridjs.html(c > 1
+                ? `<span class="badge bg-primary">${c}</span>`
+                : `<span class="text-muted">${c}</span>`) },
+        { id: 'source_vector_name', name: '来源载体', width: '160px',
+          formatter: c => gridjs.html(`<span class="text-muted small">${esc(c || '—')}</span>`) },
+        { id: 'screen_enabled', name: '纳入筛查', width: '90px', formatter: (c, row) => {
+            const id = row.cells[0].data;
+            return gridjs.html(
+                `<div class="form-check form-switch d-flex justify-content-center">
+                   <input class="form-check-input js-screen-toggle" type="checkbox"
+                          data-id="${id}" ${c ? 'checked' : ''}>
+                 </div>`);
+        }},
+        { id: 'risk_level', name: '风险', width: '80px', formatter: c => {
+            const cls = { high: 'bg-danger', medium: 'bg-warning text-dark', low: 'bg-secondary' }[c] || 'bg-secondary';
+            return gridjs.html(`<span class="badge ${cls}">${esc(RISK_LABELS[c] || c)}</span>`);
+        }},
+        { id: 'actions', name: '', width: '70px', sort: false, formatter: (_, row) => {
+            const id = row.cells[0].data;
+            return gridjs.html(
+                `<button class="btn btn-sm btn-link p-0 js-detail" data-id="${id}" title="详情">
+                   <i class="bi bi-pencil-square"></i></button>`);
+        }},
+    ];
+
+    const container = document.getElementById('element-table');
+    if (elementGrid) {
+        elementGrid.updateConfig({ columns, data: rows }).forceRender();
+    } else {
+        elementGrid = new gridjs.Grid({
+            columns, data: rows,
+            search: true, sort: true,
+            pagination: { limit: 20 },
+            className: { table: 'table table-hover align-middle' },
+            language: { search: { placeholder: '搜索元件名 / 类型 / 来源…' },
+                        pagination: { previous: '上一页', next: '下一页',
+                                      showing: '显示', of: '/', to: '-', results: '条' },
+                        noRecordsFound: '没有匹配的元件' },
+        }).render(container);
+    }
+}
+
+// 事件委托：Grid.js 每次重渲染会换掉 DOM，直接绑在按钮上会失效
+document.addEventListener('change', e => {
+    const t = e.target.closest('.js-screen-toggle');
+    if (!t) return;
+    updateElementField(t.dataset.id, 'screen_enabled', t.checked ? '1' : '0')
+        .then(() => loadElements());
+});
+document.addEventListener('click', e => {
+    const t = e.target.closest('.js-detail');
+    if (t) openDrawer(t.dataset.id);
+});
+
+function updateElementField(id, field, value) {
+    const fd = new FormData();
+    fd.append('element_id', id);
+    fd.append('field', field);
+    fd.append('value', value);
+    return fetch("{% url 'super_manage:element_update_field' %}",
+                 { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }, body: fd })
+        .then(r => r.json())
+        .then(d => { if (d.status !== 'success') alert(d.message || '保存失败'); return d; });
+}
+
+// ---------------- 元件详情抽屉 ----------------
+
+function openDrawer(id) {
+    fetch(`/super_manage/element_detail/${id}/`)
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'success') { alert(d.message); return; }
+            renderDrawer(d.element, d.occurrences);
+            new bootstrap.Offcanvas(document.getElementById('elementDrawer')).show();
+        });
+}
+
+function renderDrawer(el, occurrences) {
+    document.getElementById('elementDrawerTitle').textContent = el.name;
+    document.getElementById('elementDrawerSubtitle').innerHTML =
+        `${TYPE_LABELS[el.element_type] || el.element_type} · ${el.seq_length} bp`;
+
+    const typeOptions = Object.entries(TYPE_LABELS).map(([v, l]) =>
+        `<option value="${v}" ${v === el.element_type ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const riskOptions = Object.entries(RISK_LABELS).map(([v, l]) =>
+        `<option value="${v}" ${v === el.risk_level ? 'selected' : ''}>${esc(l)}</option>`).join('');
+
+    const occRows = occurrences.length ? occurrences.map(o => `
+        <tr>
+          <td>${esc(o.vector_name)}<div class="text-muted small">${esc(o.vector_code || '')}</div></td>
+          <td class="text-muted small">${esc(o.owner)}</td>
+          <td class="mono small">${o.start}–${o.end}</td>
+          <td class="mono small">${o.strand > 0 ? '+' : '−'}</td>
+          <td class="text-muted small">${esc(o.label_in_vector || '')}</td>
+        </tr>`).join('')
+        : `<tr><td colspan="5" class="text-muted small text-center py-2">还没登记它出现在哪些载体上</td></tr>`;
+
+    document.getElementById('elementDrawerBody').innerHTML = `
+      <div class="drawer-section">
+        <div class="drawer-section-title">基本信息</div>
+        <div class="drawer-meta">
+          <span class="k">元件名</span>
+          <input class="form-control form-control-sm js-fld" data-field="name" value="${esc(el.name)}">
+          <span class="k">类型</span>
+          <select class="form-select form-select-sm js-fld" data-field="element_type">${typeOptions}</select>
+          <span class="k">风险等级</span>
+          <select class="form-select form-select-sm js-fld" data-field="risk_level">${riskOptions}</select>
+          <span class="k">纳入筛查</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input js-fld" type="checkbox" data-field="screen_enabled"
+                   ${el.screen_enabled ? 'checked' : ''}>
+          </div>
+          <span class="k">启用</span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input js-fld" type="checkbox" data-field="is_active"
+                   ${el.is_active ? 'checked' : ''}>
+          </div>
+          <span class="k">备注</span>
+          <input class="form-control form-control-sm js-fld" data-field="description"
+                 value="${esc(el.description)}" placeholder="可选">
+        </div>
+        <div class="drawer-meta mt-2">
+          <span class="k">来源</span>
+          <span class="small">${esc(el.source_vector_name || '—')}
+            <span class="text-muted">(${esc(el.source_kind)}${el.genbank_feature_type ? ', ' + esc(el.genbank_feature_type) : ''})</span></span>
+          <span class="k">别名</span>
+          <span class="small text-muted">${esc((el.aliases || []).join(' / ') || '—')}</span>
+        </div>
+        <div class="text-end mt-2">
+          <span class="small text-success d-none" id="drawerSaved"><i class="bi bi-check2"></i> 已保存</span>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">出现在这些载体上 (${occurrences.length})</div>
+        <table class="table table-sm mb-0">
+          <thead><tr class="small text-muted">
+            <th>载体</th><th>归属</th><th>位置</th><th>链</th><th>图谱标注</th>
+          </tr></thead>
+          <tbody>${occRows}</tbody>
+        </table>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">序列 (${el.seq_length} bp)</div>
+        <div class="el-seq">${esc(el.sequence)}</div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" id="btnCopySeq">
+          <i class="bi bi-clipboard me-1"></i>复制序列
+        </button>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title text-danger" style="border-color:#fecaca;">危险操作</div>
+        <button class="btn btn-sm btn-outline-danger" id="btnDeleteElement" data-id="${el.id}">
+          <i class="bi bi-trash me-1"></i>删除这条元件
+        </button>
+        <div class="form-text">会同时删掉它在所有载体上的出现记录。</div>
+      </div>`;
+
+    // 抽屉里的字段改动即时保存
+    document.querySelectorAll('#elementDrawerBody .js-fld').forEach(input => {
+        input.addEventListener('change', () => {
+            const value = input.type === 'checkbox' ? (input.checked ? '1' : '0') : input.value;
+            updateElementField(el.id, input.dataset.field, value).then(d => {
+                if (d.status === 'success') {
+                    const flag = document.getElementById('drawerSaved');
+                    flag.classList.remove('d-none');
+                    setTimeout(() => flag.classList.add('d-none'), 1500);
+                    loadElements();
+                }
+            });
+        });
+    });
+
+    document.getElementById('btnCopySeq').addEventListener('click', () => {
+        navigator.clipboard.writeText(el.sequence)
+            .then(() => alert('序列已复制'))
+            .catch(() => alert('复制失败，请手动选中'));
+    });
+
+    document.getElementById('btnDeleteElement').addEventListener('click', () => {
+        if (!confirm(`确定删除元件「${el.name}」？它在所有载体上的出现记录也会一并删除。`)) return;
+        const fd = new FormData();
+        fd.append('element_id', el.id);
+        fetch("{% url 'super_manage:element_delete' %}",
+              { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }, body: fd })
+            .then(r => r.json())
+            .then(d => {
+                alert(d.message);
+                if (d.status === 'success') {
+                    bootstrap.Offcanvas.getInstance(document.getElementById('elementDrawer')).hide();
+                    loadElements();
+                }
+            });
+    });
+}
+
+// ---------------- 从载体图谱提取元件 ----------------
+
+function loadVectorOptions() {
+    return fetch("{% url 'super_manage:element_vector_options_api' %}")
+        .then(r => r.json())
+        .then(d => {
+            vectorOptions = d.data || [];
+            // 筛查 tab 用得上全部有骨架的载体，抽取 tab 只能用有 GenBank 图谱的
+            document.getElementById('screenVector').innerHTML =
+                '<option value="">— 不指定（只比元件库）—</option>' +
+                vectorOptions.map(v =>
+                    `<option value="${v.id}">${esc(v.vector_name)}${v.vector_id ? ' (' + esc(v.vector_id) + ')' : ''}</option>`
+                ).join('');
+            renderVectorPicker();
+        });
+}
+
+function parseableVectors() {
+    return vectorOptions.filter(v => v.parseable);
+}
+
+function renderVectorPicker() {
+    const keyword = (document.getElementById('extractSearch').value || '').trim().toLowerCase();
+    const all = parseableVectors();
+    const shown = keyword
+        ? all.filter(v => (`${v.vector_name} ${v.vector_id || ''}`).toLowerCase().includes(keyword))
+        : all;
+
+    const list = document.getElementById('extractVectorList');
+    list.innerHTML = shown.length ? shown.map(v => `
+        <label class="vec-pick-item ${v.element_count ? 'is-done' : ''}">
+            <input type="checkbox" class="form-check-input me-1 js-vec" value="${v.id}"
+                   ${pickedVectorIds.has(v.id) ? 'checked' : ''}>
+            ${esc(v.vector_name)}
+            ${v.vector_id ? `<span class="vec-code">(${esc(v.vector_id)})</span>` : ''}
+            ${v.element_count ? `<span class="vec-code" title="已登记 ${v.element_count} 处元件">· 已解析</span>` : ''}
+        </label>`).join('')
+        : '<span class="vec-pick-empty">没有匹配的载体</span>';
+
+    list.querySelectorAll('.js-vec').forEach(cb => cb.addEventListener('change', () => {
+        if (cb.checked) pickedVectorIds.add(Number(cb.value));
+        else pickedVectorIds.delete(Number(cb.value));
+        updatePickCount();
+    }));
+
+    const hidden = vectorOptions.length - all.length;
+    document.getElementById('extractPickNote').innerHTML =
+        `可解析的载体 ${all.length} 个` +
+        (hidden ? ` · 另有 ${hidden} 个只有裸序列、没有 GenBank 图谱，无法提取元件，已不列出` : '');
+    updatePickCount();
+}
+
+function updatePickCount() {
+    document.getElementById('extractPickCount').textContent = `已选 ${pickedVectorIds.size} 个`;
+    document.getElementById('btnExtract').disabled = pickedVectorIds.size === 0;
+}
+
+document.getElementById('btnOpenExtract').addEventListener('click', () => {
+    new bootstrap.Modal(document.getElementById('extractModal')).show();
+});
+
+document.getElementById('extractSearch').addEventListener('input', renderVectorPicker);
+document.getElementById('btnPickAll').addEventListener('click', () => {
+    parseableVectors().forEach(v => pickedVectorIds.add(v.id));
+    renderVectorPicker();
+});
+document.getElementById('btnPickNone').addEventListener('click', () => {
+    pickedVectorIds.clear();
+    renderVectorPicker();
+});
+document.getElementById('btnPickTodo').addEventListener('click', () => {
+    pickedVectorIds.clear();
+    parseableVectors().filter(v => !v.element_count).forEach(v => pickedVectorIds.add(v.id));
+    renderVectorPicker();
+});
+
+document.getElementById('btnExtract').addEventListener('click', () => {
+    const ids = [...pickedVectorIds];
+    if (!ids.length) { alert('请先勾选载体'); return; }
+
+    const box = document.getElementById('extractResult');
+    box.innerHTML = `<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>
+                     解析 ${ids.length} 个载体的图谱中…</div>`;
+    document.getElementById('btnCommit').disabled = true;
+
+    fetch("{% url 'super_manage:element_extract_api' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vector_ids: ids }),
+    })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'success') {
+                box.innerHTML = `<div class="alert alert-danger small mb-0">${esc(d.message)}</div>`;
+                return;
+            }
+            extractState = { candidates: d.candidates, onlyNew: false, meta: d };
+            // 解析完把载体清单收起来，把地方让给候选表
+            bootstrap.Collapse.getOrCreateInstance(document.getElementById('extractPicker')).hide();
+            renderCandidates();
+        });
+});
+
+const DEDUP_LABEL = {
+    new: '新元件',
+    exists: '库中已有（相关载体也都登记过了）',
+    exists_new_occurrence: '库中已有（还有载体没登记）',
+    name_clash: '同名不同序！',
+};
+
+function renderCandidates() {
+    const d = extractState.meta;
+    const box = document.getElementById('extractResult');
+
+    const errNote = d.errors.length ? `
+      <div class="alert alert-danger small py-2">
+        <i class="bi bi-x-circle me-1"></i>${d.errors.length} 个载体的图谱读不出来，已跳过：
+        ${esc(d.errors.map(e => e.vector_name).join('、'))}
+      </div>` : '';
+
+    if (!d.candidates.length) {
+        box.innerHTML = errNote +
+            '<div class="alert alert-warning small mb-0">这些图谱上没找到可入库的功能元件。</div>';
+        return;
+    }
+
+    // vector_gb 是我们改造后生成的图谱，里面混着自己插入的 Cm-ccdB 盒子和设计引物 —— 得说清楚
+    const gbWarn = d.from_vector_gb.length ? `
+      <div class="alert alert-warning small py-2">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        其中 ${d.from_vector_gb.length} 个载体（${esc(d.from_vector_gb.join('、'))}）没有原始上传图谱，
+        用的是 <strong>改造后的图谱 (vector_gb)</strong>。里面可能混着我们自己插入的元件
+        （如 Cm-ccdB 盒子、设计引物），入库前请确认哪些是载体<strong>原本</strong>就有的。
+      </div>` : '';
+
+    const s = d.stats, sk = d.skipped;
+    const summary = `
+      <div class="alert alert-light border small py-2 mb-2">
+        <i class="bi bi-check2-circle me-1 text-success"></i>
+        解析 ${s.vectors_ok} 个载体，共 ${s.rows_before_merge} 处标注，
+        按序列合并后 <strong>${s.rows_after_merge}</strong> 条待审 ——
+        跨载体重复的已经并成一行，勾一次就登记到所有相关载体。
+        <div class="text-muted mt-1">
+          已自动跳过：内部标记 (iU20/iD20/v5NC/v3NC 等) ${sk.internal_marker} 个 ·
+          非元件类型 (primer_bind/source 等) ${sk.ignored_type} 个 ·
+          过短 (&lt;15bp) ${sk.too_short} 个
+        </div>
+      </div>`;
+
+    const toolbar = `
+      <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+        <div class="form-check form-check-inline mb-0">
+          <input class="form-check-input" type="checkbox" id="candOnlyNew" ${extractState.onlyNew ? 'checked' : ''}>
+          <label class="form-check-label small" for="candOnlyNew">只看新元件（隐藏库里已有的）</label>
+        </div>
+        <span class="text-muted small ms-auto" id="candShownNote"></span>
+      </div>`;
+
+    const typeOptionsFor = sel => Object.entries(TYPE_LABELS).map(([v, l]) =>
+        `<option value="${v}" ${v === sel ? 'selected' : ''}>${esc(l)}</option>`).join('');
+
+    const visible = d.candidates
+        .map((c, i) => ({ c, i }))
+        .filter(({ c }) => !extractState.onlyNew || c.dedup !== 'exists');
+
+    const rows = visible.map(({ c, i }) => `
+      <tr class="${c.dedup === 'exists' ? 'table-light' : ''}">
+        <td><input type="checkbox" class="form-check-input js-cand" data-i="${i}"
+                   ${c.default_checked ? 'checked' : ''} ${c.dedup === 'exists' ? 'disabled' : ''}></td>
+        <td><input class="form-control form-control-sm js-cand-name" data-i="${i}"
+                   value="${esc(c.label)}" style="min-width:150px;">
+            ${c.aliases.length ? `<div class="el-alias">图谱上另有叫法：${esc(c.aliases.join(' / '))}</div>` : ''}</td>
+        <td><select class="form-select form-select-sm js-cand-type" data-i="${i}" style="min-width:120px;">
+              ${typeOptionsFor(c.suggested_type)}</select></td>
+        <td class="mono small text-nowrap">${c.length} bp</td>
+        <td><span class="badge bg-secondary occ-badge js-occ" data-i="${i}"
+                  title="点开看具体位置">${c.vector_count} 个载体</span></td>
+        <td><span class="text-muted small">${esc(c.genbank_feature_type)}</span></td>
+        <td><span class="small dedup-${c.dedup}">${DEDUP_LABEL[c.dedup]}</span>
+            ${c.dedup === 'name_clash' ? `<div class="small text-muted">库中同名: ${esc(c.existing_name)}</div>` : ''}</td>
+        <td class="cand-seq">${esc(c.sequence.slice(0, 24))}${c.sequence.length > 24 ? '…' : ''}</td>
+      </tr>
+      <tr class="occ-detail d-none" data-detail="${i}">
+        <td colspan="8">${c.occurrences.map(o => `
+          <div class="occ-row">
+            <span class="v">${esc(o.vector_name)}${o.vector_code ? ' (' + esc(o.vector_code) + ')' : ''}</span>
+            <span class="p">${o.start}–${o.end} ${o.strand > 0 ? '+' : '−'}</span>
+            <span class="text-muted">标注为 ${esc(o.label)}</span>
+            ${o.registered ? '<span class="done">· 已登记</span>' : ''}
+          </div>`).join('')}</td>
+      </tr>`).join('');
+
+    box.innerHTML = errNote + gbWarn + summary + toolbar + `
+      <table class="table table-sm table-hover cand-table">
+        <thead class="table-light">
+          <tr>
+            <th style="width:32px;"><input type="checkbox" class="form-check-input" id="candAll"></th>
+            <th>元件名</th><th>类型</th><th>长度</th><th>出现于</th>
+            <th>GenBank</th><th>库内状态</th><th>序列</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    document.getElementById('candShownNote').textContent =
+        `显示 ${visible.length} / ${d.candidates.length} 条`;
+    document.getElementById('candOnlyNew').addEventListener('change', e => {
+        extractState.onlyNew = e.target.checked;
+        renderCandidates();
+    });
+    document.getElementById('candAll').addEventListener('change', e => {
+        document.querySelectorAll('.js-cand:not(:disabled)').forEach(cb => cb.checked = e.target.checked);
+        updateCommitState();
+    });
+    document.querySelectorAll('.js-cand').forEach(cb =>
+        cb.addEventListener('change', updateCommitState));
+    document.querySelectorAll('.js-occ').forEach(badge => badge.addEventListener('click', () => {
+        document.querySelector(`tr[data-detail="${badge.dataset.i}"]`).classList.toggle('d-none');
+    }));
+    updateCommitState();
+}
+
+function updateCommitState() {
+    const checked = [...document.querySelectorAll('.js-cand:checked')];
+    const occ = checked.reduce(
+        (n, cb) => n + extractState.candidates[Number(cb.dataset.i)].occurrences.length, 0);
+    document.getElementById('btnCommit').disabled = !checked.length;
+    document.getElementById('extractSummary').textContent =
+        checked.length ? `已勾选 ${checked.length} 条元件，将登记 ${occ} 处载体出现位置` : '';
+}
+
+document.getElementById('btnCommit').addEventListener('click', () => {
+    const selections = [];
+    document.querySelectorAll('.js-cand:checked').forEach(cb => {
+        const i = Number(cb.dataset.i);
+        const c = extractState.candidates[i];
+        selections.push({
+            sequence: c.sequence,
+            name: document.querySelector(`.js-cand-name[data-i="${i}"]`).value.trim(),
+            element_type: document.querySelector(`.js-cand-type[data-i="${i}"]`).value,
+            genbank_feature_type: c.genbank_feature_type,
+            aliases: c.aliases,
+            screen_enabled: true,
+            risk_level: 'medium',
+            occurrences: c.occurrences.map(o => ({
+                vector_id: o.vector_id, start: o.start, end: o.end,
+                strand: o.strand, label_in_vector: o.label,
+            })),
+        });
+    });
+    if (!selections.length) return;
+
+    const btn = document.getElementById('btnCommit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>入库中…';
+
+    fetch("{% url 'super_manage:element_commit_api' %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selections }),
+    })
+        .then(r => r.json())
+        .then(d => {
+            alert(d.message || '完成');
+            btn.innerHTML = '<i class="bi bi-database-add me-1"></i>把勾选的元件入库';
+            if (d.status === 'success') {
+                bootstrap.Modal.getInstance(document.getElementById('extractModal')).hide();
+                pickedVectorIds.clear();
+                loadVectorOptions();   // 刷新「已解析」标记
+                loadElements();
+            } else {
+                btn.disabled = false;
+            }
+        });
+});
+
+// ---------------- Tab 2: 序列查询 ----------------
+
+document.getElementById('btnSearch').addEventListener('click', () => {
+    const seq = document.getElementById('searchSeq').value.trim();
+    if (!seq) { alert('请粘贴要查询的序列'); return; }
+
+    const box = document.getElementById('searchResult');
+    box.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>查询中…</div>';
+
+    const fd = new FormData();
+    fd.append('sequence', seq);
+    fd.append('min_length', document.getElementById('searchMinLen').value);
+    fd.append('min_identity', Number(document.getElementById('searchMinIdent').value) / 100);
+
+    fetch("{% url 'super_manage:element_search_api' %}",
+          { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }, body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'success') {
+                box.innerHTML = `<div class="alert alert-danger small mb-0">${esc(d.message)}</div>`;
+                return;
+            }
+            if (!d.hits.length) {
+                box.innerHTML = `<div class="alert alert-secondary small mb-0">
+                    <i class="bi bi-x-circle me-1"></i>元件库里没有匹配这段序列的元件（查询长度 ${d.query_length} bp）。</div>`;
+                return;
+            }
+            const banner = d.exact
+                ? `<div class="alert alert-success small py-2"><i class="bi bi-check2-circle me-1"></i>
+                     <strong>完全一致命中</strong> —— 这段序列就是库里的一条元件。</div>`
+                : `<div class="alert alert-info small py-2"><i class="bi bi-info-circle me-1"></i>
+                     找到 ${d.hits.length} 个部分匹配（查询长度 ${d.query_length} bp）。</div>`;
+
+            box.innerHTML = banner + `
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light"><tr class="small">
+                  <th>元件</th><th>类型</th><th>匹配长度</th><th>一致度</th>
+                  <th>覆盖元件</th><th>链</th><th>来源载体</th>
+                </tr></thead>
+                <tbody>${d.hits.map(h => `
+                  <tr>
+                    <td><a href="#" class="js-detail fw-semibold text-decoration-none"
+                           data-id="${h.element_id}">${esc(h.name)}</a></td>
+                    <td>${typeBadge(h.element_type)}</td>
+                    <td class="mono">${h.length} bp</td>
+                    <td class="mono">${(h.identity * 100).toFixed(1)}%</td>
+                    <td class="mono">${(h.coverage * 100).toFixed(0)}%</td>
+                    <td class="mono">${h.strand > 0 ? '+' : '−'}</td>
+                    <td class="small text-muted">${esc(h.source_vector_name || '—')}</td>
+                  </tr>`).join('')}</tbody>
+              </table>`;
+        });
+});
+
+// ---------------- Tab 3: 重组风险筛查 ----------------
+
+document.getElementById('btnScreen').addEventListener('click', () => {
+    const seq = document.getElementById('screenSeq').value.trim();
+    if (!seq) { alert('请粘贴客户序列'); return; }
+
+    const box = document.getElementById('screenResult');
+    box.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>筛查中…</div>';
+
+    const fd = new FormData();
+    fd.append('sequence', seq);
+    fd.append('vector_id', document.getElementById('screenVector').value);
+    fd.append('min_length', document.getElementById('screenMinLen').value);
+    fd.append('min_identity', Number(document.getElementById('screenMinIdent').value) / 100);
+
+    fetch("{% url 'super_manage:element_screen_api' %}",
+          { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }, body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'success') {
+                box.innerHTML = `<div class="alert alert-danger small mb-0">${esc(d.message)}</div>`;
+                return;
+            }
+            renderScreenResult(box, d);
+        });
+});
+
+function renderScreenResult(box, d) {
+    const s = d.summary;
+    const verdictText = {
+        pass: '未发现明显同源重组风险',
+        warn: '发现同源区段，建议人工复核',
+        risk: '高风险：存在长同源或目标载体上的元件',
+    }[s.verdict];
+
+    const qlen = d.query_length;
+    const bar = (start, end, onTarget) => `
+      <div class="hit-bar ${onTarget ? 'on-target' : ''}">
+        <span style="left:${(start / qlen * 100).toFixed(1)}%;
+                     width:${Math.max((end - start) / qlen * 100, 0.7).toFixed(1)}%;"></span>
+      </div>`;
+
+    const header = `
+      <div class="alert verdict-${s.verdict} d-flex align-items-center gap-2 py-2 mb-3">
+        <i class="bi bi-${s.verdict === 'pass' ? 'check2-circle' : 'exclamation-triangle'} fs-5"></i>
+        <div>
+          <div class="fw-semibold">${verdictText}</div>
+          <div class="small">
+            客户序列 ${qlen} bp · 比对了 ${d.library_size} 条元件${d.target_vector ? ' + 目标载体 ' + esc(d.target_vector) + ' 骨架' : '（未指定目标载体）'} ·
+            阈值 ≥${d.params.min_length}bp / ≥${(d.params.min_identity * 100).toFixed(0)}%
+          </div>
+        </div>
+      </div>`;
+
+    const elemSection = s.n_element_hits ? `
+      <div class="fw-semibold small mb-2">
+        命中元件库 ${s.n_element_hits} 处${s.n_on_target ? `，其中 <span class="text-danger">${s.n_on_target} 处的元件就长在目标载体上</span>` : ''}
+      </div>
+      <table class="table table-sm table-hover mb-3">
+        <thead class="table-light"><tr class="small">
+          <th>元件</th><th>类型</th><th>客户序列位置</th><th>长度</th><th>一致度</th><th>链</th><th style="width:110px;">位置示意</th>
+        </tr></thead>
+        <tbody>${d.element_hits.map(h => `
+          <tr class="${h.on_target_vector ? 'hit-on-target' : ''}">
+            <td>
+              <a href="#" class="js-detail fw-semibold text-decoration-none" data-id="${h.element_id}">${esc(h.name)}</a>
+              ${h.on_target_vector ? '<span class="badge bg-danger ms-1" title="该元件就在目标载体上，同源臂现成">目标载体上</span>' : ''}
+              <div class="small text-muted">${esc(h.source_vector_name || '')}</div>
+            </td>
+            <td>${typeBadge(h.element_type)}</td>
+            <td class="mono small">${h.q_start}–${h.q_end}</td>
+            <td class="mono">${h.length} bp</td>
+            <td class="mono">${(h.identity * 100).toFixed(1)}%</td>
+            <td class="mono">${h.strand > 0 ? '+' : '−'}</td>
+            <td>${bar(h.q_start, h.q_end, h.on_target_vector)}</td>
+          </tr>`).join('')}</tbody>
+      </table>` : '';
+
+    const vecSection = s.n_vector_hits ? `
+      <div class="fw-semibold small mb-2">
+        与目标载体骨架同源 ${s.n_vector_hits} 处
+        <span class="text-muted fw-normal">（这些区段没被标注成元件，但照样能重组）</span>
+      </div>
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light"><tr class="small">
+          <th>客户序列位置</th><th>载体骨架位置</th><th>长度</th><th>一致度</th><th>链</th><th style="width:110px;">位置示意</th>
+        </tr></thead>
+        <tbody>${d.vector_hits.map(h => `
+          <tr>
+            <td class="mono small">${h.q_start}–${h.q_end}</td>
+            <td class="mono small">${h.v_start}–${h.v_end}</td>
+            <td class="mono">${h.length} bp</td>
+            <td class="mono">${(h.identity * 100).toFixed(1)}%</td>
+            <td class="mono">${h.strand > 0 ? '+' : '−'}</td>
+            <td>${bar(h.q_start, h.q_end, false)}</td>
+          </tr>`).join('')}</tbody>
+      </table>` : '';
+
+    const nothing = (!s.n_element_hits && !s.n_vector_hits)
+        ? '<div class="text-muted small">没有任何区段达到报警阈值。</div>' : '';
+
+    box.innerHTML = header + elemSection + vecSection + nothing;
+}
+
+// ---------------- 初始化 ----------------
+
+document.getElementById('filterType').addEventListener('change', renderGrid);
+document.getElementById('filterScreen').addEventListener('change', renderGrid);
+
+loadElements();
+loadVectorOptions();
+</script>
+{% endblock %}
