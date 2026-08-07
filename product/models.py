@@ -59,6 +59,12 @@ class Vector(models.Model):
 
     # 载体改造自动化设计相关字段
     cloning_method = models.CharField(verbose_name="克隆方法", max_length=50, null=True, blank=True, help_text="Gibson/GoldenGate/T4")
+    # 改造 / 不改造是载体级属性：同一条客户质粒若两种都要，就建两条 Vector 记录。
+    # 不改造(False)：只把 v5NC/v3NC/引物标注到图谱上，iU20–iD20 之间的序列保持原样，
+    # 骨架靠酶切或外向 PCR 获得（散单常用）。目前仅支持 Gibson。
+    modify_vector = models.BooleanField(
+        verbose_name="是否改造载体", default=True,
+        help_text="True=改造(iU20–iD20 之间替换为 Cm-ccdB)；False=不改造，仅标注设计结果，质粒序列不变")
     antibiotic_resistance = models.CharField(verbose_name="抗性", max_length=50, null=True, blank=True, help_text="Amp/Kan/Chlor/etc")
     design_status = models.CharField(verbose_name="设计状态", max_length=50, null=True, blank=True, default='Pending', help_text="Pending/Processing/Completed/Failed")
     design_error = models.TextField(verbose_name="设计错误信息", null=True, blank=True)
@@ -67,6 +73,14 @@ class Vector(models.Model):
     primer_forward_tm = models.FloatField(verbose_name="正向引物Tm", null=True, blank=True)
     primer_reverse_tm = models.FloatField(verbose_name="反向引物Tm", null=True, blank=True)
     colony_pcr_primers = models.TextField(verbose_name="菌落PCR引物(5对, JSON)", null=True, blank=True)
+    # 骨架 PCR 引物：只在不改造模式下设计。与 NC-PCR 的 5OL/3OLrc 相向不同，这一对是"外向"的
+    # ——正向锚在 v3NC 起点向右、反向锚在 v5NC 终点向左，绕质粒一圈扩出线性化骨架（不含 iU20–iD20 之间）。
+    backbone_primer_forward = models.TextField(verbose_name="骨架PCR正向引物", null=True, blank=True,
+                                               help_text="外向引物，锚在 v3NC 起点向右")
+    backbone_primer_reverse = models.TextField(verbose_name="骨架PCR反向引物", null=True, blank=True,
+                                               help_text="外向引物，锚在 v5NC 终点向左")
+    backbone_primer_forward_tm = models.FloatField(verbose_name="骨架PCR正向引物Tm", null=True, blank=True)
+    backbone_primer_reverse_tm = models.FloatField(verbose_name="骨架PCR反向引物Tm", null=True, blank=True)
 
     create_date = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=255, default='Received')

@@ -425,12 +425,24 @@
                 <option value="GoldenGate">GoldenGate</option>
                 <option value="T4">T4</option>
             </select>`;
+        // 改造 = iU20–iD20 之间换成 Cm-ccdB；不改造 = 只标注，质粒序列不变（散单常用，仅 Gibson）
+        const modePicker = `
+            <select class="form-select form-select-sm vec-method-select" id="modify-select-${vectorId}"
+                    title="改造 = 插入 Cm-ccdB；不改造 = 只标注设计结果，质粒序列不变（仅支持 Gibson）"
+                    onchange="onModifyModeChange(${vectorId})">
+                <option value="1" ${v.modify_vector === false ? '' : 'selected'}>改造</option>
+                <option value="0" ${v.modify_vector === false ? 'selected' : ''}>不改造</option>
+            </select>`;
+        const notModifiedBadge = v.modify_vector === false
+            ? `<span class="badge bg-warning text-dark" title="不改造：质粒序列未变，图谱上只加了 v5NC/v3NC 与引物标注">不改造</span>`
+            : '';
         const viewBtn = `<button class="btn btn-sm btn-outline-info" onclick="viewDesignResults(${vectorId})" title="View Results"><i class="bi bi-eye"></i> View</button>`;
         const parts = [];
         if (designStatus === 'Completed') {
-            parts.push(`<span class="badge bg-success">${esc(cloningMethod || 'Completed')}</span>`);
+            parts.push(`<span class="badge bg-success">${esc(cloningMethod || 'Completed')}</span>${notModifiedBadge}`);
             if (allowDesign) {
                 parts.push(methodPicker);
+                parts.push(modePicker);
                 parts.push(`<button class="btn btn-sm btn-outline-primary" onclick="startAutomationDesign(${vectorId})" title="Re-design"><i class="bi bi-arrow-clockwise"></i></button>`);
             }
             parts.push(viewBtn);
@@ -442,6 +454,7 @@
             parts.push(`<span class="badge bg-danger">Failed</span>`);
             if (allowDesign) {
                 parts.push(methodPicker);
+                parts.push(modePicker);
                 parts.push(`<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})" title="Retry"><i class="bi bi-arrow-clockwise"></i></button>`);
             }
             if (designError) {
@@ -451,6 +464,7 @@
             // 徽标独占一行，下面一行放"方法下拉 + Design"，196px 列宽内不会挤成三行
             parts.push(`<div class="vec-design-tag"><span class="badge bg-secondary">Not Designed</span></div>`);
             parts.push(methodPicker);
+            parts.push(modePicker);
             parts.push(`<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`);
         } else {
             parts.push(`<span class="badge bg-light text-secondary border">Manual</span>`);
@@ -473,12 +487,33 @@
         ]);
     }
 
+    // 不改造只支持 Gibson（GG/T4 的 4bp 粘端要靠 Cm-ccdB 自带的 IIS 位点切出来），
+    // 所以切到"不改造"时把方法锁死在 Gibson
+    function onModifyModeChange(vectorId) {
+        const modeSelect = document.getElementById(`modify-select-${vectorId}`);
+        const methodSelect = document.getElementById(`method-select-${vectorId}`);
+        if (!modeSelect || !methodSelect) return;
+        if (modeSelect.value === '0') {
+            methodSelect.value = 'Gibson';
+            methodSelect.disabled = true;
+            methodSelect.title = '不改造模式只支持 Gibson';
+        } else {
+            methodSelect.disabled = false;
+            methodSelect.title = 'Cloning method';
+        }
+    }
+
     function startAutomationDesign(vectorId) {
         const methodSelect = document.getElementById(`method-select-${vectorId}`);
-        const forcedMethod = methodSelect ? methodSelect.value : '';
+        const modeSelect = document.getElementById(`modify-select-${vectorId}`);
+        const modify = !modeSelect || modeSelect.value !== '0';
+        const forcedMethod = modify ? (methodSelect ? methodSelect.value : '') : 'Gibson';
         const methodLabel = forcedMethod || 'Auto';
+        const modeLabel = modify
+            ? '改造（iU20–iD20 之间替换为 Cm-ccdB）'
+            : '不改造（只标注 v5NC/v3NC 与引物，质粒序列不变）';
 
-        if (!confirm(`Start automation design for this vector?\nCloning method: ${methodLabel}`)) {
+        if (!confirm(`Start automation design for this vector?\nCloning method: ${methodLabel}\nMode: ${modeLabel}`)) {
             return;
         }
 
@@ -488,6 +523,7 @@
         const postData = {
             'csrfmiddlewaretoken': csrftoken,
             'vector_id': vectorId,
+            'modify_vector': modify ? '1' : '0',
         };
         if (forcedMethod) {
             postData['forced_method'] = forcedMethod;
@@ -607,7 +643,12 @@
             <div class="container-fluid px-0">
                 <div class="d-flex align-items-center mb-2">
                     <span class="badge bg-primary me-2">Cloning Method</span>
-                    <span class="fw-bold">${data.cloning_method || 'N/A'}</span>
+                    <span class="fw-bold me-3">${data.cloning_method || 'N/A'}</span>
+                    ${data.modify_vector === false
+                        ? `<span class="badge bg-warning text-dark">不改造</span>
+                           <span class="text-muted ms-2" style="font-size:11px;">质粒序列未改动，图谱上只加了标注</span>`
+                        : `<span class="badge bg-secondary">改造</span>
+                           <span class="text-muted ms-2" style="font-size:11px;">iU20–iD20 之间已替换为 Cm-ccdB</span>`}
                 </div>
 
                 <table class="table table-sm table-bordered mb-2 align-middle" style="font-size:12px;">
@@ -659,6 +700,39 @@
                     </tbody>
                 </table>
                 <p class="text-muted small mb-2" style="font-size:11px;">Heterodimer ΔG: ${fmt(data.primer_heterodimer_dg)} kcal/mol</p>
+            `;
+        }
+
+        if (data.backbone_primer_forward || data.backbone_primer_reverse) {
+            html += `
+                <h6 class="text-secondary mt-3 mb-1" style="font-size:13px;">
+                    Backbone PCR Primers
+                    <span class="text-muted fw-normal">(外向的一对，绕质粒一圈扩线性化骨架；F 锚在 v3NC 起点向右，R 锚在 v5NC 终点向左)</span>
+                </h6>
+                <table class="table table-sm table-bordered mb-2 align-middle" style="font-size:12px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:50px;">Dir</th>
+                            <th>Name</th>
+                            <th>Sequence (5'→3')</th>
+                            <th style="width:70px;">T97 (℃)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge bg-primary">F</span></td>
+                            <td class="font-monospace" style="font-size:11px;">${data.backbone_primer_forward_name || 'N/A'}</td>
+                            <td>${seqCell(data.backbone_primer_forward)}</td>
+                            <td>${fmt(data.backbone_primer_forward_tm)}</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-danger">R</span></td>
+                            <td class="font-monospace" style="font-size:11px;">${data.backbone_primer_reverse_name || 'N/A'}</td>
+                            <td>${seqCell(data.backbone_primer_reverse)}</td>
+                            <td>${fmt(data.backbone_primer_reverse_tm)}</td>
+                        </tr>
+                    </tbody>
+                </table>
             `;
         }
 
@@ -895,6 +969,10 @@
                         </div>
                     </span>
                     <span class="k">Design</span><span>${designStatusBadge(v.design_status)}</span>
+                    <span class="k">Mode</span>
+                    <span>${v.modify_vector === false
+                        ? '<span class="badge bg-warning text-dark">不改造</span><span class="text-muted ms-2 small">只标注，质粒序列不变</span>'
+                        : '<span class="badge bg-secondary">改造</span><span class="text-muted ms-2 small">iU20–iD20 之间替换为 Cm-ccdB</span>'}</span>
                     <span class="k">Status</span>
                     <span class="d-flex align-items-center gap-2">
                         <select class="form-select form-select-sm" id="drawer-status-${dbId}" style="max-width:160px;">

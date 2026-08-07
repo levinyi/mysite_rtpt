@@ -508,7 +508,7 @@ def vector_data_api(request):
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
         'i5NC', 'i3NC',
         'status','user__username', 'vector_file', 'vector_png', 'vector_gb',
-        'design_status', 'cloning_method', 'design_error', 'is_public'
+        'design_status', 'cloning_method', 'design_error', 'is_public', 'modify_vector'
     )
     return JsonResponse({'data': list(vector_list)})
 
@@ -530,9 +530,10 @@ def vector_export_excel(request):
     seq_col = 'Vector_Seq(From_v3NC_Downstream_to_v5NC_Upstream_withoutV3NCv5NC_Seq)'
     columns = [
         'Vector_ID', 'Vector_Name', 'iU20', 'iD20', 'v5NC', 'v3NC', seq_col,
-        'i5NC', 'i3NC', 'Status', 'User', 'Cloning_Method',
+        'i5NC', 'i3NC', 'Status', 'User', 'Cloning_Method', 'Modify_Vector',
         'Antibiotic_Resistance', 'Design_Status', 'Primer_Forward',
-        'Primer_Reverse', 'Create_Date',
+        'Primer_Reverse', 'Backbone_Primer_Forward', 'Backbone_Primer_Reverse',
+        'Create_Date',
     ]
     rows = []
     for v in qs:
@@ -549,10 +550,13 @@ def vector_export_excel(request):
             'Status': v.status,
             'User': v.user.username if v.user else 'RootPath',
             'Cloning_Method': v.cloning_method,
+            'Modify_Vector': 'Modified' if v.modify_vector else 'NotModified',
             'Antibiotic_Resistance': v.antibiotic_resistance,
             'Design_Status': v.design_status,
             'Primer_Forward': v.primer_forward,
             'Primer_Reverse': v.primer_reverse,
+            'Backbone_Primer_Forward': v.backbone_primer_forward,
+            'Backbone_Primer_Reverse': v.backbone_primer_reverse,
             'Create_Date': v.create_date.strftime('%Y-%m-%d %H:%M:%S') if v.create_date else '',
         })
 
@@ -589,6 +593,18 @@ def vector_automation_design_trigger(request):
     if forced_method and forced_method not in valid_methods:
         return JsonResponse({'status': 'error', 'message': f'不支持的克隆方法: {forced_method}'})
 
+    # 改造 / 不改造。前端不传时默认改造，保持既有行为
+    modify = str(request.POST.get('modify_vector', '1')).lower() not in {'0', 'false', 'no'}
+    if not modify:
+        # 不改造只支持 Gibson：GG/T4 的 4bp 粘端要靠 Cm-ccdB 盒子自带的 IIS 位点切出来，
+        # 不插盒子客户质粒上就没有这个位点
+        if forced_method and forced_method != 'Gibson':
+            return JsonResponse({
+                'status': 'error',
+                'message': f'不改造模式目前只支持 Gibson，不支持 {forced_method}'
+            })
+        forced_method = 'Gibson'
+
     try:
         vector = Vector.objects.get(id=vector_id)
     except Vector.DoesNotExist:
@@ -602,11 +618,11 @@ def vector_automation_design_trigger(request):
     vector.save()
 
     from user_center.tasks import async_vector_automation_design
-    task = async_vector_automation_design.delay(vector_id, forced_method=forced_method)
+    task = async_vector_automation_design.delay(vector_id, forced_method=forced_method, modify=modify)
 
     return JsonResponse({
         'status': 'success',
-        'message': '载体改造设计任务已启动',
+        'message': '载体改造设计任务已启动' if modify else '载体标注设计任务已启动（不改造）',
         'task_id': task.id
     })
 
@@ -636,6 +652,7 @@ def vector_automation_design_status(request):
         'status': 'success',
         'design_status': vector.design_status,
         'cloning_method': vector.cloning_method,
+        'modify_vector': vector.modify_vector,
         'design_error': vector.design_error
     }
 
@@ -656,6 +673,19 @@ def vector_automation_design_status(request):
                 colony_primers = json.loads(vector.colony_pcr_primers)
             except (ValueError, TypeError):
                 colony_primers = []
+
+        # 骨架PCR外向引物（只有不改造模式才有）
+        backbone_forward_name, backbone_forward_seq = parse_primer(vector.backbone_primer_forward)
+        backbone_reverse_name, backbone_reverse_seq = parse_primer(vector.backbone_primer_reverse)
+
+        response_data.update({
+            'backbone_primer_forward': backbone_forward_seq,
+            'backbone_primer_reverse': backbone_reverse_seq,
+            'backbone_primer_forward_name': backbone_forward_name,
+            'backbone_primer_reverse_name': backbone_reverse_name,
+            'backbone_primer_forward_tm': vector.backbone_primer_forward_tm,
+            'backbone_primer_reverse_tm': vector.backbone_primer_reverse_tm,
+        })
 
         response_data.update({
             'v5nc': vector.NC5,

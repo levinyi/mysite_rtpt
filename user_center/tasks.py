@@ -21,13 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def async_vector_automation_design(vector_id, forced_method=None):
+def async_vector_automation_design(vector_id, forced_method=None, modify=True):
     """
-    异步执行载体改造自动化设计任务
+    异步执行载体设计任务
 
     Args:
         vector_id: Vector对象的ID
         forced_method: 指定克隆方法（'Gibson'/'GoldenGate'/'T4'），为None时自动选择
+        modify: True=改造载体（iU20–iD20 之间换成 Cm-ccdB）；
+                False=不改造，只把 v5NC/v3NC/引物标注到图谱上，质粒序列不变。
+                不改造目前只支持 Gibson——GG/T4 的 4bp 粘端要靠 Cm-ccdB 自带的 IIS 位点切出来，
+                不插盒子就没有这个位点。
 
     Returns:
         dict: 设计结果
@@ -35,8 +39,16 @@ def async_vector_automation_design(vector_id, forced_method=None):
     try:
         vector = Vector.objects.get(pk=vector_id)
 
+        modify = bool(modify)
+        variant = 'M1' if modify else 'A1'
+        if not modify:
+            # 不改造只走 Gibson：显式指定，失败时错误信息才说得清楚
+            # （不指定的话自动选择会在 Gibson 失败后悄悄落到 GG/T4）
+            forced_method = 'Gibson'
+
         # 更新状态为Processing
         vector.design_status = 'Processing'
+        vector.modify_vector = modify
         vector.save()
 
         # 获取上传的GenBank文件路径
@@ -61,7 +73,11 @@ def async_vector_automation_design(vector_id, forced_method=None):
         design_result = designer.select_cloning_method(parsed_data, forced_method=forced_method)
         if not design_result:
             vector.design_status = 'Failed'
-            vector.design_error = '没有找到可用的克隆方法。' + '; '.join(designer.errors)
+            if modify:
+                vector.design_error = '没有找到可用的克隆方法。' + '; '.join(designer.errors)
+            else:
+                vector.design_error = ('不改造模式只支持 Gibson，但该载体不满足 Gibson 条件。'
+                                       '若要改用 GG/T4，请改走改造模式。' + '; '.join(designer.errors))
             vector.save()
             return {'status': 'error', 'errors': designer.errors}
 
@@ -83,7 +99,9 @@ def async_vector_automation_design(vector_id, forced_method=None):
         # 3. 设计NC-PCR引物（仅Gibson方法）
         primer_result = None
         if design_result['method'] == 'Gibson':
-            primer_result = designer.design_nc_pcr_primers(design_result, parsed_data, vector_code=vector_code)
+            primer_result = designer.design_nc_pcr_primers(
+                design_result, parsed_data, vector_code=vector_code, variant=variant
+            )
             if primer_result:
                 forward = primer_result['forward']
                 reverse = primer_result['reverse']
@@ -103,6 +121,28 @@ def async_vector_automation_design(vector_id, forced_method=None):
             vector.primer_forward_tm = None
             vector.primer_reverse_tm = None
 
+        # 3.2 骨架PCR引物（外向的一对，仅不改造模式）
+        # 必须排在 NC-PCR 之后：design_nc_pcr_primers 会调整 v5NC/v3NC 边界，
+        # 骨架引物的锚点要落在调整完的接口上。
+        backbone_primers = None
+        vector.backbone_primer_forward = None
+        vector.backbone_primer_reverse = None
+        vector.backbone_primer_forward_tm = None
+        vector.backbone_primer_reverse_tm = None
+        if not modify:
+            backbone_primers = designer.design_backbone_pcr_primers(
+                design_result, parsed_data, vector_code=vector_code
+            )
+            if backbone_primers:
+                bb_forward = backbone_primers['forward']
+                bb_reverse = backbone_primers['reverse']
+                vector.backbone_primer_forward = f"{bb_forward['name']}::{bb_forward['sequence']}"
+                vector.backbone_primer_reverse = f"{bb_reverse['name']}::{bb_reverse['sequence']}"
+                vector.backbone_primer_forward_tm = bb_forward['tm']
+                vector.backbone_primer_reverse_tm = bb_reverse['tm']
+            else:
+                append_error_message('骨架PCR引物设计失败：线性化骨架的外向引物需人工设计')
+
         # 保存设计结果（在引物设计后，可能已调整边界）
         vector.cloning_method = design_result['method']
         vector.NC5 = design_result['v5nc']
@@ -112,7 +152,7 @@ def async_vector_automation_design(vector_id, forced_method=None):
 
         # 3.5 菌落PCR引物（5对，适用于所有克隆方法）
         colony_pairs = designer.design_colony_pcr_primers(
-            parsed_data, design_result, vector_code=vector_code
+            parsed_data, design_result, vector_code=vector_code, variant=variant
         )
         if colony_pairs:
             vector.colony_pcr_primers = json.dumps(colony_pairs, ensure_ascii=False)
@@ -122,12 +162,12 @@ def async_vector_automation_design(vector_id, forced_method=None):
             vector.colony_pcr_primers = None
             append_error_message('菌落PCR引物设计失败')
 
-        # 4. 生成改造后GenBank文件
-        # 构建输出文件名
+        # 4. 生成设计后GenBank文件
+        # 构建输出文件名：改造版 M1，不改造版 A1（Annotated），只差版本号这一位
         if resistance:
-            output_filename = f"{vector_code}M1({resistance})-{filename_suffix}.gb"
+            output_filename = f"{vector_code}{variant}({resistance})-{filename_suffix}.gb"
         else:
-            output_filename = f"{vector_code}M1-{filename_suffix}.gb"
+            output_filename = f"{vector_code}{variant}-{filename_suffix}.gb"
             append_error_message('未在文件名中找到抗性信息')
 
         # 在临时目录生成 GenBank 文件，避免与 Django 存储路径冲突
@@ -142,6 +182,8 @@ def async_vector_automation_design(vector_id, forced_method=None):
             tmp_path,
             output_filename.replace('.gb', ''),
             colony_primers=colony_pairs,
+            modify=modify,
+            backbone_primers=backbone_primers,
         )
 
         # 保存到 vector_gb 字段（先删除旧文件避免 Django 追加随机后缀）
@@ -161,7 +203,9 @@ def async_vector_automation_design(vector_id, forced_method=None):
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-        # 保存载体序列（without v5NC/v3NC之间的序列）
+        # 保存载体骨架序列（原序列去掉 v5NC–v3NC 之间那段）。
+        # 两种模式下都是同一段：改造版是酶切掉 Cm-ccdB 得到的骨架，
+        # 不改造版是酶切/外向PCR 从客户原质粒上拿到的骨架，序列一致，下游订单逻辑不用区分。
         v5nc_end = design_result['v5nc_location'][1]
         v3nc_start = design_result['v3nc_location'][0]
         vector_without_insert = parsed_data['sequence'][:v5nc_end] + parsed_data['sequence'][v3nc_start:]
@@ -188,6 +232,7 @@ def async_vector_automation_design(vector_id, forced_method=None):
         return {
             'status': 'success',
             'method': design_result['method'],
+            'modify_vector': modify,
             'v5nc': design_result['v5nc'],
             'v3nc': design_result['v3nc'],
             'i5nc': design_result.get('i5nc', ''),

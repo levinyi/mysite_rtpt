@@ -769,7 +769,7 @@ class VectorAutomationDesigner:
 
         return None
 
-    def design_nc_pcr_primers(self, design_result, parsed_data, vector_code=None, target_tm=60):
+    def design_nc_pcr_primers(self, design_result, parsed_data, vector_code=None, target_tm=60, variant='M1'):
         """
         设计NC-PCR引物（仅Gibson方法需要）
 
@@ -777,6 +777,7 @@ class VectorAutomationDesigner:
             design_result: 克隆方法设计结果
             parsed_data: 解析后的GenBank数据
             target_tm: 目标Tm值（默认60℃）
+            variant: 引物名里的图谱版本号（改造 'M1' / 不改造 'A1'）
 
         Returns:
             dict: 引物设计结果或None
@@ -910,8 +911,8 @@ class VectorAutomationDesigner:
                     design_result['v3nc'] = sequence[v3_loc[0]:v3_loc[1]]
                     self._update_shift_records(design_result, parsed_data, sequence)
 
-                    forward['name'] = self.generate_primer_name(vector_code, '5OL', f"{v5_loc[0]}-{v5_loc[1]}")
-                    reverse['name'] = self.generate_primer_name(vector_code, '3OLrc', f"{v3_loc[0]}-{v3_loc[1]}")
+                    forward['name'] = self.generate_primer_name(vector_code, '5OL', f"{v5_loc[0]}-{v5_loc[1]}", variant=variant)
+                    reverse['name'] = self.generate_primer_name(vector_code, '3OLrc', f"{v3_loc[0]}-{v3_loc[1]}", variant=variant)
 
                     return {
                         'forward': forward,
@@ -921,6 +922,97 @@ class VectorAutomationDesigner:
 
         self.errors.append("NC-PCR引物设计失败：无法在允许边界内找到满足T97=60℃的引物")
         return None
+
+    def design_backbone_pcr_primers(self, design_result, parsed_data, vector_code=None, target_tm=60):
+        """
+        设计骨架PCR引物（外向的一对，仅"不改造"模式使用）
+
+        与 NC-PCR 的 5OL/3OLrc 相向不同，这一对是"外向"的：
+        - 正向 3BB   ：5'端锚在 v3NC 起点，沿正链向右，绕质粒一圈
+        - 反向 5BBrc ：5'端锚在 v5NC 终点，沿负链向左
+        两者背对背，产物 = 线性化骨架，两端正好落在 v3NC 起点和 v5NC 终点，
+        不含 iU20–iD20 之间那段——正是 Gibson 装基因所需要的骨架。
+
+        引物 5'端必须精确锚在接口上（只允许长度变化，锚点不动），否则 Gibson 接缝会错位。
+        本方法不修改 design_result 的边界（与 design_nc_pcr_primers 不同）。
+
+        Args:
+            design_result: 克隆方法设计结果（只读）
+            parsed_data: 解析后的GenBank数据
+            vector_code: 用于引物命名
+            target_tm: 目标T97值（默认60℃）
+
+        Returns:
+            dict: {'forward': ..., 'reverse': ..., 'heterodimer_dg': ...}，失败返回 None
+        """
+        sequence = parsed_data['sequence']
+        v5nc_end = design_result['v5nc_location'][1]
+        v3nc_start = design_result['v3nc_location'][0]
+
+        min_primer_len = 16
+        max_primer_len = 35
+        tm_tolerance = 2
+        hairpin_tm_limit = 40
+        dimer_dg_limit = 11
+
+        def pick(build_primer, max_len):
+            """长度从短到长扫，取第一个 T97 达标的；都不达标则退到 T97≥58 的最长候选。"""
+            fallback = None
+            for length in range(min_primer_len, max_len + 1):
+                primer_seq = build_primer(length)
+                if not primer_seq or len(primer_seq) != length:
+                    continue
+                hairpin_tm = self.calculate_hairpin_tm(primer_seq)
+                if hairpin_tm is not None and hairpin_tm >= hairpin_tm_limit:
+                    continue
+                homodimer_dg = self.calculate_dimer_dg(primer_seq)
+                if homodimer_dg is not None and abs(homodimer_dg) >= dimer_dg_limit:
+                    continue
+                tm = self.calculate_tm_t97(primer_seq)
+                candidate = {
+                    'sequence': primer_seq,
+                    'tm': tm,
+                    'length': length,
+                    'hairpin_tm': hairpin_tm,
+                    'homodimer_dg': homodimer_dg,
+                }
+                if tm >= target_tm:
+                    return candidate
+                if tm >= target_tm - tm_tolerance:
+                    fallback = candidate
+            return fallback
+
+        # 正向：锚点 v3nc_start，向右延伸（可越过 v3NC 终点，退火区更长只是更稳）
+        forward = pick(
+            lambda length: sequence[v3nc_start:v3nc_start + length],
+            min(max_primer_len, len(sequence) - v3nc_start),
+        )
+        # 反向：锚点 v5nc_end，向左延伸（可越过 v5NC 起点）
+        reverse = pick(
+            lambda length: self.reverse_complement(sequence[v5nc_end - length:v5nc_end]),
+            min(max_primer_len, v5nc_end),
+        )
+
+        if not forward or not reverse:
+            self.errors.append("骨架PCR引物设计失败：无法在接口处找到满足T97=60℃的外向引物")
+            return None
+
+        hetero_dg = self.calculate_dimer_dg(forward['sequence'], reverse['sequence'])
+        if hetero_dg is not None and abs(hetero_dg) >= dimer_dg_limit:
+            self.errors.append("骨架PCR引物设计失败：正反向引物间存在明显二聚体")
+            return None
+
+        forward['template_start'] = v3nc_start
+        forward['template_end'] = v3nc_start + forward['length']
+        forward['name'] = self.generate_primer_name(
+            vector_code, '3BB', f"{forward['template_start']}-{forward['template_end']}", variant='A1')
+
+        reverse['template_start'] = v5nc_end - reverse['length']
+        reverse['template_end'] = v5nc_end
+        reverse['name'] = self.generate_primer_name(
+            vector_code, '5BBrc', f"{reverse['template_start']}-{reverse['template_end']}", variant='A1')
+
+        return {'forward': forward, 'reverse': reverse, 'heterodimer_dg': hetero_dg}
 
     def _check_colony_primer_quality(self, primer_seq, target_tm=60, tm_tolerance=2,
                                       hairpin_tm_limit=40, dimer_dg_limit=11):
@@ -1028,7 +1120,7 @@ class VectorAutomationDesigner:
                                    min_dist=50, max_dist=500,
                                    min_primer_len=18, max_primer_len=25,
                                    candidate_limit=40, dimer_dg_limit=11,
-                                   start_ref=None):
+                                   start_ref=None, variant='M1'):
         """
         设计菌落PCR引物（5对），适用于所有克隆方法。
 
@@ -1161,8 +1253,8 @@ class VectorAutomationDesigner:
                     continue
 
                 pair_idx = len(pairs) + 1
-                f_name = self.generate_primer_name(vector_code, f"CPF{pair_idx}", f"{f['start']}-{f['end']}", prefix='OJYxxx')
-                r_name = self.generate_primer_name(vector_code, f"CPR{pair_idx}", f"{r['template_start']}-{r['template_end']}", prefix='OJYxxx')
+                f_name = self.generate_primer_name(vector_code, f"CPF{pair_idx}", f"{f['start']}-{f['end']}", prefix='OJYxxx', variant=variant)
+                r_name = self.generate_primer_name(vector_code, f"CPR{pair_idx}", f"{r['template_start']}-{r['template_end']}", prefix='OJYxxx', variant=variant)
                 amplicon_length = r['template_end'] - f['start']
 
                 pairs.append({
@@ -1315,17 +1407,29 @@ class VectorAutomationDesigner:
         return abs(dg) >= dg_limit
 
     def generate_modified_genbank(self, design_result, parsed_data, primer_result, output_path, vector_name,
-                                   colony_primers=None):
+                                   colony_primers=None, modify=True, backbone_primers=None):
         """
-        生成改造后的GenBank文件
+        生成设计后的GenBank文件
+
+        两种模式：
+        - modify=True（改造）：把 [v5nc_end, v3nc_start) 换成 Cm-ccdB，下游坐标整体平移，
+          跨插入区的原 feature 丢弃。
+        - modify=False（不改造）：序列一个碱基都不动，offset=0，原 feature 全部原位保留
+          （包括跨 iU20–iD20 的那些），只把 v5NC/v3NC/引物标注上去，不加 Cm-ccdB。
+
+        两种模式都把 iU20 的 end 对齐到 v5nc_end、iD20 的 start 对齐到 v3NC 的新起点，
+        因为下游 ParsingGenBank.addAnalysisFeaturesAndFragments 就是靠这两个坐标
+        取出 [iU20.end, iD20.start) 整段替换成 [i5NC, gene, i3NC] 的——错位就会切错地方。
 
         Args:
             design_result: 克隆方法设计结果
             parsed_data: 解析后的GenBank数据
-            primer_result: 引物设计结果（可能为None）
+            primer_result: NC-PCR 引物设计结果（可能为None）
             output_path: 输出文件路径
             vector_name: 载体名称
             colony_primers: 菌落PCR引物列表（可选，5对）
+            modify: 是否改造载体（False 时只标注不改序列）
+            backbone_primers: 骨架PCR外向引物（仅不改造模式，可能为None）
 
         Returns:
             str: 输出文件路径
@@ -1336,19 +1440,32 @@ class VectorAutomationDesigner:
         v5nc_start, v5nc_end = design_result['v5nc_location']
         v3nc_start, v3nc_end = design_result['v3nc_location']
 
-        # 选择合适的 Cm-ccdB 片段
-        cm_ccdb_enzyme, cm_ccdb_seq, cm_ccdb_warning = select_cm_ccdb_fragment(sequence)
-        if cm_ccdb_warning:
-            # 记录警告但不阻止生成（NNNN 片段仍然可以生成文件）
-            design_result['cm_ccdb_warning'] = cm_ccdb_warning
+        cm_ccdb_enzyme = None
+        cm_ccdb_seq = ''
+        cm_ccdb_warning = ''
 
-        design_result['cm_ccdb_enzyme'] = cm_ccdb_enzyme
+        if modify:
+            # 选择合适的 Cm-ccdB 片段
+            cm_ccdb_enzyme, cm_ccdb_seq, cm_ccdb_warning = select_cm_ccdb_fragment(sequence)
+            if cm_ccdb_warning:
+                # 记录警告但不阻止生成（NNNN 片段仍然可以生成文件）
+                design_result['cm_ccdb_warning'] = cm_ccdb_warning
 
-        # 构建改造后序列：移除v5NC和v3NC之间的序列，插入Cm-ccdB
-        modified_seq = sequence[:v5nc_end] + cm_ccdb_seq + sequence[v3nc_start:]
+            design_result['cm_ccdb_enzyme'] = cm_ccdb_enzyme
 
-        # 位移量：插入区域后的所有坐标需要偏移
-        offset = len(cm_ccdb_seq) - (v3nc_start - v5nc_end)
+            # 构建改造后序列：移除v5NC和v3NC之间的序列，插入Cm-ccdB
+            modified_seq = sequence[:v5nc_end] + cm_ccdb_seq + sequence[v3nc_start:]
+            # 位移量：插入区域后的所有坐标需要偏移
+            offset = len(cm_ccdb_seq) - (v3nc_start - v5nc_end)
+            # v3NC 被推到 Cm-ccdB 之后
+            v3nc_new_start = v5nc_end + len(cm_ccdb_seq)
+            description = f"Modified vector - {design_result['method']} method"
+        else:
+            # 不改造：序列原样输出
+            modified_seq = sequence
+            offset = 0
+            v3nc_new_start = v3nc_start
+            description = f"Annotated vector (not modified) - {design_result['method']} method"
 
         # 创建新的SeqRecord，保留原始注释信息
         original_annotations = parsed_data.get('original_annotations', {})
@@ -1357,7 +1474,7 @@ class VectorAutomationDesigner:
             Seq(modified_seq),
             id=vector_name,
             name=vector_name,
-            description=f"Modified vector - {design_result['method']} method",
+            description=description,
             annotations=original_annotations
         )
 
@@ -1368,6 +1485,12 @@ class VectorAutomationDesigner:
             # 跳过 iU20/iD20，后面单独添加
             feat_labels = feat.qualifiers.get('label', [])
             if any(l.lower() in {'iu20', 'id20'} for l in feat_labels):
+                continue
+
+            if not modify:
+                # 不改造：序列长度没变，原 feature 全部原位保留——包括跨 iU20–iD20 的那些
+                # （这些在改造模式下会被丢弃，因为它们覆盖的序列已经不存在了）
+                modified_record.features.append(feat)
                 continue
 
             try:
@@ -1412,22 +1535,20 @@ class VectorAutomationDesigner:
         )
         modified_record.features.append(v5nc_feature)
 
-        # 3. Cm-ccdB（插入在v5nc_end位置）
-        cm_ccdb_start = v5nc_end
-        cm_ccdb_end = v5nc_end + len(cm_ccdb_seq)
-        cm_ccdb_label = f"Cm-ccdB_{cm_ccdb_enzyme}"
-        cm_ccdb_note = f"Chloramphenicol resistance and ccdB ({cm_ccdb_enzyme} sites)"
-        if cm_ccdb_warning:
-            cm_ccdb_note += f" WARNING: {cm_ccdb_warning}"
-        cm_ccdb_feature = SeqFeature(
-            FeatureLocation(cm_ccdb_start, cm_ccdb_end),
-            type="CDS",
-            qualifiers={'label': [cm_ccdb_label], 'note': [cm_ccdb_note]}
-        )
-        modified_record.features.append(cm_ccdb_feature)
+        # 3. Cm-ccdB（插入在v5nc_end位置）；不改造模式下没有这个 feature
+        if modify:
+            cm_ccdb_label = f"Cm-ccdB_{cm_ccdb_enzyme}"
+            cm_ccdb_note = f"Chloramphenicol resistance and ccdB ({cm_ccdb_enzyme} sites)"
+            if cm_ccdb_warning:
+                cm_ccdb_note += f" WARNING: {cm_ccdb_warning}"
+            cm_ccdb_feature = SeqFeature(
+                FeatureLocation(v5nc_end, v3nc_new_start),
+                type="CDS",
+                qualifiers={'label': [cm_ccdb_label], 'note': [cm_ccdb_note]}
+            )
+            modified_record.features.append(cm_ccdb_feature)
 
-        # 4. v3NC（位置需要调整）
-        v3nc_new_start = cm_ccdb_end
+        # 4. v3NC（改造模式下被推到 Cm-ccdB 之后；不改造模式下就是原位）
         v3nc_new_end = v3nc_new_start + (v3nc_end - v3nc_start)
         v3nc_feature = SeqFeature(
             FeatureLocation(v3nc_new_start, v3nc_new_end),
@@ -1473,6 +1594,36 @@ class VectorAutomationDesigner:
                     qualifiers={'label': [reverse_label], 'note': reverse_notes}
                 )
                 modified_record.features.append(reverse_feature)
+
+        # 4.15 骨架PCR引物（外向，仅不改造模式）——两条背对背，产物即线性化骨架
+        if backbone_primers:
+            bb_forward = backbone_primers.get('forward') or {}
+            bb_reverse = backbone_primers.get('reverse') or {}
+            v3nc_offset = v3nc_new_start - v3nc_start
+
+            if bb_forward.get('sequence') and bb_forward.get('template_start') is not None:
+                # 正向锚在 v3NC 起点，随 v3NC 一起平移（不改造时 offset 为 0）
+                bb_f_start = bb_forward['template_start'] + v3nc_offset
+                bb_f_end = bb_forward['template_end'] + v3nc_offset
+                bb_f_notes = [f"Sequence: {bb_forward['sequence']}", "Backbone PCR (outward)"]
+                if bb_forward.get('tm') is not None:
+                    bb_f_notes.append(f"T97: {bb_forward['tm']}C")
+                modified_record.features.append(SeqFeature(
+                    FeatureLocation(bb_f_start, bb_f_end, strand=1),
+                    type="primer_bind",
+                    qualifiers={'label': [bb_forward.get('name') or 'Backbone-F'], 'note': bb_f_notes}
+                ))
+
+            if bb_reverse.get('sequence') and bb_reverse.get('template_start') is not None:
+                # 反向锚在 v5NC 终点，位于插入点之前，坐标不变
+                bb_r_notes = [f"Sequence: {bb_reverse['sequence']}", "Backbone PCR (outward)"]
+                if bb_reverse.get('tm') is not None:
+                    bb_r_notes.append(f"T97: {bb_reverse['tm']}C")
+                modified_record.features.append(SeqFeature(
+                    FeatureLocation(bb_reverse['template_start'], bb_reverse['template_end'], strand=-1),
+                    type="primer_bind",
+                    qualifiers={'label': [bb_reverse.get('name') or 'Backbone-R'], 'note': bb_r_notes}
+                ))
 
         # 4.2 Colony PCR primers (5对，对所有克隆方法都适用)
         if colony_primers:
@@ -1598,10 +1749,11 @@ class VectorAutomationDesigner:
         return suffix or 'Modified'
 
     @staticmethod
-    def generate_primer_name(vector_code, suffix, token, prefix='YHYxxxx'):
+    def generate_primer_name(vector_code, suffix, token, prefix='YHYxxxx', variant='M1'):
         """
         生成引物名称，编号用 xxxx 占位，待人工从引物总表分配唯一编号后替换。
         NC-PCR 默认前缀 YHYxxxx；菌落 PCR 传 prefix='OJYxxx'。
+        variant 跟随图谱版本号：改造版 'M1'，不改造版 'A1'。
         """
         code = vector_code or 'Vector'
-        return f"{prefix}-{code}M1-{suffix}"
+        return f"{prefix}-{code}{variant}-{suffix}"

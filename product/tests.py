@@ -1,5 +1,7 @@
 import io
+import os
 import random
+import shutil
 import tempfile
 
 from Bio import SeqIO
@@ -16,6 +18,7 @@ from user_center.utils.element_extractor import commit_candidates, extract_candi
 from user_center.utils.element_screen import (
     screen_sequence, find_element_by_sequence, invalidate_index_cache, revcomp,
 )
+from user_center.utils.vector_automation import VectorAutomationDesigner
 
 
 def _rand_seq(n, seed):
@@ -386,3 +389,247 @@ class ElementBulkExtractTests(TestCase):
         }])
         self.assertEqual(stats['skipped'], 1)
         self.assertEqual(VectorElement.objects.count(), 0)
+
+
+class VectorNoModifyDesignTests(TestCase):
+    """不改造模式：只把 v5NC/v3NC/引物标注到图谱上，质粒序列一个碱基都不动。
+
+    对照改造模式（把 iU20–iD20 之间换成 Cm-ccdB）跑同一条载体，验证两者的差别
+    只在中间区，以及下游 ParsingGenBank 依赖的 [iU20.end, iD20.start) 区间仍然对得上。
+    """
+
+    IU20 = (1000, 1020)
+    ID20 = (1500, 1520)
+    SPANNING = (900, 1600)   # 横跨 iU20–iD20，改造模式下会被丢弃
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # seed=1 的随机序列能过 Gibson 的全部闸门（长重复、回文/发卡、GC、同聚物）
+        rng = random.Random(1)
+        cls.sequence = ''.join(rng.choice('ACGT') for _ in range(3000))
+        record = SeqRecord(
+            Seq(cls.sequence), id='pCVaTEST', name='pCVaTEST',
+            description='synthetic test vector', annotations={'molecule_type': 'DNA'},
+        )
+        record.features = [
+            SeqFeature(SimpleLocation(*cls.IU20), type='misc_feature', qualifiers={'label': ['iU20']}),
+            SeqFeature(SimpleLocation(*cls.ID20), type='misc_feature', qualifiers={'label': ['iD20']}),
+            SeqFeature(SimpleLocation(200, 400), type='misc_feature', qualifiers={'label': ['upstream_elem']}),
+            SeqFeature(SimpleLocation(*cls.SPANNING), type='misc_feature', qualifiers={'label': ['spanning_elem']}),
+            SeqFeature(SimpleLocation(2000, 2300), type='misc_feature', qualifiers={'label': ['downstream_elem']}),
+        ]
+        cls._tmpdir = tempfile.mkdtemp()
+        cls.gb_path = os.path.join(cls._tmpdir, 'pCVaTEST.gb')
+        with open(cls.gb_path, 'w') as handle:
+            SeqIO.write(record, handle, 'genbank')
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._tmpdir, ignore_errors=True)
+        super().tearDownClass()
+
+    def _design(self, modify):
+        """跑完整一条设计链路，返回 (设计结果, 输出图谱 record, 骨架引物)。"""
+        designer = VectorAutomationDesigner(self.gb_path)
+        parsed = designer.parse_genbank()
+        self.assertIsNotNone(parsed, f'解析失败: {designer.errors}')
+        design_result = designer.select_cloning_method(parsed, forced_method='Gibson')
+        self.assertIsNotNone(design_result, f'Gibson 设计失败: {designer.errors}')
+
+        variant = 'M1' if modify else 'A1'
+        primers = designer.design_nc_pcr_primers(
+            design_result, parsed, vector_code='pCVaTEST', variant=variant)
+        backbone = None if modify else designer.design_backbone_pcr_primers(
+            design_result, parsed, vector_code='pCVaTEST')
+
+        out_path = os.path.join(self._tmpdir, f'out_{variant}.gb')
+        designer.generate_modified_genbank(
+            design_result, parsed, primers, out_path, f'pCVaTEST{variant}',
+            colony_primers=None, modify=modify, backbone_primers=backbone,
+        )
+        return design_result, SeqIO.read(out_path, 'genbank'), backbone
+
+    @staticmethod
+    def _labels(record):
+        found = {}
+        for feature in record.features:
+            for label in feature.qualifiers.get('label', []):
+                found.setdefault(label, []).append(
+                    (int(feature.location.start), int(feature.location.end)))
+        return found
+
+    def test_not_modified_output_keeps_the_original_sequence(self):
+        _, record, _ = self._design(modify=False)
+        self.assertEqual(str(record.seq).upper(), self.sequence.upper())
+
+    def test_not_modified_output_has_no_cm_ccdb(self):
+        _, record, _ = self._design(modify=False)
+        self.assertFalse([lbl for lbl in self._labels(record) if lbl.startswith('Cm-ccdB')])
+
+    def test_modified_output_inserts_cm_ccdb_and_grows(self):
+        # 回归保护：改造模式的行为不能被不改造模式的改动带偏
+        design_result, record, _ = self._design(modify=True)
+        cm_labels = [lbl for lbl in self._labels(record) if lbl.startswith('Cm-ccdB')]
+        self.assertEqual(len(cm_labels), 1)
+        v5nc_end = design_result['v5nc_location'][1]
+        v3nc_start = design_result['v3nc_location'][0]
+        cm_start, cm_end = self._labels(record)[cm_labels[0]][0]
+        self.assertEqual(cm_start, v5nc_end)
+        expected_len = len(self.sequence) - (v3nc_start - v5nc_end) + (cm_end - cm_start)
+        self.assertEqual(len(record.seq), expected_len)
+
+    def test_feature_spanning_the_insert_survives_only_when_not_modified(self):
+        _, annotated, _ = self._design(modify=False)
+        _, modified, _ = self._design(modify=True)
+        self.assertEqual(self._labels(annotated).get('spanning_elem'), [self.SPANNING])
+        self.assertIsNone(self._labels(modified).get('spanning_elem'))
+        # 插入点之前的 feature 两种模式下都原位保留
+        self.assertEqual(self._labels(annotated).get('upstream_elem'), [(200, 400)])
+        self.assertEqual(self._labels(modified).get('upstream_elem'), [(200, 400)])
+
+    def test_downstream_replacement_window_matches_the_design(self):
+        # 下游 ParsingGenBank 取 [iU20.end, iD20.start) 整段替换成 [i5NC, gene, i3NC]，
+        # 所以这两个坐标必须紧贴 v5NC 末端和 v3NC 起点，否则会切错地方
+        for modify in (True, False):
+            with self.subTest(modify=modify):
+                design_result, record, _ = self._design(modify)
+                labels = self._labels(record)
+                iu20_end = labels['iU20'][0][1]
+                id20_start = labels['iD20'][0][0]
+                v3nc_start = labels['v3NC'][0][0]
+                self.assertEqual(iu20_end, design_result['v5nc_location'][1])
+                self.assertEqual(id20_start, v3nc_start)
+
+    def test_not_modified_replacement_window_is_the_customers_own_sequence(self):
+        design_result, record, _ = self._design(modify=False)
+        labels = self._labels(record)
+        window = str(record.seq)[labels['iU20'][0][1]:labels['iD20'][0][0]].upper()
+        v5nc_end = design_result['v5nc_location'][1]
+        v3nc_start = design_result['v3nc_location'][0]
+        self.assertEqual(window, self.sequence[v5nc_end:v3nc_start].upper())
+
+    def test_backbone_primers_are_outward_facing(self):
+        design_result, _, backbone = self._design(modify=False)
+        self.assertIsNotNone(backbone, '骨架引物应设计成功')
+        v5nc_end = design_result['v5nc_location'][1]
+        v3nc_start = design_result['v3nc_location'][0]
+        forward = backbone['forward']
+        reverse = backbone['reverse']
+        # 正向 5' 端紧贴 v3NC 起点、向右；反向 5' 端紧贴 v5NC 末端、向左 —— 两条背对背
+        self.assertEqual(forward['template_start'], v3nc_start)
+        self.assertEqual(forward['sequence'],
+                         self.sequence[v3nc_start:v3nc_start + forward['length']])
+        self.assertEqual(reverse['template_end'], v5nc_end)
+        self.assertEqual(
+            reverse['sequence'],
+            str(Seq(self.sequence[v5nc_end - reverse['length']:v5nc_end]).reverse_complement()).upper(),
+        )
+
+    def test_backbone_primers_are_annotated_on_the_map(self):
+        _, record, backbone = self._design(modify=False)
+        labels = self._labels(record)
+        self.assertIn(backbone['forward']['name'], labels)
+        self.assertIn(backbone['reverse']['name'], labels)
+        strands = {
+            tuple(f.qualifiers.get('label', [''])): f.location.strand
+            for f in record.features if f.type == 'primer_bind'
+        }
+        self.assertEqual(strands[(backbone['forward']['name'],)], 1)
+        self.assertEqual(strands[(backbone['reverse']['name'],)], -1)
+
+    def test_modified_mode_designs_no_backbone_primers(self):
+        _, record, backbone = self._design(modify=True)
+        self.assertIsNone(backbone)
+        self.assertFalse([lbl for lbl in self._labels(record) if 'BB' in lbl])
+
+    def test_primer_names_carry_the_map_variant(self):
+        designer = VectorAutomationDesigner(self.gb_path)
+        self.assertTrue(
+            designer.generate_primer_name('pCVa001', '5OL', '0-30').endswith('pCVa001M1-5OL'))
+        self.assertTrue(
+            designer.generate_primer_name('pCVa001', '5OL', '0-30', variant='A1')
+            .endswith('pCVa001A1-5OL'))
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix='vec_task_test_'))
+class VectorDesignTaskTests(TestCase):
+    """跑完整的 Celery 任务体（同步调用），确认两种模式落库的字段和产物文件都对。"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        rng = random.Random(1)
+        cls.sequence = ''.join(rng.choice('ACGT') for _ in range(3000))
+        record = SeqRecord(
+            Seq(cls.sequence), id='pCVa777', name='pCVa777',
+            description='synthetic test vector', annotations={'molecule_type': 'DNA'},
+        )
+        record.features = [
+            SeqFeature(SimpleLocation(1000, 1020), type='misc_feature', qualifiers={'label': ['iU20']}),
+            SeqFeature(SimpleLocation(1500, 1520), type='misc_feature', qualifiers={'label': ['iD20']}),
+        ]
+        buf = io.StringIO()
+        SeqIO.write(record, buf, 'genbank')
+        cls.gb_bytes = buf.getvalue().encode()
+
+    def _make_vector(self):
+        vector = Vector.objects.create(vector_name='pCVa777 test')
+        vector.vector_file.save('pCVa777(Kan)-test.gb', ContentFile(self.gb_bytes), save=True)
+        return vector
+
+    def test_task_not_modified_writes_a1_file_and_backbone_primers(self):
+        from user_center.tasks import async_vector_automation_design
+
+        vector = self._make_vector()
+        result = async_vector_automation_design(vector.id, modify=False)
+        self.assertEqual(result['status'], 'success', result)
+        self.assertEqual(result['method'], 'Gibson')
+        self.assertIs(result['modify_vector'], False)
+
+        vector.refresh_from_db()
+        self.assertIs(vector.modify_vector, False)
+        self.assertEqual(vector.design_status, 'Completed')
+        self.assertIn('A1(Kan)', os.path.basename(vector.vector_gb.name))
+        self.assertNotIn('M1', os.path.basename(vector.vector_gb.name))
+        self.assertTrue(vector.backbone_primer_forward)
+        self.assertTrue(vector.backbone_primer_reverse)
+        self.assertIsNotNone(vector.backbone_primer_forward_tm)
+
+        # 产物图谱的序列必须与客户原质粒完全一致
+        record = SeqIO.read(vector.vector_gb.path, 'genbank')
+        self.assertEqual(str(record.seq).upper(), self.sequence.upper())
+
+        # vector_map 存的是骨架，与是否改造无关
+        self.assertEqual(vector.vector_map.upper(),
+                         (self.sequence[:1020] + self.sequence[1500:]).upper())
+
+    def test_task_modified_writes_m1_file_and_no_backbone_primers(self):
+        from user_center.tasks import async_vector_automation_design
+
+        vector = self._make_vector()
+        result = async_vector_automation_design(vector.id, forced_method='Gibson', modify=True)
+        self.assertEqual(result['status'], 'success', result)
+        self.assertIs(result['modify_vector'], True)
+
+        vector.refresh_from_db()
+        self.assertIs(vector.modify_vector, True)
+        self.assertIn('M1(Kan)', os.path.basename(vector.vector_gb.name))
+        self.assertIsNone(vector.backbone_primer_forward)
+
+        record = SeqIO.read(vector.vector_gb.path, 'genbank')
+        self.assertNotEqual(str(record.seq).upper(), self.sequence.upper())
+        self.assertGreater(len(record.seq), len(self.sequence))
+
+        # 骨架序列与不改造模式一致
+        self.assertEqual(vector.vector_map.upper(),
+                         (self.sequence[:1020] + self.sequence[1500:]).upper())
+
+    def test_task_defaults_to_modify_for_backward_compatibility(self):
+        from user_center.tasks import async_vector_automation_design
+
+        vector = self._make_vector()
+        async_vector_automation_design(vector.id)
+        vector.refresh_from_db()
+        self.assertIs(vector.modify_vector, True)
+        self.assertIn('M1', os.path.basename(vector.vector_gb.name))

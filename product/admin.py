@@ -9,16 +9,20 @@ class VectorResource(resources.ModelResource):
     class Meta:
         model = Vector
         fields = ('id', 'user', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
-                  'i5NC', 'i3NC', 'cloning_method', 'antibiotic_resistance', 'design_status',
+                  'i5NC', 'i3NC', 'cloning_method', 'modify_vector', 'antibiotic_resistance', 'design_status',
                   'design_error', 'primer_forward', 'primer_reverse', 'primer_forward_tm',
-                  'primer_reverse_tm', 'create_date', 'status')
+                  'primer_reverse_tm', 'backbone_primer_forward', 'backbone_primer_reverse',
+                  'create_date', 'status')
 
 class VectorAdmin(ImportExportModelAdmin):
-    list_display = ('id', 'vector_name', 'user', 'vector_id', 'cloning_method', 'antibiotic_resistance',
+    list_display = ('id', 'vector_name', 'user', 'vector_id', 'cloning_method', 'modify_vector',
+                    'antibiotic_resistance',
                     'design_status', 'status', 'create_date', 'vector_file', 'vector_png')
-    list_filter = ('user', 'cloning_method', 'antibiotic_resistance', 'design_status', 'status', 'create_date')
+    list_filter = ('user', 'cloning_method', 'modify_vector', 'antibiotic_resistance', 'design_status',
+                   'status', 'create_date')
     search_fields = ('vector_name', 'vector_id', 'user__username', 'user__email')
-    readonly_fields = ('create_date', 'primer_forward_tm', 'primer_reverse_tm')
+    readonly_fields = ('create_date', 'primer_forward_tm', 'primer_reverse_tm',
+                       'backbone_primer_forward_tm', 'backbone_primer_reverse_tm')
     resource_class = VectorResource
 
     fieldsets = (
@@ -29,8 +33,14 @@ class VectorAdmin(ImportExportModelAdmin):
             'fields': ('vector_map', 'NC5', 'NC3', 'iu20', 'id20', 'i5NC', 'i3NC')
         }),
         ('载体改造设计', {
-            'fields': ('cloning_method', 'antibiotic_resistance', 'design_status', 'design_error',
+            'fields': ('cloning_method', 'modify_vector', 'antibiotic_resistance', 'design_status',
+                      'design_error',
                       'primer_forward', 'primer_reverse', 'primer_forward_tm', 'primer_reverse_tm')
+        }),
+        ('骨架PCR引物（不改造模式）', {
+            'fields': ('backbone_primer_forward', 'backbone_primer_reverse',
+                      'backbone_primer_forward_tm', 'backbone_primer_reverse_tm'),
+            'classes': ('collapse',),
         }),
         ('文件', {
             'fields': ('vector_file', 'vector_png', 'vector_gb')
