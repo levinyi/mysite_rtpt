@@ -726,10 +726,14 @@ def vector_automation_design_status(request):
 def vector_colony_pcr_design(request):
     """给没走过自动化设计的载体（列表里显示 Manual 的那些）补菌落PCR引物。
 
-    这些载体多半是早年 CSV 导入的，只剩 vector_map（骨架）+ v5NC + v3NC，没有原始
-    GenBank，跑不了完整的改造设计；但菌落PCR引物只落在插入位点两侧的骨架上，这段序列
-    是齐的，所以能单独补。只写 colony_pcr_primers 一个字段——不动 design_status、
-    不动图谱、不动 NC-PCR 引物，避免把人工维护好的记录改坏。
+    这些载体跑不了完整的改造设计（多半没有可用的原始图谱，或图谱与记录对不上），但菌落
+    PCR引物只落在插入位点两侧的骨架上，只要能定出插入位点就能单独补。序列按可靠度依次取：
+
+    1. 骨架三件套 vector_map + v5NC + v3NC —— 人工确认过、自洽，优先；
+    2. 原始图谱 / GenBank 图谱 —— 线上有一批只留了图谱、没存骨架序列的老载体。
+
+    只写 colony_pcr_primers 一个字段——不动 design_status、不动图谱、不动 NC-PCR 引物，
+    避免把人工维护好的记录改坏。
     """
     vector_id = request.POST.get('vector_id')
     if not vector_id:
@@ -742,34 +746,60 @@ def vector_colony_pcr_design(request):
 
     # 引物命名用的编号：pGZ1420(Amp) -> pGZ1420
     vector_code = (vector.vector_id or vector.vector_name or '').split('(')[0].strip() or None
+    # 没改造过质粒，引物名里只能出现原编号，不加 M1
+    common = {'vector_code': vector_code, 'variant': ''}
 
-    try:
-        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
-            vector.vector_map, vector.NC5, vector.NC3,
-            vector_code=vector_code,
-            # 没改造过质粒，引物名里只能出现原编号，不加 M1
-            variant='',
-        )
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': f'菌落PCR引物设计失败: {e}'})
+    sources = []
+    if (vector.vector_map or '').strip() and (vector.NC5 or '').strip() and (vector.NC3 or '').strip():
+        sources.append(('骨架序列', lambda: VectorAutomationDesigner
+                        .design_colony_pcr_primers_from_backbone(
+                            vector.vector_map, vector.NC5, vector.NC3, **common)))
+    for label, file_field in (('原始图谱', vector.vector_file), ('GenBank 图谱', vector.vector_gb)):
+        if file_field:
+            sources.append((label, lambda ff=file_field: VectorAutomationDesigner
+                            .design_colony_pcr_primers_from_genbank(
+                                ff.path, vector.NC5, vector.NC3, **common)))
+
+    if not sources:
+        return JsonResponse({
+            'status': 'error',
+            'message': '这条载体既没有骨架序列（vector_map + v5NC + v3NC），也没有图谱文件，'
+                       '没有可用来设计的序列',
+        })
+
+    pairs, note, failures = None, None, []
+    for label, run in sources:
+        try:
+            pairs, errors, note = run()
+        except Exception as e:
+            failures.append(f'{label}：{e}')
+            continue
+        if pairs:
+            break
+        failures.append(f'{label}：' + ('；'.join(errors) if errors else '未找到合格引物'))
 
     if not pairs:
         return JsonResponse({
             'status': 'error',
-            'message': '; '.join(errors) if errors else '菌落PCR引物设计失败',
+            'message': '菌落PCR引物设计失败 —— ' + '｜'.join(failures),
         })
+
+    # 记下这批引物是从哪份数据算出来的，结果窗和以后排查都要看
+    for pair in pairs:
+        pair['source_note'] = note
 
     vector.colony_pcr_primers = json.dumps(pairs, ensure_ascii=False)
     vector.save(update_fields=['colony_pcr_primers'])
 
-    message = f'已设计 {len(pairs)} 对菌落PCR引物'
+    message = f'已设计 {len(pairs)} 对菌落PCR引物（{note}）'
     if len(pairs) < 5:
-        message += '（目标 5 对，其余候选不满足 Tm/GC/二聚体条件）'
+        message += '；目标 5 对，其余候选不满足 Tm/GC/二聚体条件'
 
     return JsonResponse({
         'status': 'success',
         'message': message,
         'pair_count': len(pairs),
+        'source_note': note,
         'colony_pcr_primers': pairs,
     })
 

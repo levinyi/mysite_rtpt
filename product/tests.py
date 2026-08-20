@@ -734,9 +734,10 @@ class VectorColonyPrimerTests(TestCase):
     def test_backbone_design_puts_the_flanks_on_the_backbone(self):
         backbone = self.sequence[:2000]
         nc5, nc3 = self.sequence[2000:2024], self.sequence[2024:2048]
-        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+        pairs, errors, note = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
             backbone, nc5, nc3, vector_code='pCVaTEST')
         self.assertTrue(pairs, errors)
+        self.assertIn('骨架序列', note)
         self.assertEqual(len([pair for pair in pairs if pair['is_best']]), 1)
 
         circle = (backbone + nc5 + nc3).upper()
@@ -754,22 +755,78 @@ class VectorColonyPrimerTests(TestCase):
                              VectorAutomationDesigner.reverse_complement(reverse['sequence']))
 
     def test_backbone_primer_names_have_no_version_suffix(self):
-        pairs, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+        pairs, _, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
             self.sequence[:2000], self.sequence[2000:2024], self.sequence[2024:2048],
             vector_code='pCVaTEST')
         # 没改造过质粒，编号必须沿用原 VectorID，不能进位成 pCVaTESTM1
         self.assertTrue(pairs)
         self.assertEqual(pairs[0]['forward']['name'], 'OJYxxx-pCVaTEST-CPF1')
 
+    def test_backbone_design_ignores_short_placeholder_ncs(self):
+        # 线上有一批记录里 v5NC/v3NC 只填了 4bp 占位值。这么短的串在任何骨架里都能命中，
+        # 不能据此判成"含 v5NC/v3NC 的另一套格式"——骨架首尾仍然是插入位点边界，照设计
+        backbone = self.sequence[:2000]
+        pairs, errors, note = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+            backbone, backbone[:4], backbone[10:14], vector_code='pCVaTEST')
+        self.assertTrue(pairs, errors)
+        self.assertIn('占位值', note)
+        for pair in pairs:
+            self.assertTrue(backbone.endswith(pair['upstream_seq']))
+            self.assertTrue(backbone.startswith(pair['downstream_seq']))
+
     def test_backbone_design_rejects_a_map_that_still_contains_the_ncs(self):
         # 自动化设计写的 vector_map 含 v5NC/v3NC，是另一套格式，直接拼会把两段重复一次
-        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+        pairs, errors, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
             self.sequence, self.sequence[100:124], self.sequence[200:224])
         self.assertIsNone(pairs)
         self.assertTrue(errors)
 
     def test_backbone_design_needs_the_backbone_and_both_ncs(self):
-        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+        pairs, errors, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
             '', 'ACGT', 'ACGT')
         self.assertIsNone(pairs)
         self.assertTrue(errors)
+
+    def test_genbank_design_uses_the_recorded_ncs_when_they_are_on_the_map(self):
+        # v5NC/v3NC 在图谱上唯一命中时用真实坐标，侧翼直接对着原质粒序列
+        nc5 = self.sequence[996:1020]   # 末尾贴着 iU20 的结尾
+        nc3 = self.sequence[1500:1524]  # 开头贴着 iD20 的起点
+        pairs, errors, note = VectorAutomationDesigner.design_colony_pcr_primers_from_genbank(
+            self.gb_path, nc5, nc3, vector_code='pCVaTEST')
+        self.assertTrue(pairs, errors)
+        self.assertIn('v5NC/v3NC', note)
+        for pair in pairs:
+            forward, reverse = pair['forward'], pair['reverse']
+            self.assertEqual(self.sequence[forward['start']:forward['end']], forward['sequence'])
+            self.assertEqual(
+                self.sequence[reverse['template_start']:reverse['template_end']],
+                VectorAutomationDesigner.reverse_complement(reverse['sequence']))
+            # 正向在 v5NC 上游、反向在 v3NC 下游，各留 50-500bp
+            self.assertTrue(50 <= forward['distance'] <= 500)
+            self.assertTrue(50 <= reverse['distance'] <= 500)
+
+    def test_genbank_design_falls_back_to_iu20_id20_without_recorded_ncs(self):
+        pairs, errors, note = VectorAutomationDesigner.design_colony_pcr_primers_from_genbank(
+            self.gb_path, None, None, vector_code='pCVaTEST')
+        self.assertTrue(pairs, errors)
+        self.assertIn('iU20/iD20', note)
+        for pair in pairs:
+            # 锚点是插入区边界：正向引物在 iU20 末尾之前，反向引物在 iD20 起点之后
+            self.assertLessEqual(pair['forward']['end'], 1020)
+            self.assertGreaterEqual(pair['reverse']['template_start'], 1500)
+
+    def test_genbank_design_rejects_a_map_that_does_not_match_the_record(self):
+        # 记录里的 v5NC 在这份图谱上根本没有 —— 图谱与记录对不上，宁可报错也不能瞎设计
+        pairs, errors, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_genbank(
+            self.gb_path, 'GGGGGGGGGGGGGGGGGGGGGGGG', 'CCCCCCCCCCCCCCCCCCCCCCCC')
+        self.assertIsNone(pairs)
+        self.assertTrue(any('对不上' in e for e in errors), errors)
+
+    def test_genbank_design_reports_an_unreadable_file(self):
+        bad_path = os.path.join(self._tmpdir, 'not_a_genbank.gb')
+        with open(bad_path, 'wb') as handle:
+            handle.write(b'\x00\x01SnapGene binary\xff\xfe')
+        pairs, errors, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_genbank(
+            bad_path, None, None)
+        self.assertIsNone(pairs)
+        self.assertTrue(any('GenBank' in e for e in errors), errors)

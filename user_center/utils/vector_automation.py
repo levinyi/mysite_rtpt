@@ -4,6 +4,7 @@
 """
 import re
 import os
+from io import StringIO
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -94,6 +95,9 @@ CM_CCDB_SEQUENCE = CM_CCDB_FRAGMENTS['BsaI']['sequence']
 
 class VectorAutomationDesigner:
     """载体改造自动化设计类"""
+
+    # 拿 v5NC/v3NC 去图谱上定位所需的最短长度：真 NC 是 20-35bp，比这短的多半是占位值
+    MIN_NC_LENGTH_FOR_LOOKUP = 15
 
     def __init__(self, genbank_file_path):
         """
@@ -1355,18 +1359,22 @@ class VectorAutomationDesigner:
             variant: 图谱版本位，这里恒为空串——没改造过质粒，编号得沿用原 VectorID
 
         Returns:
-            (list[dict] | None, list[str]): (引物对列表, 错误信息列表)
+            (list[dict] | None, list[str], str | None): (引物对列表, 错误信息列表, 数据来源说明)
         """
         backbone = re.sub(r'\s+', '', vector_map or '').upper()
         v5nc = re.sub(r'\s+', '', nc5 or '').upper()
         v3nc = re.sub(r'\s+', '', nc3 or '').upper()
 
         if not backbone or not v5nc or not v3nc:
-            return None, ['缺少骨架序列(vector_map)或 v5NC/v3NC，无法设计菌落PCR引物']
-        if v5nc in backbone or v3nc in backbone:
-            # 自动化设计写的 vector_map 是"原坐标 + 含 v5NC/v3NC"的另一套格式，
-            # 直接拼接会把这两段重复一次，坐标全错——这种载体本来就该走完整设计
-            return None, ['骨架序列里已包含 v5NC/v3NC，不是"去掉插入片段"的骨架格式，请改用完整自动化设计']
+            return None, ['缺少骨架序列(vector_map)或 v5NC/v3NC'], None
+        # 自动化设计写的 vector_map 是"原坐标 + 含 v5NC/v3NC"的另一套格式，直接拼接会把
+        # 这两段重复一次、坐标全错——这种载体本来就该走完整设计。但只有长度像真 NC
+        # （>=15bp）时"命中"才说明是那种格式：线上有一批只填了 4bp 占位值的记录，
+        # 这么短的串在任何骨架里都找得到，不能据此判格式。
+        if (len(v5nc) >= cls.MIN_NC_LENGTH_FOR_LOOKUP
+                and len(v3nc) >= cls.MIN_NC_LENGTH_FOR_LOOKUP
+                and (v5nc in backbone or v3nc in backbone)):
+            return None, ['骨架序列里已包含 v5NC/v3NC，不是"去掉插入片段"的骨架格式'], None
 
         backbone_len = len(backbone)
         circle_len = backbone_len + len(v5nc) + len(v3nc)
@@ -1385,7 +1393,7 @@ class VectorAutomationDesigner:
             **kwargs
         )
         if not pairs:
-            return None, designer.errors
+            return None, designer.errors, None
 
         # 反向引物取自第二份骨架副本，坐标折回环内
         for pair in pairs:
@@ -1394,7 +1402,153 @@ class VectorAutomationDesigner:
                 reverse['template_start'] -= circle_len
                 reverse['template_end'] -= circle_len
 
-        return pairs, designer.errors
+        note = '骨架序列 + v5NC/v3NC（Amplicon 为空载体产物长度）'
+        if len(v5nc) < cls.MIN_NC_LENGTH_FOR_LOOKUP or len(v3nc) < cls.MIN_NC_LENGTH_FOR_LOOKUP:
+            # 引物位置照样准（骨架首尾就是插入位点边界），只有 Amplicon 少算了真 NC 的长度
+            note = '骨架序列（记录里的 v5NC/v3NC 是占位值，Amplicon 偏小几十 bp）'
+        return pairs, designer.errors, note
+
+    @staticmethod
+    def read_genbank_record(genbank_file_path):
+        """按 utf-8 → gbk → latin-1 读一份 GenBank，读不出来返回 None。
+
+        gbk 这一档是给 SnapGene 在中文 Windows 上导出的文件留的（feature label 带中文）。
+        真正的 SnapGene .dna 二进制文件改名成 .gb 也会走到这里，三种编码都过不了 SeqIO，
+        返回 None——调用方据此提示重新上传。
+        """
+        try:
+            with open(genbank_file_path, 'rb') as handle:
+                raw = handle.read()
+        except OSError:
+            return None
+        for encoding in ('utf-8', 'gbk', 'latin-1'):
+            try:
+                text = raw.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+            try:
+                return SeqIO.read(StringIO(text), 'genbank')
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def find_iu20_id20(record):
+        """从图谱上取 iU20 末尾 / iD20 起点，即插入区的两个边界。找不到返回 (None, None)。"""
+        iu20_end = id20_start = None
+        for feature in record.features:
+            labels = feature.qualifiers.get('label', []) + feature.qualifiers.get('note', [])
+            for label in labels:
+                low = (label or '').lower()
+                if iu20_end is None and 'iu20' in low:
+                    iu20_end = int(feature.location.end)
+                elif id20_start is None and 'id20' in low:
+                    id20_start = int(feature.location.start)
+        return iu20_end, id20_start
+
+    @classmethod
+    def design_colony_pcr_primers_from_genbank(cls, genbank_file_path, nc5=None, nc3=None,
+                                               vector_code=None, variant='', **kwargs):
+        """从原始图谱补设计菌落PCR引物（5对），不改动载体本身。
+
+        没存骨架序列、只留了一份图谱的老载体走这条路。定位插入位点两种办法，按可靠度排：
+
+        1. 记录里的 v5NC/v3NC 在图谱上唯一命中 —— 用真实坐标；命中本身也顺带证明了
+           这份图谱确实是这条记录的图谱（线上有图谱和记录对不上的历史数据）。
+        2. 记录里压根没有 v5NC/v3NC —— 退回图谱上的 iU20/iD20 标注，拿 iU20 末尾 /
+           iD20 起点当插入区边界。此时 distance 是相对插入位点量的，比相对 v5NC/v3NC
+           量出来大几个碱基（v5NC 只比 iU20 长几 bp），引物本身不受影响。
+
+        质粒是环状的，引物窗口可能跨过图谱原点（见线上把 iD20 摆在 0 号位的图谱），
+        所以把序列复制四份、把 v5NC/v3NC 摆到中间去设计，返回前坐标折回 [0, len)。
+
+        Returns:
+            (list[dict] | None, list[str], str | None): (引物对列表, 错误信息列表, 数据来源说明)
+        """
+        record = cls.read_genbank_record(genbank_file_path)
+        if record is None:
+            return None, ['图谱文件读不出来：不是标准 GenBank 文本'
+                          '（SnapGene 的 .dna 二进制改名成 .gb 会这样），请重新导出上传'], None
+
+        sequence = str(record.seq).upper()
+        seq_len = len(sequence)
+        if seq_len < 1200:
+            return None, [f'图谱只有 {seq_len} bp，插入位点两侧凑不出 50-500bp 的引物窗口'], None
+
+        v5nc = re.sub(r'\s+', '', nc5 or '').upper()
+        v3nc = re.sub(r'\s+', '', nc3 or '').upper()
+        # 真 v5NC/v3NC 是 20-35bp；线上有一批记录里只填了 4bp 的占位值，这么短的序列
+        # 在质粒上到处都是，拿来定位只会定错——当成"没记"处理，退回 iU20/iD20
+        if len(v5nc) < cls.MIN_NC_LENGTH_FOR_LOOKUP or len(v3nc) < cls.MIN_NC_LENGTH_FOR_LOOKUP:
+            v5nc = v3nc = ''
+
+        if v5nc and v3nc:
+            missing = [name for name, seq in (('v5NC', v5nc), ('v3NC', v3nc))
+                       if sequence.count(seq) == 0]
+            if missing:
+                return None, [f'记录里的 {"/".join(missing)} 在这份图谱上找不到，'
+                              f'图谱与记录对不上，请核对后重新上传'], None
+            if sequence.count(v5nc) > 1 or sequence.count(v3nc) > 1:
+                return None, ['记录里的 v5NC/v3NC 在图谱上出现了不止一次，定不出唯一的插入位点'], None
+            v5_start = sequence.find(v5nc)
+            v5_end = v5_start + len(v5nc)
+            v3_start = sequence.find(v3nc)
+            v3_end = v3_start + len(v3nc)
+            note = '原始图谱 + v5NC/v3NC 定位'
+        else:
+            iu20_end, id20_start = cls.find_iu20_id20(record)
+            if iu20_end is None or id20_start is None:
+                return None, ['记录里没有 v5NC/v3NC，图谱上也没有 iU20/iD20 标注，定不出插入位点'], None
+            # 插入区边界当零长锚点：v5NC 的末尾就是 iU20 的末尾，v3NC 的起点就是 iD20 的起点
+            v5_start = v5_end = iu20_end
+            v3_start = v3_end = id20_start
+            note = '原始图谱 + iU20/iD20 定位（未记 v5NC/v3NC，distance 相对插入位点）'
+
+        # 展开成四份，把 v5NC/v3NC 摆到第二份上：前面留得下正向窗口，后面留得下反向窗口，
+        # 且 v3NC 一定排在 v5NC 之后（图谱原点可能正好落在插入区中间）
+        v3_len = v3_end - v3_start
+        pseudo_sequence = sequence * 4
+        v5_start += seq_len
+        v5_end += seq_len
+        v3_start += seq_len
+        while v3_start < v5_end:
+            v3_start += seq_len
+        v3_end = v3_start + v3_len
+
+        start_ref = cls.find_start_reference({'original_features': record.features})
+        if start_ref is None:
+            start_ref = v5_start
+        else:
+            # Start 标记折算到正向引物所在的那一份副本上
+            start_ref += seq_len * ((v5_start - start_ref) // seq_len)
+
+        designer = cls(genbank_file_path)
+        designer.record = record
+        pairs = designer.design_colony_pcr_primers(
+            {'sequence': pseudo_sequence, 'original_features': record.features},
+            {'v5nc_location': (v5_start, v5_end), 'v3nc_location': (v3_start, v3_end)},
+            vector_code=vector_code,
+            variant=variant,
+            start_ref=start_ref,
+            **kwargs
+        )
+        if not pairs:
+            return None, designer.errors, None
+
+        # 坐标折回 [0, len)；跨原点的引物 end 会大于 len，表示绕过了原点
+        for pair in pairs:
+            forward = pair.get('forward') or {}
+            reverse = pair.get('reverse') or {}
+            if forward.get('start') is not None:
+                forward['start'] %= seq_len
+                forward['end'] = forward['start'] + forward['length']
+            if reverse.get('template_start') is not None:
+                reverse['template_start'] %= seq_len
+                reverse['template_end'] = reverse['template_start'] + reverse['length']
+            if pair.get('insert_start_pos') is not None:
+                pair['insert_start_pos'] %= seq_len
+
+        return pairs, designer.errors, note
 
     @staticmethod
     def calculate_hairpin_tm(sequence, stem_length=4, max_stem=6):
