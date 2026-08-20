@@ -1334,6 +1334,68 @@ class VectorAutomationDesigner:
 
         return pairs
 
+    @classmethod
+    def design_colony_pcr_primers_from_backbone(cls, vector_map, nc5, nc3, vector_code=None,
+                                                variant='', **kwargs):
+        """不依赖 GenBank 文件，只用骨架序列补设计菌落PCR引物（5对）。
+
+        面向历史 / 手工录入的载体：它们手上只有 vector_map（骨架，从 v3NC 下游一路绕回
+        v5NC 上游，本身不含 v5NC/v3NC）+ v5NC + v3NC 三段序列，没有原始图谱，跑不了完整的
+        改造设计；但菌落PCR引物本来就只落在插入位点两侧的骨架上（F 在 v5NC 上游 50-500bp，
+        R 在 v3NC 下游 50-500bp），这段序列是齐的，所以这一步可以单独补出来。
+
+        做法：把环状骨架按 [骨架][v5NC][v3NC] 拉直，再在尾巴上接一份骨架副本——
+        正向引物落在第一份骨架的尾部，反向引物落在第二份骨架的头部，跨过原点的候选
+        不会因为线性边界被切掉。返回前把反向引物坐标折回环内（原点 = vector_map 起点）。
+
+        Args:
+            vector_map: 骨架序列（Vector.vector_map）
+            nc5 / nc3: v5NC / v3NC 序列
+            vector_code: 引物命名用的载体编号
+            variant: 图谱版本位，这里恒为空串——没改造过质粒，编号得沿用原 VectorID
+
+        Returns:
+            (list[dict] | None, list[str]): (引物对列表, 错误信息列表)
+        """
+        backbone = re.sub(r'\s+', '', vector_map or '').upper()
+        v5nc = re.sub(r'\s+', '', nc5 or '').upper()
+        v3nc = re.sub(r'\s+', '', nc3 or '').upper()
+
+        if not backbone or not v5nc or not v3nc:
+            return None, ['缺少骨架序列(vector_map)或 v5NC/v3NC，无法设计菌落PCR引物']
+        if v5nc in backbone or v3nc in backbone:
+            # 自动化设计写的 vector_map 是"原坐标 + 含 v5NC/v3NC"的另一套格式，
+            # 直接拼接会把这两段重复一次，坐标全错——这种载体本来就该走完整设计
+            return None, ['骨架序列里已包含 v5NC/v3NC，不是"去掉插入片段"的骨架格式，请改用完整自动化设计']
+
+        backbone_len = len(backbone)
+        circle_len = backbone_len + len(v5nc) + len(v3nc)
+        pseudo_sequence = backbone + v5nc + v3nc + backbone
+        v5nc_location = (backbone_len, backbone_len + len(v5nc))
+        v3nc_location = (v5nc_location[1], v5nc_location[1] + len(v3nc))
+
+        designer = cls(None)
+        pairs = designer.design_colony_pcr_primers(
+            {'sequence': pseudo_sequence, 'original_features': []},
+            {'v5nc_location': v5nc_location, 'v3nc_location': v3nc_location},
+            vector_code=vector_code,
+            variant=variant,
+            # 没有图谱就没有 Start 标记，用 v5NC 起点当参考点（与有图谱时的兜底一致）
+            start_ref=v5nc_location[0],
+            **kwargs
+        )
+        if not pairs:
+            return None, designer.errors
+
+        # 反向引物取自第二份骨架副本，坐标折回环内
+        for pair in pairs:
+            reverse = pair.get('reverse') or {}
+            if reverse.get('template_start') is not None and reverse['template_start'] >= circle_len:
+                reverse['template_start'] -= circle_len
+                reverse['template_end'] -= circle_len
+
+        return pairs, designer.errors
+
     @staticmethod
     def calculate_hairpin_tm(sequence, stem_length=4, max_stem=6):
         """计算序列中可能形成的hairpin的最高Tm"""
@@ -1428,7 +1490,7 @@ class VectorAutomationDesigner:
             primer_result: NC-PCR 引物设计结果（可能为None）
             output_path: 输出文件路径
             vector_name: 载体名称
-            colony_primers: 菌落PCR引物列表（可选，5对）
+            colony_primers: 菌落PCR引物列表（可选，5对）；图谱上只标 best 那一对
             modify: 是否改造载体（False 时只标注不改序列）
             backbone_primers: 骨架PCR外向引物（仅不改造模式，可能为None）
 
@@ -1626,9 +1688,17 @@ class VectorAutomationDesigner:
                     qualifiers={'label': [bb_reverse.get('name') or 'Backbone-R'], 'note': bb_r_notes}
                 ))
 
-        # 4.2 Colony PCR primers (5对，对所有克隆方法都适用)
+        # 4.2 Colony PCR primers：只把 best 那一对标到图谱上（对所有克隆方法都适用）。
+        # 5 对全标会在插入位点两侧糊出一片 primer_bind，实验员反而挑不出该用哪一对；
+        # 其余几对仍然留在 colony_pcr_primers JSON 和下载的 CSV 里，需要时照样能查。
         if colony_primers:
-            for pair in colony_primers:
+            # 兼容历史数据：旧 JSON 没有 is_best 时回退到 index==1（与 CSV 导出同一套规则）
+            has_best_flag = any(pair.get('is_best') for pair in colony_primers)
+            best_pairs = [
+                pair for pair in colony_primers
+                if (pair.get('is_best') if has_best_flag else pair.get('index') == 1)
+            ] or colony_primers[:1]
+            for pair in best_pairs:
                 fwd = pair.get('forward') or {}
                 rev = pair.get('reverse') or {}
                 pair_idx = pair.get('index')
@@ -1639,7 +1709,8 @@ class VectorAutomationDesigner:
                     fwd_start = fwd['start']
                     fwd_end = fwd['end']
                     fwd_label = fwd.get('name') or f'ColonyPCR-F-{pair_idx}'
-                    fwd_notes = [f"Sequence: {fwd_seq}", f"Pair {pair_idx} (Colony PCR)"]
+                    fwd_notes = [f"Sequence: {fwd_seq}",
+                                 f"Pair {pair_idx} of {len(colony_primers)} (Colony PCR, best)"]
                     if fwd.get('tm') is not None:
                         fwd_notes.append(f"T97: {fwd['tm']}C")
                     if fwd.get('distance') is not None:
@@ -1656,7 +1727,8 @@ class VectorAutomationDesigner:
                     new_rev_start = rev['template_start'] + offset
                     new_rev_end = rev['template_end'] + offset
                     rev_label = rev.get('name') or f'ColonyPCR-R-{pair_idx}'
-                    rev_notes = [f"Sequence: {rev_seq}", f"Pair {pair_idx} (Colony PCR)"]
+                    rev_notes = [f"Sequence: {rev_seq}",
+                                 f"Pair {pair_idx} of {len(colony_primers)} (Colony PCR, best)"]
                     if rev.get('tm') is not None:
                         rev_notes.append(f"T97: {rev['tm']}C")
                     if rev.get('distance') is not None:

@@ -1,6 +1,8 @@
+import copy
 import io
 import os
 import random
+import re
 import shutil
 import tempfile
 
@@ -653,3 +655,121 @@ class VectorDesignTaskTests(TestCase):
         vector.refresh_from_db()
         self.assertIs(vector.modify_vector, True)
         self.assertIn('M1', os.path.basename(vector.vector_gb.name))
+
+
+class VectorColonyPrimerTests(TestCase):
+    """菌落PCR引物：图谱上只标 best 那一对；没有原始图谱的老载体按骨架补设计。"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # 与 VectorNoModifyDesignTests 同一条 seed=1 序列：能过 Gibson 的全部闸门
+        cls.sequence = _rand_seq(3000, 1)
+        record = SeqRecord(
+            Seq(cls.sequence), id='pCVaTEST', name='pCVaTEST',
+            description='synthetic test vector', annotations={'molecule_type': 'DNA'},
+        )
+        record.features = [
+            SeqFeature(SimpleLocation(1000, 1020), type='misc_feature', qualifiers={'label': ['iU20']}),
+            SeqFeature(SimpleLocation(1500, 1520), type='misc_feature', qualifiers={'label': ['iD20']}),
+        ]
+        cls._tmpdir = tempfile.mkdtemp()
+        cls.gb_path = os.path.join(cls._tmpdir, 'pCVaTEST.gb')
+        with open(cls.gb_path, 'w') as handle:
+            SeqIO.write(record, handle, 'genbank')
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._tmpdir, ignore_errors=True)
+        super().tearDownClass()
+
+    def _design_with_colony(self, colony_primers=None):
+        """跑完整链路生成图谱；colony_primers 不传时现设计一套。"""
+        designer = VectorAutomationDesigner(self.gb_path)
+        parsed = designer.parse_genbank()
+        self.assertIsNotNone(parsed, f'解析失败: {designer.errors}')
+        design_result = designer.select_cloning_method(parsed, forced_method='Gibson')
+        self.assertIsNotNone(design_result, f'Gibson 设计失败: {designer.errors}')
+        primers = designer.design_nc_pcr_primers(design_result, parsed, vector_code='pCVaTEST')
+        if colony_primers is None:
+            colony_primers = designer.design_colony_pcr_primers(
+                parsed, design_result, vector_code='pCVaTEST')
+            self.assertTrue(colony_primers, f'菌落PCR设计失败: {designer.errors}')
+
+        out_path = os.path.join(self._tmpdir, 'out_colony.gb')
+        designer.generate_modified_genbank(
+            design_result, parsed, primers, out_path, 'pCVaTESTM1',
+            colony_primers=colony_primers, modify=True,
+        )
+        return colony_primers, SeqIO.read(out_path, 'genbank')
+
+    @staticmethod
+    def _colony_pair_indices(record):
+        """图谱上标了哪几对菌落PCR引物（取引物名尾巴上的 CPF{n}/CPR{n}）。"""
+        found = set()
+        for feature in record.features:
+            if feature.type != 'primer_bind':
+                continue
+            for label in feature.qualifiers.get('label', []):
+                match = re.search(r'-CP[FR](\d+)$', label)
+                if match:
+                    found.add(int(match.group(1)))
+        return found
+
+    def test_map_only_annotates_the_best_colony_pair(self):
+        colony_primers, record = self._design_with_colony()
+        self.assertGreater(len(colony_primers), 1, '要有多对引物这条测试才有意义')
+        best = [pair['index'] for pair in colony_primers if pair.get('is_best')]
+        self.assertEqual(len(best), 1)
+        self.assertEqual(self._colony_pair_indices(record), set(best))
+
+    def test_map_falls_back_to_the_first_pair_for_legacy_json(self):
+        colony_primers, _ = self._design_with_colony()
+        legacy = copy.deepcopy(colony_primers)  # 旧数据没有 is_best 字段
+        for pair in legacy:
+            pair.pop('is_best', None)
+        _, record = self._design_with_colony(colony_primers=legacy)
+        self.assertEqual(self._colony_pair_indices(record), {1})
+
+    def test_backbone_design_puts_the_flanks_on_the_backbone(self):
+        backbone = self.sequence[:2000]
+        nc5, nc3 = self.sequence[2000:2024], self.sequence[2024:2048]
+        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+            backbone, nc5, nc3, vector_code='pCVaTEST')
+        self.assertTrue(pairs, errors)
+        self.assertEqual(len([pair for pair in pairs if pair['is_best']]), 1)
+
+        circle = (backbone + nc5 + nc3).upper()
+        for pair in pairs:
+            forward, reverse = pair['forward'], pair['reverse']
+            upstream, downstream = pair['upstream_seq'], pair['downstream_seq']
+            # 正向引物落在骨架尾巴（v5NC 上游），反向引物落在骨架开头（v3NC 下游）
+            self.assertEqual(upstream, backbone[len(backbone) - len(upstream):].upper())
+            self.assertTrue(upstream.startswith(forward['sequence']))
+            self.assertEqual(downstream, backbone[:len(downstream)].upper())
+            self.assertTrue(downstream.endswith(
+                VectorAutomationDesigner.reverse_complement(reverse['sequence'])))
+            # 反向引物取自骨架副本，坐标折回环内后仍能取回同一条模板
+            self.assertEqual(circle[reverse['template_start']:reverse['template_end']],
+                             VectorAutomationDesigner.reverse_complement(reverse['sequence']))
+
+    def test_backbone_primer_names_have_no_version_suffix(self):
+        pairs, _ = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+            self.sequence[:2000], self.sequence[2000:2024], self.sequence[2024:2048],
+            vector_code='pCVaTEST')
+        # 没改造过质粒，编号必须沿用原 VectorID，不能进位成 pCVaTESTM1
+        self.assertTrue(pairs)
+        self.assertEqual(pairs[0]['forward']['name'], 'OJYxxx-pCVaTEST-CPF1')
+
+    def test_backbone_design_rejects_a_map_that_still_contains_the_ncs(self):
+        # 自动化设计写的 vector_map 含 v5NC/v3NC，是另一套格式，直接拼会把两段重复一次
+        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+            self.sequence, self.sequence[100:124], self.sequence[200:224])
+        self.assertIsNone(pairs)
+        self.assertTrue(errors)
+
+    def test_backbone_design_needs_the_backbone_and_both_ncs(self):
+        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+            '', 'ACGT', 'ACGT')
+        self.assertIsNone(pairs)
+        self.assertTrue(errors)

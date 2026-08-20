@@ -345,8 +345,8 @@
             { name: 'User', width: '130px', formatter: userCellFormatter },
             { name: 'Files', width: '84px', sort: false, formatter: filesCellFormatter },
             { name: 'Cloning', width: '96px', formatter: cloningCellFormatter },
-            // ReadyToUse 只有徽标 + View，不需要 Pending 那么宽
-            { name: 'Design', width: allowDesign ? '196px' : '150px', sort: false, formatter: (cell, row) => designCellFormatter(cell, row, allowDesign) },
+            // ReadyToUse 没有方法/模式下拉，比 Pending 窄一点就够
+            { name: 'Design', width: allowDesign ? '196px' : '176px', sort: false, formatter: (cell, row) => designCellFormatter(cell, row, allowDesign) },
             { name: 'Status', width: '96px', formatter: statusCellFormatter },
             { name: 'Actions', width: '76px', sort: false, formatter: actionsCellFormatter },
         ];
@@ -412,7 +412,8 @@
     }
 
     // Design 列：设计状态徽标 + 操作。allowDesign(Pending) 可触发/重试设计；
-    // ReadyToUse 只读：完成的可查看结果，未设计的显示 Manual
+    // ReadyToUse 只读：完成的可查看结果；未走过自动化设计的显示 Manual，
+    // 但可以单独补一次菌落PCR引物（只用骨架序列，不动图谱和其它字段）
     function designCellFormatter(cell, row, allowDesign) {
         const v = rowVector(row);
         const vectorId = v.id;
@@ -467,7 +468,15 @@
             parts.push(modePicker);
             parts.push(`<button class="btn btn-sm btn-primary" onclick="startAutomationDesign(${vectorId})"><i class="bi bi-gear"></i> Design</button>`);
         } else {
-            parts.push(`<span class="badge bg-light text-secondary border">Manual</span>`);
+            // 没走过自动化设计的老载体：没有原始 GenBank，图谱和 NC-PCR 引物补不了，
+            // 但菌落PCR引物只落在插入位点两侧的骨架上，可以单独补
+            parts.push(`<div class="vec-design-tag"><span class="badge bg-light text-secondary border">Manual</span></div>`);
+            if (v.has_colony_pcr) {
+                parts.push(viewBtn);
+                parts.push(`<button class="btn btn-sm btn-outline-secondary" onclick="startColonyPcrDesign(${vectorId})" title="重新设计菌落PCR引物"><i class="bi bi-arrow-clockwise"></i></button>`);
+            } else {
+                parts.push(`<button class="btn btn-sm btn-primary" onclick="startColonyPcrDesign(${vectorId})" title="按骨架序列补设计 5 对菌落PCR引物"><i class="bi bi-gear"></i> Colony PCR</button>`);
+            }
         }
         return gridjs.html(`<div class="vec-design">${parts.join('')}</div>`);
     }
@@ -501,6 +510,48 @@
             methodSelect.disabled = false;
             methodSelect.title = 'Cloning method';
         }
+    }
+
+    // 只补菌落PCR引物：用 vector_map(骨架) + v5NC + v3NC 现算，不碰图谱 / NC-PCR 引物 /
+    // design_status。给 ReadyToUse 里那些 Manual 载体用——它们没有原始 GenBank，跑不了完整设计。
+    function startColonyPcrDesign(vectorId) {
+        const v = vectorById[vectorId] || {};
+        const redo = v.has_colony_pcr;
+        if (!confirm(redo
+                ? '重新设计这条载体的菌落PCR引物？现有的 5 对会被覆盖。'
+                : '按骨架序列（vector_map + v5NC + v3NC）补设计 5 对菌落PCR引物？\n只写入菌落PCR引物，不改动图谱和其它字段。')) {
+            return;
+        }
+
+        showLoading();
+        $.ajax({
+            url: "{% url 'super_manage:vector_colony_pcr_design' %}",
+            type: "POST",
+            data: {
+                'csrfmiddlewaretoken': getCookie('csrftoken'),
+                'vector_id': vectorId,
+            },
+            dataType: "json",
+            success: function (data) {
+                hideLoading();
+                if (data.status === 'success') {
+                    layer.msg(data.message || 'Colony PCR primers designed', { icon: 1 });
+                    loadVectors().then(() => viewDesignResults(vectorId));
+                } else {
+                    layer.open({
+                        type: 0,
+                        title: 'Colony PCR design failed',
+                        icon: 2,
+                        area: ['500px'],
+                        content: data.message || 'Unknown error'
+                    });
+                }
+            },
+            error: function () {
+                hideLoading();
+                layer.msg('Failed to design colony PCR primers!', { icon: 2 });
+            }
+        });
     }
 
     function startAutomationDesign(vectorId) {
@@ -618,7 +669,10 @@
             success: function (data) {
                 hideLoading();
 
-                if (data.status === 'success' && data.design_status === 'Completed') {
+                // Manual 载体不会是 Completed，但补过菌落PCR引物后同样有结果可看
+                const hasResults = data.design_status === 'Completed'
+                    || (data.colony_pcr_primers || []).length > 0;
+                if (data.status === 'success' && hasResults) {
                     displayDesignResults(data, vectorId);
 
                     const modal = new bootstrap.Modal(document.getElementById('designResultsModal'));
@@ -639,16 +693,22 @@
         const fmt = (v, digits) => (v === null || v === undefined || v === '') ? 'N/A' : Number(v).toFixed(digits ?? 2);
         const seqCell = (s) => `<span class="font-monospace" style="font-size:11px; word-break:break-all;">${s || 'N/A'}</span>`;
 
+        const isCompleted = data.design_status === 'Completed';
+        const headerHtml = isCompleted
+            ? `<span class="badge bg-primary me-2">Cloning Method</span>
+               <span class="fw-bold me-3">${esc(data.cloning_method || 'N/A')}</span>
+               ${data.modify_vector === false
+                   ? `<span class="badge bg-warning text-dark">不改造</span>
+                      <span class="text-muted ms-2" style="font-size:11px;">质粒序列未改动，图谱上只加了标注</span>`
+                   : `<span class="badge bg-secondary">改造</span>
+                      <span class="text-muted ms-2" style="font-size:11px;">iU20–iD20 之间已替换为 Cm-ccdB</span>`}`
+            : `<span class="badge bg-light text-secondary border me-2">Manual</span>
+               <span class="text-muted" style="font-size:11px;">该载体未走自动化设计，下面是按骨架序列补出来的菌落PCR引物</span>`;
+
         let html = `
             <div class="container-fluid px-0">
                 <div class="d-flex align-items-center mb-2">
-                    <span class="badge bg-primary me-2">Cloning Method</span>
-                    <span class="fw-bold me-3">${data.cloning_method || 'N/A'}</span>
-                    ${data.modify_vector === false
-                        ? `<span class="badge bg-warning text-dark">不改造</span>
-                           <span class="text-muted ms-2" style="font-size:11px;">质粒序列未改动，图谱上只加了标注</span>`
-                        : `<span class="badge bg-secondary">改造</span>
-                           <span class="text-muted ms-2" style="font-size:11px;">iU20–iD20 之间已替换为 Cm-ccdB</span>`}
+                    ${headerHtml}
                 </div>
 
                 <table class="table table-sm table-bordered mb-2 align-middle" style="font-size:12px;">
@@ -741,7 +801,8 @@
             html += `
                 <h6 class="text-secondary mt-3 mb-1" style="font-size:13px;">
                     Colony PCR Primers
-                    <span class="text-muted fw-normal">(${colonyPairs.length} pair${colonyPairs.length > 1 ? 's' : ''}; F: v5NC 上游 50-500bp, R: v3NC 下游 50-500bp)</span>
+                    <span class="text-muted fw-normal">(${colonyPairs.length} pair${colonyPairs.length > 1 ? 's' : ''}; F: v5NC 上游 50-500bp, R: v3NC 下游 50-500bp；图谱上只标 ★Best 那一对)</span>
+                    ${isCompleted ? '' : `<div class="text-muted fw-normal" style="font-size:11px;">Amplicon 为空载体（未插入基因）的产物长度</div>`}
                 </h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered align-middle mb-1" style="font-size:12px;">

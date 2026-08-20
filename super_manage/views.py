@@ -508,9 +508,15 @@ def vector_data_api(request):
         'id', 'vector_id', 'vector_name', 'vector_map', 'NC5', 'NC3', 'iu20', 'id20',
         'i5NC', 'i3NC',
         'status','user__username', 'vector_file', 'vector_png', 'vector_gb',
-        'design_status', 'cloning_method', 'design_error', 'is_public', 'modify_vector'
+        'design_status', 'cloning_method', 'design_error', 'is_public', 'modify_vector',
+        'colony_pcr_primers',
     )
-    return JsonResponse({'data': list(vector_list)})
+    rows = []
+    for item in vector_list:
+        # 菌落PCR引物 JSON 一条好几 KB，列表只需要知道有没有，别整包传给前端
+        item['has_colony_pcr'] = bool(item.pop('colony_pcr_primers', None))
+        rows.append(item)
+    return JsonResponse({'data': rows})
 
 
 @login_required
@@ -648,12 +654,30 @@ def vector_automation_design_status(request):
             return parts[0], parts[1]
         return None, value or ''
 
+    colony_primers = []
+    if vector.colony_pcr_primers:
+        try:
+            colony_primers = json.loads(vector.colony_pcr_primers)
+        except (ValueError, TypeError):
+            colony_primers = []
+
+    # 这几项直接来自模型字段，Manual（没走过自动化设计）的载体也有，
+    # 所以放在 Completed 判断之外——否则前端补完菌落PCR引物也看不到结果
     response_data = {
         'status': 'success',
         'design_status': vector.design_status,
         'cloning_method': vector.cloning_method,
         'modify_vector': vector.modify_vector,
-        'design_error': vector.design_error
+        'design_error': vector.design_error,
+        'v5nc': vector.NC5,
+        'v3nc': vector.NC3,
+        'i5nc': vector.i5NC,
+        'i3nc': vector.i3NC,
+        'iu20': vector.iu20,
+        'id20': vector.id20,
+        'colony_pcr_primers': colony_primers,
+        'has_colony_csv': bool(colony_primers),
+        'has_genbank': bool(vector.vector_gb),
     }
 
     if vector.design_status == 'Completed':
@@ -666,13 +690,6 @@ def vector_automation_design_status(request):
         hetero_dg = None
         if forward_seq and reverse_seq:
             hetero_dg = VectorAutomationDesigner.calculate_dimer_dg(forward_seq, reverse_seq)
-
-        colony_primers = []
-        if vector.colony_pcr_primers:
-            try:
-                colony_primers = json.loads(vector.colony_pcr_primers)
-            except (ValueError, TypeError):
-                colony_primers = []
 
         # 骨架PCR外向引物（只有不改造模式才有）
         backbone_forward_name, backbone_forward_seq = parse_primer(vector.backbone_primer_forward)
@@ -688,12 +705,6 @@ def vector_automation_design_status(request):
         })
 
         response_data.update({
-            'v5nc': vector.NC5,
-            'v3nc': vector.NC3,
-            'i5nc': vector.i5NC,
-            'i3nc': vector.i3NC,
-            'iu20': vector.iu20,
-            'id20': vector.id20,
             'primer_forward': forward_seq,
             'primer_reverse': reverse_seq,
             'primer_forward_name': forward_name,
@@ -705,12 +716,62 @@ def vector_automation_design_status(request):
             'primer_forward_homodimer_dg': forward_dg,
             'primer_reverse_homodimer_dg': reverse_dg,
             'primer_heterodimer_dg': hetero_dg,
-            'colony_pcr_primers': colony_primers,
-            'has_genbank': bool(vector.vector_gb),
-            'has_colony_csv': bool(colony_primers),
         })
 
     return JsonResponse(response_data)
+
+
+@login_required
+@require_POST
+def vector_colony_pcr_design(request):
+    """给没走过自动化设计的载体（列表里显示 Manual 的那些）补菌落PCR引物。
+
+    这些载体多半是早年 CSV 导入的，只剩 vector_map（骨架）+ v5NC + v3NC，没有原始
+    GenBank，跑不了完整的改造设计；但菌落PCR引物只落在插入位点两侧的骨架上，这段序列
+    是齐的，所以能单独补。只写 colony_pcr_primers 一个字段——不动 design_status、
+    不动图谱、不动 NC-PCR 引物，避免把人工维护好的记录改坏。
+    """
+    vector_id = request.POST.get('vector_id')
+    if not vector_id:
+        return JsonResponse({'status': 'error', 'message': 'Missing vector ID'})
+
+    try:
+        vector = Vector.objects.get(id=vector_id)
+    except Vector.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': '载体不存在'})
+
+    # 引物命名用的编号：pGZ1420(Amp) -> pGZ1420
+    vector_code = (vector.vector_id or vector.vector_name or '').split('(')[0].strip() or None
+
+    try:
+        pairs, errors = VectorAutomationDesigner.design_colony_pcr_primers_from_backbone(
+            vector.vector_map, vector.NC5, vector.NC3,
+            vector_code=vector_code,
+            # 没改造过质粒，引物名里只能出现原编号，不加 M1
+            variant='',
+        )
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'菌落PCR引物设计失败: {e}'})
+
+    if not pairs:
+        return JsonResponse({
+            'status': 'error',
+            'message': '; '.join(errors) if errors else '菌落PCR引物设计失败',
+        })
+
+    vector.colony_pcr_primers = json.dumps(pairs, ensure_ascii=False)
+    vector.save(update_fields=['colony_pcr_primers'])
+
+    message = f'已设计 {len(pairs)} 对菌落PCR引物'
+    if len(pairs) < 5:
+        message += '（目标 5 对，其余候选不满足 Tm/GC/二聚体条件）'
+
+    return JsonResponse({
+        'status': 'success',
+        'message': message,
+        'pair_count': len(pairs),
+        'colony_pcr_primers': pairs,
+    })
 
 
 @login_required
