@@ -1,4 +1,5 @@
 # notifications/signals.py
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
@@ -47,19 +48,21 @@ def order_created_signal(sender, instance, created, **kwargs):
     if created:
         # 新订单创建成功时
         print("order_created_signal", instance.id)
-        async_send_order_created_user_email.delay(instance.id)
-        async_send_order_created_staff_notify.delay(instance.id)
+        transaction.on_commit(lambda: async_send_order_created_user_email.delay(instance.id))
+        transaction.on_commit(lambda: async_send_order_created_staff_notify.delay(instance.id))
 
 @receiver(post_save, sender=Vector)
 def vector_uploaded_signal(sender, instance, created, **kwargs):
     # 只在“用户(非 RootPath)提交了一个尚未 ReadyToUse 的载体”时通知管理员去 design。
     # 排除：RootPath 目录导入(user=None)、管理员直接建成的 ReadyToUse 载体。
+    # update_or_create 自带事务，post_save 在提交前触发：直接 delay 的话 worker 常常先于
+    # 提交去查库，报 Vector.DoesNotExist（线上这条通知一直是这么丢的），所以等提交后再投递
     if created and instance.user_id and (instance.status or '').lower() != 'readytouse':
-        async_send_vector_uploaded_staff_notify.delay(instance.id)
+        transaction.on_commit(lambda: async_send_vector_uploaded_staff_notify.delay(instance.id))
 
 @receiver(post_save, sender=Vector)
 def vector_approved_signal(sender, instance, created, update_fields, **kwargs):
     # 需要区分一下，只要status 从其他状态变成了 ReadyToUse 就发送邮件
     if not created and instance.status == "ReadyToUse":
-        async_send_vector_approved_user_email.delay(instance.id)
-        async_send_vector_approved_staff_notify.delay(instance.id)
+        transaction.on_commit(lambda: async_send_vector_approved_user_email.delay(instance.id))
+        transaction.on_commit(lambda: async_send_vector_approved_staff_notify.delay(instance.id))
