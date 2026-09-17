@@ -1,5 +1,6 @@
 import copy
 import io
+import json
 import os
 import random
 import re
@@ -830,3 +831,61 @@ class VectorColonyPrimerTests(TestCase):
             bad_path, None, None)
         self.assertIsNone(pairs)
         self.assertTrue(any('GenBank' in e for e in errors), errors)
+
+
+class VectorAmbiguousBaseTests(TestCase):
+    """图谱里夹着 IUPAC 简并碱基（线上 pCVa488 的 ADH1 terminator 里有个 R）。
+
+    之前 reverse_complement 只认 ACGT，菌落PCR反向引物扫到 R 就 KeyError，
+    整个设计任务以"系统错误: 'R'"失败。
+    """
+
+    FWD_AMBIGUOUS = 910    # 落在原先第 1 对正向引物 [905, 930) 里
+    REV_AMBIGUOUS = 1590   # 落在原先第 1 对反向引物模板 [1580, 1600) 里
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        seq = list(_rand_seq(3000, 1))
+        seq[cls.FWD_AMBIGUOUS] = 'R'
+        seq[cls.REV_AMBIGUOUS] = 'Y'
+        record = SeqRecord(
+            Seq(''.join(seq)), id='pCVa778', name='pCVa778',
+            description='synthetic test vector', annotations={'molecule_type': 'DNA'},
+        )
+        record.features = [
+            SeqFeature(SimpleLocation(1000, 1020), type='misc_feature', qualifiers={'label': ['iU20']}),
+            SeqFeature(SimpleLocation(1500, 1520), type='misc_feature', qualifiers={'label': ['iD20']}),
+        ]
+        buf = io.StringIO()
+        SeqIO.write(record, buf, 'genbank')
+        cls.gb_bytes = buf.getvalue().encode()
+
+    def test_reverse_complement_handles_iupac_codes(self):
+        self.assertEqual(VectorAutomationDesigner.reverse_complement('acgtRYN'), 'NRYACGT')
+        self.assertFalse(VectorAutomationDesigner.is_plain_dna('ACGRT'))
+
+    def test_design_task_steers_primers_around_ambiguous_bases(self):
+        from user_center.tasks import async_vector_automation_design
+
+        vector = Vector.objects.create(vector_name='pCVa778 test')
+        vector.vector_file.save('pCVa778(Kan)-test.gb', ContentFile(self.gb_bytes), save=True)
+        result = async_vector_automation_design(vector.id, modify=False)
+        self.assertEqual(result['status'], 'success', result)
+
+        vector.refresh_from_db()
+        self.assertEqual(vector.design_status, 'Completed')
+        self.assertIn('第911位R', vector.design_error)
+        self.assertIn('第1591位Y', vector.design_error)
+
+        pairs = json.loads(vector.colony_pcr_primers)
+        self.assertEqual(len(pairs), 5)
+        for pair in pairs:
+            forward, reverse = pair['forward'], pair['reverse']
+            self.assertRegex(forward['sequence'], r'^[ACGT]+$')
+            self.assertRegex(reverse['sequence'], r'^[ACGT]+$')
+            self.assertFalse(forward['start'] <= self.FWD_AMBIGUOUS < forward['end'])
+            self.assertFalse(reverse['template_start'] <= self.REV_AMBIGUOUS < reverse['template_end'])
+        for field in ('primer_forward', 'primer_reverse',
+                      'backbone_primer_forward', 'backbone_primer_reverse'):
+            self.assertRegex(getattr(vector, field).split('::', 1)[1], r'^[ACGT]+$')

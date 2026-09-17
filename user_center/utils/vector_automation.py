@@ -63,6 +63,11 @@ ALL_IIS_SITES = {
     'BtgZI': ['GCGATG', 'CATCGC'],
 }
 
+# 反向互补表，含 IUPAC 简并碱基：客户图谱里偶尔夹着 R/Y/N 这类碱基（SnapGene 照常导出，
+# 图谱上看不出来），只认 ACGT 的话一扫到就 KeyError，整个设计任务挂掉
+_IUPAC_COMPLEMENT = str.maketrans('ACGTRYSWKMBDHVN', 'TGCAYRSWMKVHDBN')
+_PLAIN_DNA = re.compile(r'[ACGT]+')
+
 
 def select_cm_ccdb_fragment(vector_sequence):
     """
@@ -175,6 +180,7 @@ class VectorAutomationDesigner:
                 'record_description': self.record.description,
                 'original_features': self.record.features,
                 'original_annotations': self.record.annotations,
+                'ambiguous_bases': self.find_ambiguous_bases(str(self.record.seq)),
             }
 
         except Exception as e:
@@ -305,9 +311,18 @@ class VectorAutomationDesigner:
 
     @staticmethod
     def reverse_complement(sequence):
-        """返回反向互补序列"""
-        complement = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
-        return ''.join(complement[base] for base in reversed(sequence.upper()))
+        """返回反向互补序列（支持 IUPAC 简并碱基）"""
+        return sequence.upper().translate(_IUPAC_COMPLEMENT)[::-1]
+
+    @staticmethod
+    def is_plain_dna(sequence):
+        """只含 ACGT。引物跨过简并碱基就不是一条确定的序列，不能拿去合成。"""
+        return bool(_PLAIN_DNA.fullmatch(sequence.upper()))
+
+    @staticmethod
+    def find_ambiguous_bases(sequence):
+        """列出序列里的非 ACGT 碱基：[(1-based 位置, 碱基), ...]"""
+        return [(m.start() + 1, m.group()) for m in re.finditer(r'[^ACGT]', sequence.upper())]
 
     @staticmethod
     def is_palindrome(sequence):
@@ -822,6 +837,8 @@ class VectorAutomationDesigner:
                 if v5_start + length > len(sequence):
                     break
                 primer_seq = sequence[v5_start:v5_start + length]
+                if not self.is_plain_dna(primer_seq):
+                    continue
                 tm = self.calculate_tm_t97(primer_seq)
                 hairpin_tm = self.calculate_hairpin_tm(primer_seq)
                 if hairpin_tm is not None and hairpin_tm >= hairpin_tm_limit:
@@ -861,6 +878,8 @@ class VectorAutomationDesigner:
                     continue
                 template = sequence[template_start:v3_end]
                 primer_seq = self.reverse_complement(template)
+                if not self.is_plain_dna(primer_seq):
+                    continue
                 tm = self.calculate_tm_t97(primer_seq)
                 hairpin_tm = self.calculate_hairpin_tm(primer_seq)
                 if hairpin_tm is not None and hairpin_tm >= hairpin_tm_limit:
@@ -964,7 +983,7 @@ class VectorAutomationDesigner:
             fallback = None
             for length in range(min_primer_len, max_len + 1):
                 primer_seq = build_primer(length)
-                if not primer_seq or len(primer_seq) != length:
+                if not primer_seq or len(primer_seq) != length or not self.is_plain_dna(primer_seq):
                     continue
                 hairpin_tm = self.calculate_hairpin_tm(primer_seq)
                 if hairpin_tm is not None and hairpin_tm >= hairpin_tm_limit:
@@ -1022,7 +1041,7 @@ class VectorAutomationDesigner:
     def _check_colony_primer_quality(self, primer_seq, target_tm=60, tm_tolerance=2,
                                       hairpin_tm_limit=40, dimer_dg_limit=11):
         """菌落PCR引物质量检查：Tm/GC/同源聚体/GC富集/发卡/自二聚体。"""
-        if len(primer_seq) < 16:
+        if len(primer_seq) < 16 or not self.is_plain_dna(primer_seq):
             return None
         gc = self.calculate_gc_content(primer_seq)
         if gc < 40 or gc > 60:

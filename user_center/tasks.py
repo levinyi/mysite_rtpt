@@ -99,6 +99,12 @@ def async_vector_automation_design(vector_id, forced_method=None, modify=True):
             else:
                 vector.design_error = message
 
+        ambiguous = parsed_data.get('ambiguous_bases') or []
+        if ambiguous:
+            shown = '、'.join(f'第{pos}位{base}' for pos, base in ambiguous[:5])
+            more = f' 等共 {len(ambiguous)} 处' if len(ambiguous) > 5 else ''
+            append_error_message(f'图谱含非 ACGT 碱基（{shown}{more}），引物已避开，请与客户核实序列。')
+
         # 3. 设计NC-PCR引物（仅Gibson方法）
         primer_result = None
         if design_result['method'] == 'Gibson':

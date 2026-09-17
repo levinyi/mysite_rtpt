@@ -710,6 +710,9 @@
                 <div class="d-flex align-items-center mb-2">
                     ${headerHtml}
                 </div>
+                ${isCompleted && data.design_error
+                    ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:12px;"><i class="bi bi-exclamation-triangle me-1"></i>${esc(data.design_error)}</div>`
+                    : ''}
 
                 <table class="table table-sm table-bordered mb-2 align-middle" style="font-size:12px;">
                     <thead class="table-light">
