@@ -1,3 +1,6 @@
+import re
+
+from django import forms
 from django.contrib import admin
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
@@ -14,7 +17,37 @@ class VectorResource(resources.ModelResource):
                   'primer_reverse_tm', 'backbone_primer_forward', 'backbone_primer_reverse',
                   'create_date', 'status')
 
+IUPAC_BASES_RE = re.compile(r'^[ACGTURYSWKMBDHVN]+$', re.IGNORECASE)
+
+
+class VectorAdminForm(forms.ModelForm):
+    """iU20/iD20 必须恰好 20 bp：少填/多填一个碱基会让插入位点定位悄悄出错，很难排查。"""
+
+    class Meta:
+        model = Vector
+        fields = '__all__'
+
+    def _clean_site_20bp(self, field, label):
+        value = self.cleaned_data.get(field)
+        if not value:
+            return value
+        seq = re.sub(r'\s+', '', value)
+        if not IUPAC_BASES_RE.match(seq):
+            bad = sorted(set(c for c in seq if not IUPAC_BASES_RE.match(c)))
+            raise forms.ValidationError(f"{label} 含非碱基字符：{' '.join(bad)}")
+        if len(seq) != 20:
+            raise forms.ValidationError(f"{label} 必须是 20 bp，当前为 {len(seq)} bp")
+        return seq
+
+    def clean_iu20(self):
+        return self._clean_site_20bp('iu20', 'iU20')
+
+    def clean_id20(self):
+        return self._clean_site_20bp('id20', 'iD20')
+
+
 class VectorAdmin(ImportExportModelAdmin):
+    form = VectorAdminForm
     list_display = ('id', 'vector_name', 'user', 'vector_id', 'cloning_method', 'modify_vector',
                     'antibiotic_resistance',
                     'design_status', 'status', 'create_date', 'vector_file', 'vector_png')
