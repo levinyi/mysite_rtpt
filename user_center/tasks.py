@@ -87,6 +87,13 @@ def async_vector_automation_design(vector_id, forced_method=None, modify=True):
         original_filename = os.path.basename(genbank_file_path)
         resistance = designer.extract_resistance_from_filename(original_filename)
         vector_code = designer.extract_vector_code_from_filename(original_filename)
+        if not vector_code:
+            # 编号会写进 VectorID、图谱文件名和所有引物名，下单也按 VectorID 找载体，猜错比报错危害大
+            vector.design_status = 'Failed'
+            vector.design_error = (f'文件名 {original_filename} 开头没有载体编号（如 pCVa123 / pGZ1234），'
+                                   '请按「编号(抗性)-描述」重命名后重新上传。')
+            vector.save()
+            return {'status': 'error', 'errors': [vector.design_error]}
         filename_suffix = designer.extract_filename_suffix(original_filename)
         if resistance:
             vector.vector_id = f"{vector_code}({resistance})"

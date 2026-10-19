@@ -657,6 +657,65 @@ class VectorDesignTaskTests(TestCase):
         self.assertIs(vector.modify_vector, True)
         self.assertIn('M1', os.path.basename(vector.vector_gb.name))
 
+    def test_task_keeps_pgz_vector_code(self):
+        # 线上 pGZ2053(Amp)-pColdII 跑完变成了 pCVa001(Amp)：编号只认 pCVa，其余一律回退 pCVa001
+        from user_center.tasks import async_vector_automation_design
+
+        vector = Vector.objects.create(vector_name='pGZ2053(Amp)-pColdII')
+        vector.vector_file.save('pGZ2053(Amp)-pColdII.gb', ContentFile(self.gb_bytes), save=True)
+        result = async_vector_automation_design(vector.id, modify=False)
+        self.assertEqual(result['status'], 'success', result)
+
+        vector.refresh_from_db()
+        self.assertEqual(vector.vector_id, 'pGZ2053(Amp)')
+        gb_name = os.path.basename(vector.vector_gb.name)
+        self.assertTrue(gb_name.startswith('pGZ2053(Amp)-pColdII'), gb_name)
+        self.assertNotIn('pCVa001', SeqIO.read(vector.vector_gb.path, 'genbank').name)
+        for field in (vector.primer_forward, vector.primer_reverse,
+                      vector.backbone_primer_forward, vector.backbone_primer_reverse):
+            self.assertIn('-pGZ2053-', field.split('::')[0])
+        for pair in json.loads(vector.colony_pcr_primers):
+            self.assertIn('-pGZ2053-', pair['forward']['name'])
+
+    def test_task_fails_when_filename_has_no_vector_code(self):
+        from user_center.tasks import async_vector_automation_design
+
+        vector = Vector.objects.create(vector_name='pColdII')
+        vector.vector_file.save('(Amp)-pColdII.gb', ContentFile(self.gb_bytes), save=True)
+        result = async_vector_automation_design(vector.id, modify=False)
+        self.assertEqual(result['status'], 'error')
+
+        vector.refresh_from_db()
+        self.assertEqual(vector.design_status, 'Failed')
+        self.assertIn('载体编号', vector.design_error)
+        self.assertIsNone(vector.vector_id)
+        self.assertFalse(vector.vector_gb)
+
+
+class VectorFilenameParsingTests(TestCase):
+    """文件名「编号(抗性)-描述」的解析：编号不只 pCVa，公司自有质粒是 pGZ。"""
+
+    def setUp(self):
+        self.designer = VectorAutomationDesigner.__new__(VectorAutomationDesigner)
+
+    def test_vector_code(self):
+        cases = {
+            'pCVa406(Amp)-xxx.gb': 'pCVa406',
+            'pGZ2053(Amp)-pColdII.gb': 'pGZ2053',
+            'pCVa999Kan-xxx.gb': 'pCVa999',
+            # 描述里出现别的质粒名，取的必须是开头那个
+            'pCVa347(Kan)-pGZ1477-pET28a.gb': 'pCVa347',
+            'pCVa452(Amp)-pGZ1680(Amp).gb': 'pCVa452',
+            '(Amp)-pColdII.gb': None,
+        }
+        for filename, expected in cases.items():
+            self.assertEqual(self.designer.extract_vector_code_from_filename(filename), expected, filename)
+
+    def test_resistance_without_parentheses(self):
+        self.assertEqual(self.designer.extract_resistance_from_filename('pCVa999Kan-xxx.gb'), 'Kan')
+        self.assertEqual(self.designer.extract_resistance_from_filename('pGZ1936Amp-xxx.gb'), 'Amp')
+        self.assertEqual(self.designer.extract_resistance_from_filename('pGZ2053(Amp)-pColdII.gb'), 'Amp')
+
 
 class VectorColonyPrimerTests(TestCase):
     """菌落PCR引物：图谱上只标 best 那一对；没有原始图谱的老载体按骨架补设计。"""

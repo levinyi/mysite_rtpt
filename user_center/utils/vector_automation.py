@@ -1950,8 +1950,8 @@ class VectorAutomationDesigner:
         if match:
             return match.group(1)
 
-        # 回退：从 pCVa + 数字 后面提取已知抗性标记
-        match = re.search(r'pCVa\d+([A-Za-z]+)', filename)
+        # 回退：从开头的载体编号后面提取已知抗性标记
+        match = re.match(self.VECTOR_CODE_PATTERN + r'([A-Za-z]+)', os.path.basename(filename))
         if match:
             suffix = match.group(1)
             for resistance in self.KNOWN_RESISTANCES:
@@ -1960,24 +1960,28 @@ class VectorAutomationDesigner:
 
         return None
 
+    # 载体编号 = 文件名开头的「字母前缀 + 数字」：客户质粒 pCVa123、公司自有质粒 pGZ1234 等
+    VECTOR_CODE_PATTERN = r'[A-Za-z]+\d+'
+
     def extract_vector_code_from_filename(self, filename):
         """
-        从文件名中提取载体编号（仅数字部分）
+        从文件名开头提取载体编号（字母前缀 + 数字部分）
         支持两种格式:
-        - 有括号: pCVa123(Amp)-xxx.gb -> pCVa123
+        - 有括号: pCVa123(Amp)-xxx.gb -> pCVa123，pGZ2053(Amp)-xxx.gb -> pGZ2053
         - 无括号: pCVa123Amp-xxx.gb -> pCVa123
 
         Args:
             filename: 文件名
 
         Returns:
-            str: 载体编号
+            str: 载体编号；文件名开头没有编号时返回 None。
+            不能编一个默认值顶上——以前固定回退 pCVa001，pGZ 质粒全被改名成了 pCVa001。
         """
-        # 只匹配 pCVa + 数字部分，不把抗性吞进去
-        match = re.search(r'(pCVa\d+)', filename)
+        # 只匹配开头的编号，不把抗性吞进去，也不误抓描述里别的质粒名（pCVa347(Kan)-pGZ1477-...）
+        match = re.match(f'({self.VECTOR_CODE_PATTERN})', os.path.basename(filename))
         if match:
             return match.group(1)
-        return 'pCVa001'  # 默认值
+        return None
 
     def extract_filename_suffix(self, filename):
         """
